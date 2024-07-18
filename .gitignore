@@ -1,0 +1,7 @@
+
+# cmake stuff
+build/
+
+*/*.o
+tools/lcvm
+
