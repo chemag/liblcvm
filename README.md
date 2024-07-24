@@ -22,7 +22,7 @@ Tested in Fedora:
 $ git clone --recursive http://github.com/chemag/liblcvm
 $ cd liblcvm
 ```
-    
+
 2. fix the ISOBMFF Makefile (needed for Fedora)
 ```
 $ git diff
@@ -83,3 +83,16 @@ $ csvlook -I /tmp/full.csv
 | /tmp/test/c.mp4 | 570              | 29.910269      | 0            | -0.011072          | 0.124218         | 2.035057                             |
 ```
 
+
+# 3. Build Using CMake
+
+1. Clone the repository
+    ```
+    $ git clone --recursive http://github.com/chemag/liblcvm
+    $ cd liblcvm
+
+2. Run build command
+    ```
+    $ mkdir build
+    $ cd build; cmake ..
+    $ ./lcvm test.mp4 -o full.csv
