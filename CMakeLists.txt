@@ -14,11 +14,20 @@ message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR} ")
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff/ISOBMFF/include)
 
+
+# apply isobmff fix patch
+execute_process(
+  COMMAND git apply ${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff.patch
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff
+)
+
 # build isobmff library
 execute_process(
   COMMAND make
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff
 )
+
+
 
 # Build liblcvm library
 add_library(liblcvm src/liblcvm.cc)
