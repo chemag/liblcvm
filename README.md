@@ -15,7 +15,37 @@ it in devices with battery and thermal constrains.
 
 # 2. Operation
 
-Tested in Fedora:
+1. Clone the repository.
+
+```
+$ git clone --recursive http://github.com/chemag/liblcvm
+$ cd liblcvm
+```
+
+2. Build library and binary.
+```
+$ mkdir build
+$ cd build
+$ cmake ..
+$ make
+```
+
+3. test the binary tool
+```
+./lcvm /tmp/test/*mp4 -o full.csv
+
+$ csvlook -I full.csv
+| infile          | num_video_frames | frame_rate_fps | video_freeze | video_freeze_ratio | frame_drop_ratio | normalized_frame_drop_average_length |
+| --------------- | ---------------- | -------------- | ------------ | ------------------ | ---------------- | ------------------------------------ |
+| /tmp/test/a.mp4 | 1807             | 30.010002      | 0            | -0.003015          | 0.001108         | 3.003668                             |
+| /tmp/test/b.mp4 | 331              | 30.010002      | 0            | -0.008523          | 0.006015         | 3.003335                             |
+| /tmp/test/c.mp4 | 570              | 29.910269      | 0            | -0.011072          | 0.124218         | 2.035057                             |
+```
+
+
+
+
+# Appendix 1: Build Manually
 
 1. Clone the repository
 ```
@@ -84,15 +114,3 @@ $ csvlook -I /tmp/full.csv
 ```
 
 
-# 3. Build Using CMake
-
-1. Clone the repository
-    ```
-    $ git clone --recursive http://github.com/chemag/liblcvm
-    $ cd liblcvm
-
-2. Run build command
-    ```
-    $ mkdir build
-    $ cd build; cmake ..
-    $ ./lcvm test.mp4 -o full.csv
