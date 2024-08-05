@@ -34,6 +34,9 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
 // @param[in] infile: Name of the file to be parsed.
 // @param[out] video_freeze: Whether there is a video freeze.
 // @param[out] audio_video_ratio: Audio/video length ratio.
+// @param[out] duration_video_sec: Video length (seconds).
+// @param[out] duration_audio_sec: Audio length (seconds).
 // @param[in] debug: Debug level.
 int get_video_freeze_info(const char *infile, bool *video_freeze,
-                          float *audio_video_ratio, int debug);
+                          float *audio_video_ratio, float *duration_video_sec,
+                          float *duration_audio_sec, int debug);

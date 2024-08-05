@@ -47,18 +47,21 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
   }
 
   // 1. write CSV header
-  fprintf(
-      outfp,
-      "infile,num_video_frames,frame_rate_fps,video_freeze,video_freeze_ratio,"
-      "frame_drop_ratio,normalized_frame_drop_average_length\n");
+  fprintf(outfp,
+          "infile,num_video_frames,frame_rate_fps,video_freeze,video_freeze_"
+          "ratio,duration_video_sec,duration_audio_sec,"
+          "frame_drop_ratio,normalized_frame_drop_average_length\n");
 
   // 2. write CSV rows
   for (const auto &infile : infile_list) {
     // 2.1. get video freeze info
     bool video_freeze;
     float audio_video_ratio;
-    int ret = get_video_freeze_info(infile.c_str(), &video_freeze,
-                                    &audio_video_ratio, debug);
+    float duration_video_sec;
+    float duration_audio_sec;
+    int ret =
+        get_video_freeze_info(infile.c_str(), &video_freeze, &audio_video_ratio,
+                              &duration_video_sec, &duration_audio_sec, debug);
     if (ret < 0) {
       fprintf(stderr, "error: get_video_freeze_info() in %s\n", infile.c_str());
       return -1;
@@ -83,6 +86,8 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     fprintf(outfp, ",%f", frame_rate_fps);
     fprintf(outfp, ",%i", video_freeze ? 1 : 0);
     fprintf(outfp, ",%f", audio_video_ratio);
+    fprintf(outfp, ",%f", duration_video_sec);
+    fprintf(outfp, ",%f", duration_audio_sec);
     fprintf(outfp, ",%f", frame_drop_ratio);
     fprintf(outfp, ",%f", normalized_frame_drop_average_length);
     fprintf(outfp, "\n");

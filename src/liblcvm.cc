@@ -226,36 +226,35 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
 }
 
 int get_video_freeze_info(const char *infile, bool *video_freeze,
-                          float *audio_video_ratio, int debug) {
+                          float *audio_video_ratio, float *duration_video_sec,
+                          float *duration_audio_sec, int debug) {
   // 0. get timing information
   int num_video_frames;
-  float duration_video_sec;
-  float duration_audio_sec;
   std::vector<float> delta_timestamp_sec_list;
-  if (get_timing_information(infile, &num_video_frames, &duration_video_sec,
-                             &duration_audio_sec, delta_timestamp_sec_list,
+  if (get_timing_information(infile, &num_video_frames, duration_video_sec,
+                             duration_audio_sec, delta_timestamp_sec_list,
                              debug) < 0) {
     return -1;
   }
 
   // 1. check both audio and video tracks, and video track at least 2 seconds
-  if (duration_video_sec == -1.0) {
+  if (*duration_video_sec == -1.0) {
     fprintf(stderr, "error: no video track in %s\n", infile);
     return -1;
   }
-  if (duration_audio_sec == -1.0) {
+  if (*duration_audio_sec == -1.0) {
     fprintf(stderr, "error: no audio track in %s\n", infile);
     return -1;
   }
-  if (duration_video_sec < 2.0) {
+  if (*duration_video_sec < 2.0) {
     fprintf(stderr, "error: video track too short %s (%f seconds)\n", infile,
-            duration_video_sec);
+            *duration_video_sec);
     return -1;
   }
 
   // 2. calculate audio to video ratio
   *audio_video_ratio =
-      (duration_video_sec - duration_audio_sec) / duration_audio_sec;
+      (*duration_video_sec - *duration_audio_sec) / *duration_audio_sec;
   *video_freeze = *audio_video_ratio > 0.05;
   return 0;
 }
