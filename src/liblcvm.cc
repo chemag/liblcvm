@@ -256,7 +256,7 @@ int get_video_freeze_info(const char *infile, bool *video_freeze,
 
   // 2. calculate audio to video ratio
   *audio_video_ratio =
-      (*duration_video_sec - *duration_audio_sec) / *duration_audio_sec;
+      (*duration_audio_sec - *duration_video_sec) / *duration_audio_sec;
   *video_freeze = *audio_video_ratio > MAX_AUDIO_VIDEO_RATIO;
   return 0;
 }
