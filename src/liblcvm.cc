@@ -14,6 +14,8 @@
 #include <string>              // for basic_string, string
 #include <vector>              // for vector
 
+#define MAX_AUDIO_VIDEO_RATIO 0.05
+
 int get_timing_information(const char *infile, int *num_video_frames,
                            float *duration_video_sec, float *duration_audio_sec,
                            std::vector<float> &delta_timestamp_sec_list,
@@ -255,6 +257,6 @@ int get_video_freeze_info(const char *infile, bool *video_freeze,
   // 2. calculate audio to video ratio
   *audio_video_ratio =
       (*duration_video_sec - *duration_audio_sec) / *duration_audio_sec;
-  *video_freeze = *audio_video_ratio > 0.05;
+  *video_freeze = *audio_video_ratio > MAX_AUDIO_VIDEO_RATIO;
   return 0;
 }
