@@ -49,7 +49,7 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
   // 1. write CSV header
   fprintf(outfp,
           "infile,num_video_frames,frame_rate_fps,video_freeze,video_freeze_"
-          "ratio,duration_video_sec,duration_audio_sec,"
+          "ratio,duration_video_sec,duration_audio_sec,frame_drop_count,"
           "frame_drop_ratio,normalized_frame_drop_average_length\n");
 
   // 2. write CSV rows
@@ -69,11 +69,12 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     // 2.2. get frame drop info
     int num_video_frames;
     float frame_rate_fps;
+    int frame_drop_count;
     float frame_drop_ratio;
     float normalized_frame_drop_average_length;
-    ret = get_frame_drop_info(infile.c_str(), &num_video_frames,
-                              &frame_rate_fps, &frame_drop_ratio,
-                              &normalized_frame_drop_average_length, debug);
+    ret = get_frame_drop_info(
+        infile.c_str(), &num_video_frames, &frame_rate_fps, &frame_drop_count,
+        &frame_drop_ratio, &normalized_frame_drop_average_length, debug);
     if (ret < 0) {
       fprintf(stderr, "error: get_frame_drop_info() in %s\n", infile.c_str());
       return -1;
@@ -87,6 +88,7 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     fprintf(outfp, ",%f", audio_video_ratio);
     fprintf(outfp, ",%f", duration_video_sec);
     fprintf(outfp, ",%f", duration_audio_sec);
+    fprintf(outfp, ",%i", frame_drop_count);
     fprintf(outfp, ",%f", frame_drop_ratio);
     fprintf(outfp, ",%f", normalized_frame_drop_average_length);
     fprintf(outfp, "\n");
