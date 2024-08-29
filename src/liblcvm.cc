@@ -155,8 +155,10 @@ int get_timing_information(const char *infile, int *num_video_frames,
 }
 
 int get_frame_drop_info(const char *infile, int *num_video_frames,
-                        float *frame_rate_fps, float *frame_drop_ratio,
+                        float *frame_rate_fps, int *frame_drop_count,
+                        float *frame_drop_ratio,
                         float *normalized_frame_drop_average_length,
+                        float percentile, float *frame_drop_length_percentile,
                         int debug) {
   // 0. get the list of inter-frame timestamp distances.
   float duration_video_sec;
@@ -191,7 +193,7 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
     if (delta_timestamp_sec > delta_timestamp_sec_threshold) {
       drop_length_sec_list.push_back(delta_timestamp_sec);
     }
-  }
+  } 
   // drop_length_sec_list: {0.6668900000000022, 0.10025600000000168, ...}
 
   // 4. sum all the drops, but adding only the length over 1x frame time
@@ -212,17 +214,22 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
 
   // 6. calculate frame drop ratio as extra drop length over total duration
   *frame_drop_ratio = drop_length_duration_sec / total_duration_sec;
-
+  *frame_drop_count = drop_length_sec_list_sum / delta_timestamp_sec_median;
   // 7. calculate average drop length, normalized to framerate. Note that
   // a single frame drop is a normalized frame drop length of 2. When
   // frame drops are uncorrelated, the normalized average drop length
   // should be close to 2
   *normalized_frame_drop_average_length = 0.0;
+  *frame_drop_length_percentile = 0.0;
   if (drop_length_sec_list.size() > 0) {
     float frame_drop_average_length =
         drop_length_sec_list_sum / drop_length_sec_list.size();
     *normalized_frame_drop_average_length =
         (frame_drop_average_length / delta_timestamp_sec_median);
+  
+    sort(drop_length_sec_list.begin(), drop_length_sec_list.end());
+    int position = (percentile / 100.0) * drop_length_sec_list.size();
+    *frame_drop_length_percentile = drop_length_sec_list[position] / delta_timestamp_sec_median;
   }
   return 0;
 }
