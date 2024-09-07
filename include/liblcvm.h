@@ -25,11 +25,17 @@
 // @param[out] frame_drop_ratio: Frame drop ratio (unitless).
 // @param[out] normalized_frame_drop_average_length: Normalized frame drop
 // length.
+// @param[in] percentile_list: Percentile list.
+// @param[out] frame_drop_length_percentile_list: Frame drop length percentile
+// list.
 // @param[in] debug: Debug level.
 int get_frame_drop_info(const char *infile, int *num_video_frames,
                         float *frame_rate_fps, int *frame_drop_count,
                         float *frame_drop_ratio,
-                        float *normalized_frame_drop_average_length, int debug);
+                        float *normalized_frame_drop_average_length,
+                        const std::vector<float> percentile_list,
+                        std::vector<float> &frame_drop_length_percentile_list,
+                        int debug);
 
 // @brief Calculates the video freeze info.
 //
