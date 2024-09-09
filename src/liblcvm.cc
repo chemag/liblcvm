@@ -140,7 +140,7 @@ int get_timing_information(const char *infile, int *num_video_frames,
       *num_video_frames += sample_count;
       uint32_t sample_offset = stts->GetSampleOffset(i);
       float sample_offset_sec = (float)sample_offset / timescale;
-      for (int sample = 0; sample < sample_count; sample++) {
+      for (uint32_t sample = 0; sample < sample_count; sample++) {
         delta_timestamp_sec_list.push_back(sample_offset_sec);
       }
       if (debug > 2) {
@@ -240,7 +240,7 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
       frame_drop_length_percentile_list.push_back(frame_drop_length_percentile);
     }
   } else {
-    for (const float &percentile : percentile_list) {
+    for (const float &_ : percentile_list) {
       frame_drop_length_percentile_list.push_back(0.0);
     }
   }

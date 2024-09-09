@@ -28,6 +28,7 @@ typedef struct arg_options {
 arg_options DEFAULT_OPTIONS{
     .debug = 0,
     .outfile = nullptr,
+    .infile_list = {},
 };
 
 int parse_files(std::vector<std::string> &infile_list, char *outfile,
@@ -121,7 +122,6 @@ enum {
 
 arg_options *parse_args(int argc, char **argv) {
   int c;
-  char *endptr;
   static arg_options options;
 
   // set default option values
@@ -170,6 +170,7 @@ arg_options *parse_args(int argc, char **argv) {
       case HELP_OPTION:
       case 'h':
         usage(argv[0]);
+        break;
 
       default:
         printf("Unsupported option: %c\n", c);
