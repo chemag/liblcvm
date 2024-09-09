@@ -154,6 +154,20 @@ int get_timing_information(const char *infile, int *num_video_frames,
   return 0;
 }
 
+int get_frame_interframe_info(const char *infile, int *num_video_frames,
+                              std::vector<float> &delta_timestamp_sec_list,
+                              int debug) {
+  // get the list of inter-frame timestamp distances.
+  float duration_video_sec;
+  float duration_audio_sec;
+  if (get_timing_information(infile, num_video_frames, &duration_video_sec,
+                             &duration_audio_sec, delta_timestamp_sec_list,
+                             debug) < 0) {
+    return -1;
+  }
+  return 0;
+}
+
 int get_frame_drop_info(const char *infile, int *num_video_frames,
                         float *frame_rate_fps, int *frame_drop_count,
                         float *frame_drop_ratio,

@@ -21,6 +21,7 @@ extern int optind;
 typedef struct arg_options {
   int debug;
   char *outfile;
+  char *outfile_timestamps;
   std::vector<std::string> infile_list;
 } arg_options;
 
@@ -28,11 +29,12 @@ typedef struct arg_options {
 arg_options DEFAULT_OPTIONS{
     .debug = 0,
     .outfile = nullptr,
+    .outfile_timestamps = nullptr,
     .infile_list = {},
 };
 
 int parse_files(std::vector<std::string> &infile_list, char *outfile,
-                int debug) {
+                char *outfile_timestamps, int debug) {
   // 0. open outfile
   FILE *outfp;
   if (outfile == nullptr || (strlen(outfile) == 1 && outfile[0] == '-')) {
@@ -55,6 +57,7 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
           "frame_drop_length_percentile_50,frame_drop_length_percentile_90\n");
 
   // 2. write CSV rows
+  std::vector<std::vector<float>> delta_timestamp_sec_list_list;
   for (const auto &infile : infile_list) {
     // 2.1. get video freeze info
     bool video_freeze;
@@ -99,7 +102,58 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     fprintf(outfp, ",%f", frame_drop_length_percentile_list[0]);
     fprintf(outfp, ",%f", frame_drop_length_percentile_list[1]);
     fprintf(outfp, "\n");
+
+    // 2.4. capture outfile timestamps
+    if (outfile_timestamps != nullptr) {
+      std::vector<float> delta_timestamp_sec_list;
+      ret = get_frame_interframe_info(infile.c_str(), &num_video_frames,
+                                      delta_timestamp_sec_list, debug);
+      if (ret < 0) {
+        fprintf(stderr, "error: get_frame_interframe_info() in %s\n",
+                infile.c_str());
+      }
+      delta_timestamp_sec_list_list.push_back(delta_timestamp_sec_list);
+    }
   }
+
+  // 3. dump outfile timestamps
+  if (outfile_timestamps != nullptr) {
+    // 3.1. get the maximum number of frames
+    size_t max_number_of_frames = 0;
+    for (const auto &delta_timestamp_sec_list : delta_timestamp_sec_list_list) {
+      max_number_of_frames =
+          std::max(max_number_of_frames, delta_timestamp_sec_list.size());
+    }
+    // 3.2. open outfile_timestamps
+    FILE *outtsfp = fopen(outfile_timestamps, "wb");
+    if (outtsfp == nullptr) {
+      // did not work
+      fprintf(stderr, "Could not open output file: \"%s\"\n",
+              outfile_timestamps);
+      return -1;
+    }
+    // 3.3. dump the file names
+    fprintf(outtsfp, "frame_num");
+    for (const auto &infile : infile_list) {
+      fprintf(outtsfp, ",%s", infile.c_str());
+    }
+    fprintf(outtsfp, "\n");
+    // 3.4. dump the columns of inter-frame timestamps
+    for (size_t i = 0; i < max_number_of_frames; ++i) {
+      fprintf(outtsfp, "%li", i);
+      for (const auto &delta_timestamp_sec_list :
+           delta_timestamp_sec_list_list) {
+        if (i < delta_timestamp_sec_list.size()) {
+          float delta_timestamp_sec = delta_timestamp_sec_list[i];
+          fprintf(outtsfp, ",%f", delta_timestamp_sec);
+        } else {
+          fprintf(outtsfp, ",");
+        }
+      }
+      fprintf(outtsfp, "\n");
+    }
+  }
+
   return 0;
 }
 
@@ -110,6 +164,9 @@ void usage(char *name) {
           DEFAULT_OPTIONS.debug);
   fprintf(stderr, "\t-q:\t\tZero debug verbosity\n");
   fprintf(stderr, "\t-o outfile:\t\tSelect outfile\n");
+  fprintf(stderr,
+          "\t--outfile_timestamps outfile_timestamps:\t\tSelect outfile to "
+          "dump timestamps\n");
   fprintf(stderr, "\t-h:\t\tHelp\n");
   exit(-1);
 }
@@ -118,6 +175,7 @@ void usage(char *name) {
 enum {
   QUIET_OPTION = CHAR_MAX + 1,
   HELP_OPTION,
+  OUTFILE_TIMESTAMPS_OPTION,
 };
 
 arg_options *parse_args(int argc, char **argv) {
@@ -135,6 +193,8 @@ arg_options *parse_args(int argc, char **argv) {
       // matching options to short options
       {"debug", no_argument, nullptr, 'd'},
       {"outfile", required_argument, nullptr, 'o'},
+      {"outfile-timestamps", required_argument, nullptr,
+       OUTFILE_TIMESTAMPS_OPTION},
       // options without a short option
       {"quiet", no_argument, nullptr, QUIET_OPTION},
       {"help", no_argument, nullptr, HELP_OPTION},
@@ -161,6 +221,10 @@ arg_options *parse_args(int argc, char **argv) {
 
       case 'o':
         options.outfile = optarg;
+        break;
+
+      case OUTFILE_TIMESTAMPS_OPTION:
+        options.outfile_timestamps = optarg;
         break;
 
       case QUIET_OPTION:
@@ -204,13 +268,18 @@ int main(int argc, char **argv) {
     printf("options->debug = %i\n", options->debug);
     printf("options->outfile = %s\n",
            (options->outfile == nullptr) ? "nullptr" : options->outfile);
+    printf("options->outfile_timestamps = %s\n",
+           (options->outfile_timestamps == nullptr)
+               ? "nullptr"
+               : options->outfile_timestamps);
 
     for (const auto &infile : options->infile_list) {
       printf("options->infile = %s\n", infile.c_str());
     }
   }
 
-  parse_files(options->infile_list, options->outfile, options->debug);
+  parse_files(options->infile_list, options->outfile,
+              options->outfile_timestamps, options->debug);
 
   return 0;
 }

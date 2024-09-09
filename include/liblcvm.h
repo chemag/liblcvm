@@ -48,3 +48,15 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
 int get_video_freeze_info(const char *infile, bool *video_freeze,
                           float *audio_video_ratio, float *duration_video_sec,
                           float *duration_audio_sec, int debug);
+
+// debug API
+
+// @brief Calculates full inter-frame time info.
+//
+// @param[in] infile: Name of the file to be parsed.
+// @param[out] num_video_frames: Number of video frames in the file.
+// @param[out] delta_timestamp_sec_list: Inter-frame distances (seconds).
+// @param[in] debug: Debug level.
+int get_frame_interframe_info(const char *infile, int *num_video_frames,
+                              std::vector<float> &delta_timestamp_sec_list,
+                              int debug);
