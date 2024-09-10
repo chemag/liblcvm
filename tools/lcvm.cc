@@ -56,7 +56,8 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
           "video_freeze_ratio,duration_video_sec,duration_audio_sec,"
           "frame_drop_count,frame_drop_ratio,"
           "normalized_frame_drop_average_length,"
-          "frame_drop_length_percentile_50,frame_drop_length_percentile_90\n");
+          "frame_drop_length_percentile_50,frame_drop_length_percentile_90,"
+          "frame_drop_length_consecutive_2,frame_drop_length_consecutive_5\n");
 
   // 2. write CSV rows
   std::vector<std::vector<float>> delta_timestamp_sec_list_list;
@@ -83,11 +84,14 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     std::vector<float> percentile_list = {50, 90};
     std::vector<float> frame_drop_length_percentile_list;
     float normalized_frame_drop_average_length;
+    std::vector<int> consecutive_list = {2, 5};
+    std::vector<long int> frame_drop_length_consecutive;
     ret = get_frame_drop_info(
         infile.c_str(), &num_video_frames, &frame_rate_fps_median,
         &frame_rate_fps_average, &frame_rate_fps_stddev, &frame_drop_count,
         &frame_drop_ratio, &normalized_frame_drop_average_length,
-        percentile_list, frame_drop_length_percentile_list, debug);
+        percentile_list, frame_drop_length_percentile_list, consecutive_list,
+        frame_drop_length_consecutive,debug);
     if (ret < 0) {
       fprintf(stderr, "error: get_frame_drop_info() in %s\n", infile.c_str());
       return -1;
@@ -108,6 +112,8 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     fprintf(outfp, ",%f", normalized_frame_drop_average_length);
     fprintf(outfp, ",%f", frame_drop_length_percentile_list[0]);
     fprintf(outfp, ",%f", frame_drop_length_percentile_list[1]);
+    fprintf(outfp, ",%ld", frame_drop_length_consecutive[0]);
+    fprintf(outfp, ",%ld", frame_drop_length_consecutive[1]);
     fprintf(outfp, "\n");
 
     // 2.4. capture outfile timestamps

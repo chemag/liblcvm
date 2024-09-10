@@ -30,6 +30,8 @@
 // @param[in] percentile_list: Percentile list.
 // @param[out] frame_drop_length_percentile_list: Frame drop length percentile
 // list.
+// @param[in] consecutive_list: Consecutive list.
+// @param[out] frame_drop_length_consecutive: Frame drop length consecutive.
 // @param[in] debug: Debug level.
 int get_frame_drop_info(const char *infile, int *num_video_frames,
                         float *frame_rate_fps_median,
@@ -39,6 +41,8 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
                         float *normalized_frame_drop_average_length,
                         const std::vector<float> percentile_list,
                         std::vector<float> &frame_drop_length_percentile_list,
+                        const std::vector<int> consecutive_list,
+                        std::vector<long int> &frame_drop_length_consecutive,
                         int debug);
 
 // @brief Calculates the video freeze info.
