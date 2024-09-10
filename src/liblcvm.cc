@@ -9,8 +9,10 @@
 #include <ISOBMFF.hpp>         // for various
 #include <ISOBMFF/Parser.hpp>  // for Parser
 #include <algorithm>           // for sort
+#include <cmath>               // for sqrt
 #include <cstdio>              // for fprintf, stderr, stdout
 #include <memory>              // for shared_ptr, operator==, __shared...
+#include <numeric>             // for accumulate
 #include <string>              // for basic_string, string
 #include <vector>              // for vector
 
@@ -169,7 +171,9 @@ int get_frame_interframe_info(const char *infile, int *num_video_frames,
 }
 
 int get_frame_drop_info(const char *infile, int *num_video_frames,
-                        float *frame_rate_fps, int *frame_drop_count,
+                        float *frame_rate_fps_median,
+                        float *frame_rate_fps_average,
+                        float *frame_rate_fps_stddev, int *frame_drop_count,
                         float *frame_drop_ratio,
                         float *normalized_frame_drop_average_length,
                         const std::vector<float> percentile_list,
@@ -191,11 +195,39 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
     fprintf(stdout, "\n");
   }
 
-  // 1. calculate the median inter-frame distance
+  // 1. calculate the inter-frame distance statistics
+  // 1.1. get the list of frame rates
+  std::vector<float> frame_rate_fps_list(delta_timestamp_sec_list.size());
+  std::transform(delta_timestamp_sec_list.begin(),
+                 delta_timestamp_sec_list.end(), frame_rate_fps_list.begin(),
+                 [](float val) {
+                   // Handle division by zero
+                   return val != 0.0f ? 1.0f / static_cast<float>(val) : 0.0f;
+                 });
+  // 1.2. median
+  sort(frame_rate_fps_list.begin(), frame_rate_fps_list.end());
+  *frame_rate_fps_median =
+      frame_rate_fps_list[frame_rate_fps_list.size() / 2 - 1];
   sort(delta_timestamp_sec_list.begin(), delta_timestamp_sec_list.end());
   float delta_timestamp_sec_median =
       delta_timestamp_sec_list[delta_timestamp_sec_list.size() / 2 - 1];
-  *frame_rate_fps = 1.0 / delta_timestamp_sec_median;
+  // 1.3. average
+  *frame_rate_fps_average =
+      (1.0 * std::accumulate(frame_rate_fps_list.begin(),
+                             frame_rate_fps_list.end(), 0.0)) /
+      frame_rate_fps_list.size();
+  // 1.4. stddev
+  // vmas := value minus average square
+  std::vector<float> frame_rate_fps_vmas_list(frame_rate_fps_list.size());
+  std::transform(frame_rate_fps_list.begin(), frame_rate_fps_list.end(),
+                 frame_rate_fps_vmas_list.begin(), [=](float val) {
+                   return (val - (*frame_rate_fps_average)) *
+                          (val - (*frame_rate_fps_average));
+                 });
+  double frame_rate_fps_square_sum = std::accumulate(
+      frame_rate_fps_vmas_list.begin(), frame_rate_fps_vmas_list.end(), 0.0);
+  *frame_rate_fps_stddev =
+      std::sqrt(frame_rate_fps_square_sum / frame_rate_fps_vmas_list.size());
 
   // 2. calculate the threshold to consider frame drop: This should be 2
   // times the median, minus a factor
