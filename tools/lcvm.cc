@@ -91,7 +91,7 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
         &frame_rate_fps_average, &frame_rate_fps_stddev, &frame_drop_count,
         &frame_drop_ratio, &normalized_frame_drop_average_length,
         percentile_list, frame_drop_length_percentile_list, consecutive_list,
-        frame_drop_length_consecutive,debug);
+        frame_drop_length_consecutive, debug);
     if (ret < 0) {
       fprintf(stderr, "error: get_frame_drop_info() in %s\n", infile.c_str());
       return -1;

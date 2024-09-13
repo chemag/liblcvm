@@ -296,19 +296,19 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
   // 9. calculate consecutive list
   frame_drop_length_consecutive.clear();
   for (int element : consecutive_list) {
-      frame_drop_length_consecutive.push_back(0);
+    frame_drop_length_consecutive.push_back(0);
   }
   if (drop_length_sec_list.size() > 0) {
-      for (const auto &drop_length_sec : drop_length_sec_list) {
-           float drop_length =  drop_length_sec / delta_timestamp_sec_median;
-           for (int i = 0; i < consecutive_list.size(); i++) {
-               if (drop_length >= consecutive_list[i]) {
-                   frame_drop_length_consecutive[i]++;
-               }
-           }
+    for (const auto &drop_length_sec : drop_length_sec_list) {
+      float drop_length = drop_length_sec / delta_timestamp_sec_median;
+      for (int i = 0; i < consecutive_list.size(); i++) {
+        if (drop_length >= consecutive_list[i]) {
+          frame_drop_length_consecutive[i]++;
+        }
       }
-  } 
-  
+    }
+  }
+
   return 0;
 }
 
