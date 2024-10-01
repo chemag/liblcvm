@@ -57,6 +57,15 @@ int get_video_freeze_info(const char *infile, bool *video_freeze,
                           float *audio_video_ratio, float *duration_video_sec,
                           float *duration_audio_sec, int debug);
 
+// @brief Calculates the video GoP structure info.
+//
+// @param[in] infile: Name of the file to be parsed.
+// @param[out] num_video_frames: Number of video frames in the file.
+// @param[out] num_video_keyframes: Number of video key frames in the file.
+// @param[in] debug: Debug level.
+int get_video_structure_info(const char *infile, int *num_video_frames,
+                             int *num_video_keyframes, int debug);
+
 // debug API
 
 // @brief Calculates full inter-frame time info.

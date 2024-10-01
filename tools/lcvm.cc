@@ -57,7 +57,8 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
           "frame_drop_count,frame_drop_ratio,"
           "normalized_frame_drop_average_length,"
           "frame_drop_length_percentile_50,frame_drop_length_percentile_90,"
-          "frame_drop_length_consecutive_2,frame_drop_length_consecutive_5\n");
+          "frame_drop_length_consecutive_2,frame_drop_length_consecutive_5,"
+          "num_video_keyframes,key_frame_ratio\n");
 
   // 2. write CSV rows
   std::vector<std::vector<float>> delta_timestamp_sec_list_list;
@@ -97,7 +98,20 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
       return -1;
     }
 
-    // 2.3. dump all output
+    // 2.3. get video structure info
+    int num_video_keyframes;
+    ret = get_video_structure_info(infile.c_str(), &num_video_frames,
+                                   &num_video_keyframes, debug);
+    if (ret < 0) {
+      fprintf(stderr, "error: get_video_structure_info() in %s\n",
+              infile.c_str());
+      return -1;
+    }
+    float key_frame_ratio = (num_video_keyframes > 0)
+                                ? (1.0 * num_video_frames) / num_video_keyframes
+                                : 0.0;
+
+    // 2.4. dump all output
     fprintf(outfp, "%s", infile.c_str());
     fprintf(outfp, ",%i", num_video_frames);
     fprintf(outfp, ",%f", frame_rate_fps_median);
@@ -114,6 +128,8 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     fprintf(outfp, ",%f", frame_drop_length_percentile_list[1]);
     fprintf(outfp, ",%ld", frame_drop_length_consecutive[0]);
     fprintf(outfp, ",%ld", frame_drop_length_consecutive[1]);
+    fprintf(outfp, ",%i", num_video_keyframes);
+    fprintf(outfp, ",%f", key_frame_ratio);
     fprintf(outfp, "\n");
 
     // 2.4. capture outfile timestamps

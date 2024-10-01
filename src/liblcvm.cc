@@ -21,6 +21,7 @@
 int get_timing_information(const char *infile, int *num_video_frames,
                            float *duration_video_sec, float *duration_audio_sec,
                            std::vector<float> &delta_timestamp_sec_list,
+                           std::vector<uint32_t> &keyframe_sample_number_list,
                            int debug) {
   // 1. parse the input file
   ISOBMFF::Parser parser;
@@ -151,6 +152,24 @@ int get_timing_information(const char *infile, int *num_video_frames,
         fprintf(stdout, "sample_offset_sec: %f\n", sample_offset_sec);
       }
     }
+
+    // 11. look for a stss box in the video track
+    if (handler_type.compare("vide") == 0) {
+      std::shared_ptr<ISOBMFF::STSS> stss =
+          stbl->GetTypedBox<ISOBMFF::STSS>("stss");
+      if (stss == nullptr) {
+        if (debug > 0) {
+          fprintf(stderr, "warning: no /moov/trak/mdia/minf/stbl/stss in %s\n",
+                  infile);
+        }
+      } else {
+        keyframe_sample_number_list.clear();
+        for (unsigned int i = 0; i < stss->GetEntryCount(); i++) {
+          uint32_t sample_count = stss->GetSampleNumber(i);
+          keyframe_sample_number_list.push_back(sample_count);
+        }
+      }
+    }
   }
 
   return 0;
@@ -162,9 +181,11 @@ int get_frame_interframe_info(const char *infile, int *num_video_frames,
   // get the list of inter-frame timestamp distances.
   float duration_video_sec;
   float duration_audio_sec;
+  std::vector<uint32_t> keyframe_sample_number_list;
+
   if (get_timing_information(infile, num_video_frames, &duration_video_sec,
                              &duration_audio_sec, delta_timestamp_sec_list,
-                             debug) < 0) {
+                             keyframe_sample_number_list, debug) < 0) {
     return -1;
   }
   return 0;
@@ -185,9 +206,10 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
   float duration_video_sec;
   float duration_audio_sec;
   std::vector<float> delta_timestamp_sec_list;
+  std::vector<uint32_t> keyframe_sample_number_list;
   if (get_timing_information(infile, num_video_frames, &duration_video_sec,
                              &duration_audio_sec, delta_timestamp_sec_list,
-                             debug) < 0) {
+                             keyframe_sample_number_list, debug) < 0) {
     return -1;
   }
   if (debug > 1) {
@@ -318,9 +340,10 @@ int get_video_freeze_info(const char *infile, bool *video_freeze,
   // 0. get timing information
   int num_video_frames;
   std::vector<float> delta_timestamp_sec_list;
+  std::vector<uint32_t> keyframe_sample_number_list;
   if (get_timing_information(infile, &num_video_frames, duration_video_sec,
                              duration_audio_sec, delta_timestamp_sec_list,
-                             debug) < 0) {
+                             keyframe_sample_number_list, debug) < 0) {
     return -1;
   }
 
@@ -343,5 +366,24 @@ int get_video_freeze_info(const char *infile, bool *video_freeze,
   *audio_video_ratio =
       (*duration_audio_sec - *duration_video_sec) / *duration_audio_sec;
   *video_freeze = *audio_video_ratio > MAX_AUDIO_VIDEO_RATIO;
+  return 0;
+}
+
+int get_video_structure_info(const char *infile, int *num_video_frames,
+                             int *num_video_keyframes, int debug) {
+  // 0. get timing information
+  float duration_video_sec;
+  float duration_audio_sec;
+  std::vector<float> delta_timestamp_sec_list;
+  std::vector<uint32_t> keyframe_sample_number_list;
+  if (get_timing_information(infile, num_video_frames, &duration_video_sec,
+                             &duration_audio_sec, delta_timestamp_sec_list,
+                             keyframe_sample_number_list, debug) < 0) {
+    return -1;
+  }
+
+  // 1. count the number of video keyframes from stss (0 if no stss)
+  *num_video_keyframes = keyframe_sample_number_list.size();
+
   return 0;
 }
