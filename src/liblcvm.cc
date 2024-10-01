@@ -130,8 +130,8 @@ int get_timing_information(const char *infile, int *num_video_frames,
       if (debug > 0) {
         fprintf(stderr, "error: no /moov/trak/mdia/minf/stbl/stts in %s\n",
                 infile);
-        return -1;
       }
+      return -1;
     }
 
     // 10. gather the inter-frame timestamp deltas
