@@ -194,7 +194,7 @@ void usage(char *name) {
   fprintf(stderr, "\t-q:\t\tZero debug verbosity\n");
   fprintf(stderr, "\t-o outfile:\t\tSelect outfile\n");
   fprintf(stderr,
-          "\t--outfile_timestamps outfile_timestamps:\t\tSelect outfile to "
+          "\t--outfile-timestamps outfile_timestamps:\t\tSelect outfile to "
           "dump timestamps\n");
   fprintf(stderr, "\t-h:\t\tHelp\n");
   exit(-1);
