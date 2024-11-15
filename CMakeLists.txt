@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(lcvm)
+project(lcvm VERSION 0.0)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -29,8 +29,6 @@ execute_process(
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff
 )
 
-
-
 # Build liblcvm library
 add_library(liblcvm src/liblcvm.cc)
 target_link_libraries(liblcvm
@@ -43,6 +41,16 @@ target_include_directories(liblcvm
 # Build lcvm executable
 add_executable(lcvm tools/lcvm.cc)
 target_link_libraries(lcvm liblcvm)
+
+# Configure a header file to pass some of the CMake settings
+# to the source code
+configure_file(
+  ${CMAKE_SOURCE_DIR}/include/config.h.in
+  ${CMAKE_BINARY_DIR}/config.h
+)
+
+# Include the directory where config.h is generated
+target_include_directories(liblcvm PRIVATE ${CMAKE_BINARY_DIR})
 
 # Add test target
 add_custom_target(test

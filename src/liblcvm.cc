@@ -16,7 +16,14 @@
 #include <string>              // for basic_string, string
 #include <vector>              // for vector
 
+#include "config.h"
+
 #define MAX_AUDIO_VIDEO_RATIO 0.05
+
+int get_liblcvm_version(std::string &version) {
+  version = PROJECT_VER;
+  return 0;
+}
 
 struct TimingInformation {
   int num_video_frames;

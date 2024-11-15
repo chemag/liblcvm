@@ -216,6 +216,7 @@ enum {
   QUIET_OPTION = CHAR_MAX + 1,
   HELP_OPTION,
   OUTFILE_TIMESTAMPS_OPTION,
+  VERSION_OPTION,
 };
 
 arg_options *parse_args(int argc, char **argv) {
@@ -237,6 +238,7 @@ arg_options *parse_args(int argc, char **argv) {
        OUTFILE_TIMESTAMPS_OPTION},
       // options without a short option
       {"quiet", no_argument, nullptr, QUIET_OPTION},
+      {"version", no_argument, NULL, VERSION_OPTION},
       {"help", no_argument, nullptr, HELP_OPTION},
       {nullptr, 0, nullptr, 0}};
 
@@ -275,6 +277,13 @@ arg_options *parse_args(int argc, char **argv) {
       case 'h':
         usage(argv[0]);
         break;
+
+      case VERSION_OPTION: {
+        std::string version;
+        get_liblcvm_version(version);
+        fprintf(stdout, "version: %s\n", version.c_str());
+        exit(0);
+      } break;
 
       default:
         printf("Unsupported option: %c\n", c);

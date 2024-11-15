@@ -16,6 +16,11 @@
 #include <numeric>
 #include <vector>
 
+// @brief Gets the library version.
+//
+// @param[out] version: Version string.
+int get_liblcvm_version(std::string &version);
+
 // @brief Calculates the frame drop info.
 //
 // @param[in] infile: Name of the file to be parsed.
