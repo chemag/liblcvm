@@ -18,10 +18,16 @@
 
 #define MAX_AUDIO_VIDEO_RATIO 0.05
 
-int get_timing_information(const char *infile, int *num_video_frames,
-                           float *duration_video_sec, float *duration_audio_sec,
-                           std::vector<float> &delta_timestamp_sec_list,
-                           std::vector<uint32_t> &keyframe_sample_number_list,
+struct TimingInformation {
+  int num_video_frames;
+  float duration_video_sec;
+  float duration_audio_sec;
+  std::vector<float> delta_timestamp_sec_list;
+  std::vector<uint32_t> keyframe_sample_number_list;
+} TimingInformation;
+
+int get_timing_information(const char *infile,
+                           struct TimingInformation *timing_information,
                            int debug) {
   // 1. parse the input file
   ISOBMFF::Parser parser;
@@ -45,8 +51,8 @@ int get_timing_information(const char *infile, int *num_video_frames,
   }
 
   // 3. look for trak boxes
-  *duration_video_sec = -1.0;
-  *duration_audio_sec = -1.0;
+  timing_information->duration_video_sec = -1.0;
+  timing_information->duration_audio_sec = -1.0;
   for (auto &box : moov->GetBoxes()) {
     std::string name = box->GetName();
     if (name.compare("trak") != 0) {
@@ -94,9 +100,9 @@ int get_timing_information(const char *infile, int *num_video_frames,
       fprintf(stdout, "duration_sec: %f\n", duration_sec);
     }
     if (handler_type.compare("soun") == 0) {
-      *duration_audio_sec = duration_sec;
+      timing_information->duration_audio_sec = duration_sec;
     } else if (handler_type.compare("vide") == 0) {
-      *duration_video_sec = duration_sec;
+      timing_information->duration_video_sec = duration_sec;
     }
 
     // only keep video processing
@@ -136,15 +142,16 @@ int get_timing_information(const char *infile, int *num_video_frames,
     }
 
     // 10. gather the inter-frame timestamp deltas
-    delta_timestamp_sec_list.clear();
-    *num_video_frames = 0;
+    timing_information->delta_timestamp_sec_list.clear();
+    timing_information->num_video_frames = 0;
     for (unsigned int i = 0; i < stts->GetEntryCount(); i++) {
       uint32_t sample_count = stts->GetSampleCount(i);
-      *num_video_frames += sample_count;
+      timing_information->num_video_frames += sample_count;
       uint32_t sample_offset = stts->GetSampleOffset(i);
       float sample_offset_sec = (float)sample_offset / timescale;
       for (uint32_t sample = 0; sample < sample_count; sample++) {
-        delta_timestamp_sec_list.push_back(sample_offset_sec);
+        timing_information->delta_timestamp_sec_list.push_back(
+            sample_offset_sec);
       }
       if (debug > 2) {
         fprintf(stdout, "sample_count: %u ", sample_count);
@@ -163,10 +170,11 @@ int get_timing_information(const char *infile, int *num_video_frames,
                   infile);
         }
       } else {
-        keyframe_sample_number_list.clear();
+        timing_information->keyframe_sample_number_list.clear();
         for (unsigned int i = 0; i < stss->GetEntryCount(); i++) {
           uint32_t sample_count = stss->GetSampleNumber(i);
-          keyframe_sample_number_list.push_back(sample_count);
+          timing_information->keyframe_sample_number_list.push_back(
+              sample_count);
         }
       }
     }
@@ -179,15 +187,12 @@ int get_frame_interframe_info(const char *infile, int *num_video_frames,
                               std::vector<float> &delta_timestamp_sec_list,
                               int debug) {
   // get the list of inter-frame timestamp distances.
-  float duration_video_sec;
-  float duration_audio_sec;
-  std::vector<uint32_t> keyframe_sample_number_list;
-
-  if (get_timing_information(infile, num_video_frames, &duration_video_sec,
-                             &duration_audio_sec, delta_timestamp_sec_list,
-                             keyframe_sample_number_list, debug) < 0) {
+  struct TimingInformation timing_information;
+  if (get_timing_information(infile, &timing_information, debug) < 0) {
     return -1;
   }
+  *num_video_frames = timing_information.num_video_frames;
+  delta_timestamp_sec_list = timing_information.delta_timestamp_sec_list;
   return 0;
 }
 
@@ -203,17 +208,15 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
                         std::vector<long int> &frame_drop_length_consecutive,
                         int debug) {
   // 0. get the list of inter-frame timestamp distances.
-  float duration_video_sec;
-  float duration_audio_sec;
-  std::vector<float> delta_timestamp_sec_list;
-  std::vector<uint32_t> keyframe_sample_number_list;
-  if (get_timing_information(infile, num_video_frames, &duration_video_sec,
-                             &duration_audio_sec, delta_timestamp_sec_list,
-                             keyframe_sample_number_list, debug) < 0) {
+  struct TimingInformation timing_information;
+  if (get_timing_information(infile, &timing_information, debug) < 0) {
     return -1;
   }
+  *num_video_frames = timing_information.num_video_frames;
+
   if (debug > 1) {
-    for (const auto &delta_timestamp_sec : delta_timestamp_sec_list) {
+    for (const auto &delta_timestamp_sec :
+         timing_information.delta_timestamp_sec_list) {
       fprintf(stdout, "%f,", delta_timestamp_sec);
     }
     fprintf(stdout, "\n");
@@ -221,10 +224,11 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
 
   // 1. calculate the inter-frame distance statistics
   // 1.1. get the list of frame rates
-  std::vector<float> frame_rate_fps_list(delta_timestamp_sec_list.size());
-  std::transform(delta_timestamp_sec_list.begin(),
-                 delta_timestamp_sec_list.end(), frame_rate_fps_list.begin(),
-                 [](float val) {
+  std::vector<float> frame_rate_fps_list(
+      timing_information.delta_timestamp_sec_list.size());
+  std::transform(timing_information.delta_timestamp_sec_list.begin(),
+                 timing_information.delta_timestamp_sec_list.end(),
+                 frame_rate_fps_list.begin(), [](float val) {
                    // Handle division by zero
                    return val != 0.0f ? 1.0f / static_cast<float>(val) : 0.0f;
                  });
@@ -232,9 +236,11 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
   sort(frame_rate_fps_list.begin(), frame_rate_fps_list.end());
   *frame_rate_fps_median =
       frame_rate_fps_list[frame_rate_fps_list.size() / 2 - 1];
-  sort(delta_timestamp_sec_list.begin(), delta_timestamp_sec_list.end());
+  sort(timing_information.delta_timestamp_sec_list.begin(),
+       timing_information.delta_timestamp_sec_list.end());
   float delta_timestamp_sec_median =
-      delta_timestamp_sec_list[delta_timestamp_sec_list.size() / 2 - 1];
+      timing_information.delta_timestamp_sec_list
+          [timing_information.delta_timestamp_sec_list.size() / 2 - 1];
   // 1.3. average
   *frame_rate_fps_average =
       (1.0 * std::accumulate(frame_rate_fps_list.begin(),
@@ -260,7 +266,8 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
 
   // 3. get the list of all the drops (absolute inter-frame values)
   std::vector<float> drop_length_sec_list;
-  for (const auto &delta_timestamp_sec : delta_timestamp_sec_list) {
+  for (const auto &delta_timestamp_sec :
+       timing_information.delta_timestamp_sec_list) {
     if (delta_timestamp_sec > delta_timestamp_sec_threshold) {
       drop_length_sec_list.push_back(delta_timestamp_sec);
     }
@@ -279,7 +286,8 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
 
   // 5. get the total duration as the sum of all the inter-frame distances
   float total_duration_sec = 0.0;
-  for (const auto &delta_timestamp_sec : delta_timestamp_sec_list) {
+  for (const auto &delta_timestamp_sec :
+       timing_information.delta_timestamp_sec_list) {
     total_duration_sec += delta_timestamp_sec;
   }
 
@@ -338,14 +346,12 @@ int get_video_freeze_info(const char *infile, bool *video_freeze,
                           float *audio_video_ratio, float *duration_video_sec,
                           float *duration_audio_sec, int debug) {
   // 0. get timing information
-  int num_video_frames;
-  std::vector<float> delta_timestamp_sec_list;
-  std::vector<uint32_t> keyframe_sample_number_list;
-  if (get_timing_information(infile, &num_video_frames, duration_video_sec,
-                             duration_audio_sec, delta_timestamp_sec_list,
-                             keyframe_sample_number_list, debug) < 0) {
+  struct TimingInformation timing_information;
+  if (get_timing_information(infile, &timing_information, debug) < 0) {
     return -1;
   }
+  *duration_video_sec = timing_information.duration_video_sec;
+  *duration_audio_sec = timing_information.duration_audio_sec;
 
   // 1. check both audio and video tracks, and video track at least 2 seconds
   if (*duration_video_sec == -1.0) {
@@ -372,18 +378,14 @@ int get_video_freeze_info(const char *infile, bool *video_freeze,
 int get_video_structure_info(const char *infile, int *num_video_frames,
                              int *num_video_keyframes, int debug) {
   // 0. get timing information
-  float duration_video_sec;
-  float duration_audio_sec;
-  std::vector<float> delta_timestamp_sec_list;
-  std::vector<uint32_t> keyframe_sample_number_list;
-  if (get_timing_information(infile, num_video_frames, &duration_video_sec,
-                             &duration_audio_sec, delta_timestamp_sec_list,
-                             keyframe_sample_number_list, debug) < 0) {
+  struct TimingInformation timing_information;
+  if (get_timing_information(infile, &timing_information, debug) < 0) {
     return -1;
   }
+  *num_video_frames = timing_information.num_video_frames;
 
   // 1. count the number of video keyframes from stss (0 if no stss)
-  *num_video_keyframes = keyframe_sample_number_list.size();
+  *num_video_keyframes = timing_information.keyframe_sample_number_list.size();
 
   return 0;
 }
