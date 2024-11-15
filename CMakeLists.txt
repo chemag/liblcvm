@@ -38,6 +38,9 @@ target_include_directories(liblcvm
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff/ISOBMFF/include
 )
 
+# Set the output name to ensure the library is named liblcvm.a
+set_target_properties(liblcvm PROPERTIES OUTPUT_NAME "lcvm")
+
 # Build lcvm executable
 add_executable(lcvm tools/lcvm.cc)
 target_link_libraries(lcvm liblcvm)
