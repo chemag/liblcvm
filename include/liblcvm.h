@@ -66,6 +66,15 @@ int get_video_freeze_info(const char *infile, bool *video_freeze,
 int get_video_structure_info(const char *infile, int *num_video_frames,
                              int *num_video_keyframes, int debug);
 
+// @brief Calculates the generic video info.
+//
+// @param[in] infile: Name of the file to be parsed.
+// @param[out] width: Video width.
+// @param[out] height: Video height.
+// @param[in] debug: Debug level.
+int get_video_generic_info(const char *infile, int *width, int *height,
+                           int debug);
+
 // debug API
 
 // @brief Calculates full inter-frame time info.

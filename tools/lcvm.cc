@@ -51,7 +51,7 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
 
   // 1. write CSV header
   fprintf(outfp,
-          "infile,num_video_frames,frame_rate_fps_median,"
+          "infile,width,height,num_video_frames,frame_rate_fps_median,"
           "frame_rate_fps_average,frame_rate_fps_stddev,video_freeze,"
           "video_freeze_ratio,duration_video_sec,duration_audio_sec,"
           "frame_drop_count,frame_drop_ratio,"
@@ -63,12 +63,21 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
   // 2. write CSV rows
   std::vector<std::vector<float>> delta_timestamp_sec_list_list;
   for (const auto &infile : infile_list) {
+    // 2.0. get generic info
+    int width;
+    int height;
+    int ret = get_video_generic_info(infile.c_str(), &width, &height, debug);
+    if (ret < 0) {
+      fprintf(stderr, "error: get_video_generic_info() in %s\n",
+              infile.c_str());
+    }
+
     // 2.1. get video freeze info
     bool video_freeze;
     float audio_video_ratio;
     float duration_video_sec;
     float duration_audio_sec;
-    int ret =
+    ret =
         get_video_freeze_info(infile.c_str(), &video_freeze, &audio_video_ratio,
                               &duration_video_sec, &duration_audio_sec, debug);
     if (ret < 0) {
@@ -113,6 +122,8 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
 
     // 2.4. dump all output
     fprintf(outfp, "%s", infile.c_str());
+    fprintf(outfp, ",%i", width);
+    fprintf(outfp, ",%i", height);
     fprintf(outfp, ",%i", num_video_frames);
     fprintf(outfp, ",%f", frame_rate_fps_median);
     fprintf(outfp, ",%f", frame_rate_fps_average);

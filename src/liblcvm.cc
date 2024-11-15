@@ -20,6 +20,8 @@
 
 struct TimingInformation {
   int num_video_frames;
+  float width;
+  float height;
   float duration_video_sec;
   float duration_audio_sec;
   std::vector<float> delta_timestamp_sec_list;
@@ -110,7 +112,19 @@ int get_timing_information(const char *infile,
       continue;
     }
 
-    // 7. look for a minf box
+    // 7. look for a tkhd box
+    std::shared_ptr<ISOBMFF::TKHD> tkhd =
+        trak->GetTypedBox<ISOBMFF::TKHD>("tkhd");
+    if (tkhd == nullptr) {
+      if (debug > 0) {
+        fprintf(stderr, "error: no /moov/trak/tkhd in %s\n", infile);
+      }
+      return -1;
+    }
+    timing_information->width = tkhd->GetWidth();
+    timing_information->height = tkhd->GetHeight();
+
+    // 8. look for a minf box
     std::shared_ptr<ISOBMFF::ContainerBox> minf =
         mdia->GetTypedBox<ISOBMFF::ContainerBox>("minf");
     if (minf == nullptr) {
@@ -120,7 +134,7 @@ int get_timing_information(const char *infile,
       return -1;
     }
 
-    // 8. look for a stbl box
+    // 9. look for a stbl box
     std::shared_ptr<ISOBMFF::ContainerBox> stbl =
         minf->GetTypedBox<ISOBMFF::ContainerBox>("stbl");
     if (stbl == nullptr) {
@@ -130,7 +144,7 @@ int get_timing_information(const char *infile,
       return -1;
     }
 
-    // 9. look for a stts box
+    // 10. look for a stts box
     std::shared_ptr<ISOBMFF::STTS> stts =
         stbl->GetTypedBox<ISOBMFF::STTS>("stts");
     if (stts == nullptr) {
@@ -141,7 +155,7 @@ int get_timing_information(const char *infile,
       return -1;
     }
 
-    // 10. gather the inter-frame timestamp deltas
+    // 11. gather the inter-frame timestamp deltas
     timing_information->delta_timestamp_sec_list.clear();
     timing_information->num_video_frames = 0;
     for (unsigned int i = 0; i < stts->GetEntryCount(); i++) {
@@ -160,7 +174,7 @@ int get_timing_information(const char *infile,
       }
     }
 
-    // 11. look for a stss box in the video track
+    // 12. look for a stss box in the video track
     if (handler_type.compare("vide") == 0) {
       std::shared_ptr<ISOBMFF::STSS> stss =
           stbl->GetTypedBox<ISOBMFF::STSS>("stss");
@@ -386,6 +400,21 @@ int get_video_structure_info(const char *infile, int *num_video_frames,
 
   // 1. count the number of video keyframes from stss (0 if no stss)
   *num_video_keyframes = timing_information.keyframe_sample_number_list.size();
+
+  return 0;
+}
+
+int get_video_generic_info(const char *infile, int *width, int *height,
+                           int debug) {
+  // 0. get timing information
+  struct TimingInformation timing_information;
+  if (get_timing_information(infile, &timing_information, debug) < 0) {
+    return -1;
+  }
+
+  // 1. convert width and height to integers
+  *width = static_cast<int>(timing_information.width);
+  *height = static_cast<int>(timing_information.height);
 
   return 0;
 }
