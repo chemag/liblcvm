@@ -27,8 +27,6 @@ int get_liblcvm_version(std::string &version) {
 
 struct TimingInformation {
   int num_video_frames;
-  float width;
-  float height;
   float duration_video_sec;
   float duration_audio_sec;
   std::vector<float> delta_timestamp_sec_list;
@@ -49,7 +47,7 @@ int get_timing_information(const char *infile,
     return -1;
   }
 
-  // 2. look for a moov box
+  // 2. look for a moov container box
   std::shared_ptr<ISOBMFF::ContainerBox> moov =
       file->GetTypedBox<ISOBMFF::ContainerBox>("moov");
   if (moov == nullptr) {
@@ -59,7 +57,7 @@ int get_timing_information(const char *infile,
     return -1;
   }
 
-  // 3. look for trak boxes
+  // 3. look for trak container boxes
   timing_information->duration_video_sec = -1.0;
   timing_information->duration_audio_sec = -1.0;
   for (auto &box : moov->GetBoxes()) {
@@ -69,7 +67,7 @@ int get_timing_information(const char *infile,
     }
     auto trak = std::dynamic_pointer_cast<ISOBMFF::ContainerBox>(box);
 
-    // 4. look for a mdia box
+    // 4. look for a mdia container box
     std::shared_ptr<ISOBMFF::ContainerBox> mdia =
         trak->GetTypedBox<ISOBMFF::ContainerBox>("mdia");
     if (mdia == nullptr) {
@@ -119,19 +117,7 @@ int get_timing_information(const char *infile,
       continue;
     }
 
-    // 7. look for a tkhd box
-    std::shared_ptr<ISOBMFF::TKHD> tkhd =
-        trak->GetTypedBox<ISOBMFF::TKHD>("tkhd");
-    if (tkhd == nullptr) {
-      if (debug > 0) {
-        fprintf(stderr, "error: no /moov/trak/tkhd in %s\n", infile);
-      }
-      return -1;
-    }
-    timing_information->width = tkhd->GetWidth();
-    timing_information->height = tkhd->GetHeight();
-
-    // 8. look for a minf box
+    // 7. look for a minf container box
     std::shared_ptr<ISOBMFF::ContainerBox> minf =
         mdia->GetTypedBox<ISOBMFF::ContainerBox>("minf");
     if (minf == nullptr) {
@@ -141,7 +127,7 @@ int get_timing_information(const char *infile,
       return -1;
     }
 
-    // 9. look for a stbl box
+    // 8. look for a stbl container box
     std::shared_ptr<ISOBMFF::ContainerBox> stbl =
         minf->GetTypedBox<ISOBMFF::ContainerBox>("stbl");
     if (stbl == nullptr) {
@@ -151,7 +137,7 @@ int get_timing_information(const char *infile,
       return -1;
     }
 
-    // 10. look for a stts box
+    // 9. look for a stts box
     std::shared_ptr<ISOBMFF::STTS> stts =
         stbl->GetTypedBox<ISOBMFF::STTS>("stts");
     if (stts == nullptr) {
@@ -162,7 +148,7 @@ int get_timing_information(const char *infile,
       return -1;
     }
 
-    // 11. gather the inter-frame timestamp deltas
+    // 10. gather the inter-frame timestamp deltas
     timing_information->delta_timestamp_sec_list.clear();
     timing_information->num_video_frames = 0;
     for (unsigned int i = 0; i < stts->GetEntryCount(); i++) {
@@ -181,7 +167,7 @@ int get_timing_information(const char *infile,
       }
     }
 
-    // 12. look for a stss box in the video track
+    // 11. look for a stss box in the video track
     if (handler_type.compare("vide") == 0) {
       std::shared_ptr<ISOBMFF::STSS> stss =
           stbl->GetTypedBox<ISOBMFF::STSS>("stss");
@@ -199,6 +185,85 @@ int get_timing_information(const char *infile,
         }
       }
     }
+  }
+
+  return 0;
+}
+
+struct FrameInformation {
+  float width;
+  float height;
+} FrameInformation;
+
+int get_frame_information(const char *infile,
+                          struct FrameInformation *frame_information,
+                          int debug) {
+  // 1. parse the input file
+  ISOBMFF::Parser parser;
+  parser.Parse(infile);
+  std::shared_ptr<ISOBMFF::File> file = parser.GetFile();
+  if (file == nullptr) {
+    if (debug > 0) {
+      fprintf(stderr, "error: no file in %s\n", infile);
+    }
+    return -1;
+  }
+
+  // 2. look for a moov container box
+  std::shared_ptr<ISOBMFF::ContainerBox> moov =
+      file->GetTypedBox<ISOBMFF::ContainerBox>("moov");
+  if (moov == nullptr) {
+    if (debug > 0) {
+      fprintf(stderr, "error: no /moov in %s\n", infile);
+    }
+    return -1;
+  }
+
+  // 3. look for trak container boxes
+  for (auto &box : moov->GetBoxes()) {
+    std::string name = box->GetName();
+    if (name.compare("trak") != 0) {
+      continue;
+    }
+    auto trak = std::dynamic_pointer_cast<ISOBMFF::ContainerBox>(box);
+
+    // 4. look for a mdia container box
+    std::shared_ptr<ISOBMFF::ContainerBox> mdia =
+        trak->GetTypedBox<ISOBMFF::ContainerBox>("mdia");
+    if (mdia == nullptr) {
+      if (debug > 0) {
+        fprintf(stderr, "error: no /moov/trak/mdia in %s\n", infile);
+      }
+      return -1;
+    }
+
+    // 5. look for a hdlr box
+    std::shared_ptr<ISOBMFF::HDLR> hdlr =
+        mdia->GetTypedBox<ISOBMFF::HDLR>("hdlr");
+    if (hdlr == nullptr) {
+      if (debug > 0) {
+        fprintf(stderr, "error: no /moov/trak/mdia/hdlr in %s\n", infile);
+      }
+      return -1;
+    }
+    std::string handler_type = hdlr->GetHandlerType();
+
+    // only keep video processing
+    if (handler_type.compare("vide") != 0) {
+      continue;
+    }
+
+    // 6. look for a tkhd box
+    std::shared_ptr<ISOBMFF::TKHD> tkhd =
+        trak->GetTypedBox<ISOBMFF::TKHD>("tkhd");
+    if (tkhd == nullptr) {
+      if (debug > 0) {
+        fprintf(stderr, "error: no /moov/trak/tkhd in %s\n", infile);
+      }
+      return -1;
+    }
+    frame_information->width = tkhd->GetWidth();
+    frame_information->height = tkhd->GetHeight();
   }
 
   return 0;
@@ -413,15 +478,15 @@ int get_video_structure_info(const char *infile, int *num_video_frames,
 
 int get_video_generic_info(const char *infile, int *width, int *height,
                            int debug) {
-  // 0. get timing information
-  struct TimingInformation timing_information;
-  if (get_timing_information(infile, &timing_information, debug) < 0) {
+  // 0. get frame information
+  struct FrameInformation frame_information;
+  if (get_frame_information(infile, &frame_information, debug) < 0) {
     return -1;
   }
 
   // 1. convert width and height to integers
-  *width = static_cast<int>(timing_information.width);
-  *height = static_cast<int>(timing_information.height);
+  *width = static_cast<int>(frame_information.width);
+  *height = static_cast<int>(frame_information.height);
 
   return 0;
 }
