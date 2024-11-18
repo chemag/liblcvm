@@ -51,7 +51,9 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
 
   // 1. write CSV header
   fprintf(outfp,
-          "infile,width,height,num_video_frames,frame_rate_fps_median,"
+          "infile,width,height,type,horizresolution,vertresolution,depth,"
+          "chroma_format,bit_depth_luma,bit_depth_chroma,"
+          "num_video_frames,frame_rate_fps_median,"
           "frame_rate_fps_average,frame_rate_fps_stddev,video_freeze,"
           "video_freeze_ratio,duration_video_sec,duration_audio_sec,"
           "frame_drop_count,frame_drop_ratio,"
@@ -66,7 +68,20 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     // 2.0. get generic info
     int width;
     int height;
-    int ret = get_video_generic_info(infile.c_str(), &width, &height, debug);
+    std::string type;
+    unsigned int width2;
+    unsigned int height2;
+    unsigned int horizresolution;
+    unsigned int vertresolution;
+    unsigned int depth;
+    unsigned int chroma_format;
+    unsigned int bit_depth_luma;
+    unsigned int bit_depth_chroma;
+
+    int ret = get_video_generic_info(infile.c_str(), &width, &height, type,
+                                     &width2, &height2, &horizresolution,
+                                     &vertresolution, &depth, &chroma_format,
+                                     &bit_depth_luma, &bit_depth_chroma, debug);
     if (ret < 0) {
       fprintf(stderr, "error: get_video_generic_info() in %s\n",
               infile.c_str());
@@ -126,6 +141,15 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     fprintf(outfp, "%s", infile.c_str());
     fprintf(outfp, ",%i", width);
     fprintf(outfp, ",%i", height);
+    fprintf(outfp, ",%s", type.c_str());
+    // fprintf(outfp, ",%i", width2);
+    // fprintf(outfp, ",%i", height2);
+    fprintf(outfp, ",%u", horizresolution);
+    fprintf(outfp, ",%u", vertresolution);
+    fprintf(outfp, ",%u", depth);
+    fprintf(outfp, ",%u", chroma_format);
+    fprintf(outfp, ",%u", bit_depth_luma);
+    fprintf(outfp, ",%u", bit_depth_chroma);
     fprintf(outfp, ",%i", num_video_frames);
     fprintf(outfp, ",%f", frame_rate_fps_median);
     fprintf(outfp, ",%f", frame_rate_fps_average);

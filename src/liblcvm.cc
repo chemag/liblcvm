@@ -197,6 +197,15 @@ int get_timing_information(const char *infile,
 struct FrameInformation {
   float width;
   float height;
+  std::string type;
+  uint16_t width2;
+  uint16_t height2;
+  uint32_t horizresolution;
+  uint32_t vertresolution;
+  uint16_t depth;
+  uint16_t chroma_format;
+  uint16_t bit_depth_luma;
+  uint16_t bit_depth_chroma;
 } FrameInformation;
 
 int get_frame_information(const char *infile,
@@ -272,6 +281,70 @@ int get_frame_information(const char *infile,
     }
     frame_information->width = tkhd->GetWidth();
     frame_information->height = tkhd->GetHeight();
+
+    // 7. look for a minf container box
+    std::shared_ptr<ISOBMFF::ContainerBox> minf =
+        mdia->GetTypedBox<ISOBMFF::ContainerBox>("minf");
+    if (minf == nullptr) {
+      if (debug > 0) {
+        fprintf(stderr, "error: no /moov/trak/mdia/minf in %s\n", infile);
+      }
+      return -1;
+    }
+
+    // 8. look for a stbl container box
+    std::shared_ptr<ISOBMFF::ContainerBox> stbl =
+        minf->GetTypedBox<ISOBMFF::ContainerBox>("stbl");
+    if (stbl == nullptr) {
+      if (debug > 0) {
+        fprintf(stderr, "error: no /moov/trak/mdia/minf/stbl in %s\n", infile);
+      }
+      return -1;
+    }
+
+    // 9. look for a stsd container box
+    std::shared_ptr<ISOBMFF::STSD> stsd =
+        stbl->GetTypedBox<ISOBMFF::STSD>("stsd");
+    if (stsd == nullptr) {
+      if (debug > 0) {
+        fprintf(stderr, "error: no /moov/trak/mdia/minf/stbl/stsd in %s\n",
+                infile);
+      }
+      return -1;
+    }
+
+    // 10. look for a hvc1 (container) box
+    std::shared_ptr<ISOBMFF::HVC1> hvc1 =
+        stsd->GetTypedBox<ISOBMFF::HVC1>("hvc1");
+    if (hvc1 != nullptr) {
+      // 11. look for an hvcC box
+      std::shared_ptr<ISOBMFF::HVCC> hvcc =
+          hvc1->GetTypedBox<ISOBMFF::HVCC>("hvcC");
+      if (hvcc == nullptr) {
+        if (debug > 0) {
+          fprintf(stderr,
+                  "error: no /moov/trak/mdia/minf/stbl/stsd/hvc1/hvcC in %s\n",
+                  infile);
+        }
+        return -1;
+      }
+      frame_information->type = "hvc1";
+      frame_information->width2 = hvc1->GetWidth();
+      frame_information->height2 = hvc1->GetHeight();
+      frame_information->horizresolution = hvc1->GetHorizResolution();
+      frame_information->vertresolution = hvc1->GetVertResolution();
+      frame_information->depth = hvc1->GetDepth();
+      frame_information->chroma_format = hvcc->GetChromaFormat();
+      frame_information->bit_depth_luma = 8 + hvcc->GetBitDepthLumaMinus8();
+      frame_information->bit_depth_chroma = 8 + hvcc->GetBitDepthChromaMinus8();
+
+    } else {
+      if (debug > 0) {
+        fprintf(stderr, "error: no /moov/trak/mdia/minf/stbl/stsd/hvc1 in %s\n",
+                infile);
+      }
+      return -1;
+    }
   }
 
   return 0;
@@ -485,7 +558,12 @@ int get_video_structure_info(const char *infile, int *num_video_frames,
 }
 
 int get_video_generic_info(const char *infile, int *width, int *height,
-                           int debug) {
+                           std::string &type, unsigned int *width2,
+                           unsigned int *height2, unsigned int *horizresolution,
+                           unsigned int *vertresolution, unsigned int *depth,
+                           unsigned int *chroma_format,
+                           unsigned int *bit_depth_luma,
+                           unsigned int *bit_depth_chroma, int debug) {
   // 0. get frame information
   struct FrameInformation frame_information;
   if (get_frame_information(infile, &frame_information, debug) < 0) {
@@ -493,8 +571,19 @@ int get_video_generic_info(const char *infile, int *width, int *height,
   }
 
   // 1. convert width and height to integers
+  type = frame_information.type;
   *width = static_cast<int>(frame_information.width);
   *height = static_cast<int>(frame_information.height);
+  *width2 = static_cast<unsigned int>(frame_information.width2);
+  *height2 = static_cast<unsigned int>(frame_information.height2);
+  *horizresolution =
+      static_cast<unsigned int>(frame_information.horizresolution);
+  *vertresolution = static_cast<unsigned int>(frame_information.vertresolution);
+  *depth = static_cast<unsigned int>(frame_information.depth);
+  *chroma_format = static_cast<unsigned int>(frame_information.chroma_format);
+  *bit_depth_luma = static_cast<unsigned int>(frame_information.bit_depth_luma);
+  *bit_depth_chroma =
+      static_cast<unsigned int>(frame_information.bit_depth_chroma);
 
   return 0;
 }
