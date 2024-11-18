@@ -23,6 +23,17 @@ execute_process(
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff
 )
 
+# Add the ISOBMFF submodule
+include(ExternalProject)
+ExternalProject_Add(
+  ISOBMFF
+  SOURCE_DIR ${CMAKE_SOURCE_DIR}/lib/isobmff
+  BUILD_IN_SOURCE 1
+  CONFIGURE_COMMAND ""
+  BUILD_COMMAND make
+  INSTALL_COMMAND ""
+)
+
 # build isobmff library
 execute_process(
   COMMAND make
