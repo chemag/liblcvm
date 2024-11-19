@@ -92,15 +92,12 @@ int get_video_structure_info(const char *infile, int *num_video_frames,
 // @param[out] matrix_coeffs: Video matrix coefficients (from HEVC/AVC SPS).
 // @param[in] debug: Debug level.
 int get_video_generic_info(const char *infile, int *width, int *height,
-                           std::string &type, unsigned int *width2,
-                           unsigned int *height2, unsigned int *horizresolution,
-                           unsigned int *vertresolution, unsigned int *depth,
-                           unsigned int *chroma_format,
-                           unsigned int *bit_depth_luma,
-                           unsigned int *bit_depth_chroma,
-                           int *video_full_range_flag, int *colour_primaries,
-                           int *transfer_characteristics, int *matrix_coeffs,
-                           int debug);
+                           std::string &type, int *width2, int *height2,
+                           int *horizresolution, int *vertresolution,
+                           int *depth, int *chroma_format, int *bit_depth_luma,
+                           int *bit_depth_chroma, int *video_full_range_flag,
+                           int *colour_primaries, int *transfer_characteristics,
+                           int *matrix_coeffs, int debug);
 
 // debug API
 

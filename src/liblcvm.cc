@@ -201,14 +201,14 @@ struct FrameInformation {
   float width;
   float height;
   std::string type;
-  uint16_t width2;
-  uint16_t height2;
-  uint32_t horizresolution;
-  uint32_t vertresolution;
-  uint16_t depth;
-  uint16_t chroma_format;
-  uint16_t bit_depth_luma;
-  uint16_t bit_depth_chroma;
+  int width2;
+  int height2;
+  int horizresolution;
+  int vertresolution;
+  int depth;
+  int chroma_format;
+  int bit_depth_luma;
+  int bit_depth_chroma;
   int video_full_range_flag;
   int colour_primaries;
   int transfer_characteristics;
@@ -422,9 +422,9 @@ int get_frame_information(const char *infile,
       frame_information->horizresolution = avc1->GetHorizResolution();
       frame_information->vertresolution = avc1->GetVertResolution();
       frame_information->depth = avc1->GetDepth();
-      frame_information->chroma_format = 0;
-      frame_information->bit_depth_luma = 0;
-      frame_information->bit_depth_chroma = 0;
+      frame_information->chroma_format = -1;
+      frame_information->bit_depth_luma = -1;
+      frame_information->bit_depth_chroma = -1;
 
     } else {
       if (debug > 0) {
@@ -648,15 +648,12 @@ int get_video_structure_info(const char *infile, int *num_video_frames,
 }
 
 int get_video_generic_info(const char *infile, int *width, int *height,
-                           std::string &type, unsigned int *width2,
-                           unsigned int *height2, unsigned int *horizresolution,
-                           unsigned int *vertresolution, unsigned int *depth,
-                           unsigned int *chroma_format,
-                           unsigned int *bit_depth_luma,
-                           unsigned int *bit_depth_chroma,
-                           int *video_full_range_flag, int *colour_primaries,
-                           int *transfer_characteristics, int *matrix_coeffs,
-                           int debug) {
+                           std::string &type, int *width2, int *height2,
+                           int *horizresolution, int *vertresolution,
+                           int *depth, int *chroma_format, int *bit_depth_luma,
+                           int *bit_depth_chroma, int *video_full_range_flag,
+                           int *colour_primaries, int *transfer_characteristics,
+                           int *matrix_coeffs, int debug) {
   // 0. get frame information
   struct FrameInformation frame_information;
   if (get_frame_information(infile, &frame_information, debug) < 0) {
@@ -667,16 +664,14 @@ int get_video_generic_info(const char *infile, int *width, int *height,
   type = frame_information.type;
   *width = static_cast<int>(frame_information.width);
   *height = static_cast<int>(frame_information.height);
-  *width2 = static_cast<unsigned int>(frame_information.width2);
-  *height2 = static_cast<unsigned int>(frame_information.height2);
-  *horizresolution =
-      static_cast<unsigned int>(frame_information.horizresolution);
-  *vertresolution = static_cast<unsigned int>(frame_information.vertresolution);
-  *depth = static_cast<unsigned int>(frame_information.depth);
-  *chroma_format = static_cast<unsigned int>(frame_information.chroma_format);
-  *bit_depth_luma = static_cast<unsigned int>(frame_information.bit_depth_luma);
-  *bit_depth_chroma =
-      static_cast<unsigned int>(frame_information.bit_depth_chroma);
+  *width2 = frame_information.width2;
+  *height2 = frame_information.height2;
+  *horizresolution = frame_information.horizresolution;
+  *vertresolution = frame_information.vertresolution;
+  *depth = frame_information.depth;
+  *chroma_format = frame_information.chroma_format;
+  *bit_depth_luma = frame_information.bit_depth_luma;
+  *bit_depth_chroma = frame_information.bit_depth_chroma;
   *video_full_range_flag = frame_information.video_full_range_flag;
   *colour_primaries = frame_information.colour_primaries;
   *transfer_characteristics = frame_information.transfer_characteristics;
