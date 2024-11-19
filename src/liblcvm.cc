@@ -4,6 +4,9 @@
 // A show case of using [ISOBMFF](https://github.com/DigiDNA/ISOBMFF) to
 // detect frame dups and video freezes in ISOBMFF files.
 
+#include <h264_bitstream_parser.h>
+#include <h264_common.h>
+#include <h264_nal_unit_parser.h>
 #include <h265_bitstream_parser.h>
 #include <h265_common.h>
 #include <h265_nal_unit_parser.h>
@@ -215,6 +218,54 @@ struct FrameInformation {
   int matrix_coeffs;
 } FrameInformation;
 
+void parse_avcc(std::shared_ptr<ISOBMFF::AVCC> avcc,
+                struct FrameInformation *frame_information, int debug) {
+  // define an hevc parser state
+  h264nal::H264BitstreamParserState bitstream_parser_state;
+  std::unique_ptr<h264nal::H264BitstreamParser::BitstreamState> bitstream;
+  h264nal::ParsingOptions parsing_options;
+  parsing_options.add_offset = false;
+  parsing_options.add_length = false;
+  parsing_options.add_parsed_length = false;
+  parsing_options.add_checksum = false;
+  parsing_options.add_resolution = false;
+
+  // set default values
+  frame_information->colour_primaries = -1;
+  frame_information->transfer_characteristics = -1;
+  frame_information->matrix_coeffs = -1;
+  frame_information->video_full_range_flag = -1;
+
+  // extract the SPS NAL Units
+  for (const auto &sps : avcc->GetSequenceParameterSetNALUnits()) {
+    std::vector<uint8_t> buffer = sps->GetData();
+    auto nal_unit = h264nal::H264NalUnitParser::ParseNalUnit(
+        buffer.data(), buffer.size(), &bitstream_parser_state, parsing_options);
+    if (nal_unit == nullptr) {
+      // cannot parse the NalUnit
+      continue;
+    }
+    // look for valid SPS NAL units
+    if ((nal_unit->nal_unit_payload->sps->sps_data
+             ->vui_parameters_present_flag == 1) &&
+        (nal_unit->nal_unit_payload->sps->sps_data->vui_parameters
+             ->colour_description_present_flag == 1)) {
+      frame_information->colour_primaries =
+          nal_unit->nal_unit_payload->sps->sps_data->vui_parameters
+              ->colour_primaries;
+      frame_information->transfer_characteristics =
+          nal_unit->nal_unit_payload->sps->sps_data->vui_parameters
+              ->transfer_characteristics;
+      frame_information->matrix_coeffs =
+          nal_unit->nal_unit_payload->sps->sps_data->vui_parameters
+              ->matrix_coefficients;
+      frame_information->video_full_range_flag =
+          nal_unit->nal_unit_payload->sps->sps_data->vui_parameters
+              ->video_full_range_flag;
+    }
+  }
+}
+
 void parse_hvcc(std::shared_ptr<ISOBMFF::HVCC> hvcc,
                 struct FrameInformation *frame_information, int debug) {
   // define an hevc parser state
@@ -425,6 +476,7 @@ int get_frame_information(const char *infile,
       frame_information->chroma_format = -1;
       frame_information->bit_depth_luma = -1;
       frame_information->bit_depth_chroma = -1;
+      parse_avcc(avcc, frame_information, debug);
 
     } else {
       if (debug > 0) {
