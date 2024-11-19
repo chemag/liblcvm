@@ -76,15 +76,20 @@ int get_video_structure_info(const char *infile, int *num_video_frames,
 // @param[in] infile: Name of the file to be parsed.
 // @param[out] width: Video width.
 // @param[out] height: Video height.
-// @param[out] type: Video type ("hvc1" only).
-// @param[out] width2: Video width (from hvc1).
-// @param[out] height2: Video height (from hvc1).
-// @param[out] horizresolution: Video horizresolution (from hvc1).
-// @param[out] vertresolution: Video vertresolution (from hvc1).
-// @param[out] depth: Video depth (from hvc1).
-// @param[out] chroma_format: Video chroma format (from hvcC).
-// @param[out] bit_depth_luma: Video luma bit depth (from hvcC).
-// @param[out] bit_depth_chroma: Video chroma bit depth (from hvcC).
+// @param[out] type: Video type ("hvc1" or "avc1").
+// @param[out] width2: Video width (from hvc1/avc1).
+// @param[out] height2: Video height (from hvc1/avc1).
+// @param[out] horizresolution: Video horizresolution (from hvc1/avc1).
+// @param[out] vertresolution: Video vertresolution (from hvc1/avc1).
+// @param[out] depth: Video depth (from hvc1/avc1).
+// @param[out] chroma_format: Video chroma format (from hvcC/avcC).
+// @param[out] bit_depth_luma: Video luma bit depth (from hvcC/avcC).
+// @param[out] bit_depth_chroma: Video chroma bit depth (from hvcC/avcC).
+// @param[out] video_full_range_flag: Video range (from HEVC/AVC SPS).
+// @param[out] colour_primaries: Video color primaries (from HEVC/AVC SPS).
+// @param[out] transfer_characteristics: Video transfer characteristics (from
+// HEVC/AVC SPS).
+// @param[out] matrix_coeffs: Video matrix coefficients (from HEVC/AVC SPS).
 // @param[in] debug: Debug level.
 int get_video_generic_info(const char *infile, int *width, int *height,
                            std::string &type, unsigned int *width2,
@@ -93,7 +98,8 @@ int get_video_generic_info(const char *infile, int *width, int *height,
                            unsigned int *chroma_format,
                            unsigned int *bit_depth_luma,
                            unsigned int *bit_depth_chroma,
-
+                           int *video_full_range_flag, int *colour_primaries,
+                           int *transfer_characteristics, int *matrix_coeffs,
                            int debug);
 
 // debug API

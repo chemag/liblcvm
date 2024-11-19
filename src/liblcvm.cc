@@ -4,6 +4,9 @@
 // A show case of using [ISOBMFF](https://github.com/DigiDNA/ISOBMFF) to
 // detect frame dups and video freezes in ISOBMFF files.
 
+#include <h265_bitstream_parser.h>
+#include <h265_common.h>
+#include <h265_nal_unit_parser.h>
 #include <stdint.h>  // for uint32_t, uint64_t
 
 #include <ISOBMFF.hpp>         // for various
@@ -206,7 +209,62 @@ struct FrameInformation {
   uint16_t chroma_format;
   uint16_t bit_depth_luma;
   uint16_t bit_depth_chroma;
+  int video_full_range_flag;
+  int colour_primaries;
+  int transfer_characteristics;
+  int matrix_coeffs;
 } FrameInformation;
+
+void parse_hvcc(std::shared_ptr<ISOBMFF::HVCC> hvcc,
+                struct FrameInformation *frame_information, int debug) {
+  // define an hevc parser state
+  h265nal::H265BitstreamParserState bitstream_parser_state;
+  std::unique_ptr<h265nal::H265BitstreamParser::BitstreamState> bitstream;
+  h265nal::ParsingOptions parsing_options;
+  parsing_options.add_offset = false;
+  parsing_options.add_length = false;
+  parsing_options.add_parsed_length = false;
+  parsing_options.add_checksum = false;
+  parsing_options.add_resolution = false;
+
+  // set default values
+  frame_information->colour_primaries = -1;
+  frame_information->transfer_characteristics = -1;
+  frame_information->matrix_coeffs = -1;
+  frame_information->video_full_range_flag = -1;
+
+  // extract the NAL Units
+  for (const auto &array : hvcc->GetArrays()) {
+    // bool array_completeness = array->GetArrayCompleteness();
+    uint8_t nal_unit_type = array->GetNALUnitType();
+    for (const auto &data : array->GetNALUnits()) {
+      std::vector<uint8_t> buffer = data->GetData();
+      auto nal_unit = h265nal::H265NalUnitParser::ParseNalUnit(
+          buffer.data(), buffer.size(), &bitstream_parser_state,
+          parsing_options);
+      if (nal_unit == nullptr) {
+        // cannot parse the NalUnit
+        continue;
+      }
+      // look for SPS NAL units
+      if ((nal_unit_type == h265nal::NalUnitType::SPS_NUT) &&
+          (nal_unit->nal_unit_payload->sps->vui_parameters_present_flag == 1) &&
+          (nal_unit->nal_unit_payload->sps->vui_parameters
+               ->colour_description_present_flag == 1)) {
+        frame_information->colour_primaries =
+            nal_unit->nal_unit_payload->sps->vui_parameters->colour_primaries;
+        frame_information->transfer_characteristics =
+            nal_unit->nal_unit_payload->sps->vui_parameters
+                ->transfer_characteristics;
+        frame_information->matrix_coeffs =
+            nal_unit->nal_unit_payload->sps->vui_parameters->matrix_coeffs;
+        frame_information->video_full_range_flag =
+            nal_unit->nal_unit_payload->sps->vui_parameters
+                ->video_full_range_flag;
+      }
+    }
+  }
+}
 
 int get_frame_information(const char *infile,
                           struct FrameInformation *frame_information,
@@ -340,6 +398,11 @@ int get_frame_information(const char *infile,
       frame_information->chroma_format = hvcc->GetChromaFormat();
       frame_information->bit_depth_luma = 8 + hvcc->GetBitDepthLumaMinus8();
       frame_information->bit_depth_chroma = 8 + hvcc->GetBitDepthChromaMinus8();
+      frame_information->colour_primaries = -1;
+      frame_information->transfer_characteristics = -1;
+      frame_information->matrix_coeffs = -1;
+      frame_information->video_full_range_flag = -1;
+      parse_hvcc(hvcc, frame_information, debug);
 
     } else if (avc1 != nullptr) {
       // 11.2. look for an avcC box
@@ -590,7 +653,10 @@ int get_video_generic_info(const char *infile, int *width, int *height,
                            unsigned int *vertresolution, unsigned int *depth,
                            unsigned int *chroma_format,
                            unsigned int *bit_depth_luma,
-                           unsigned int *bit_depth_chroma, int debug) {
+                           unsigned int *bit_depth_chroma,
+                           int *video_full_range_flag, int *colour_primaries,
+                           int *transfer_characteristics, int *matrix_coeffs,
+                           int debug) {
   // 0. get frame information
   struct FrameInformation frame_information;
   if (get_frame_information(infile, &frame_information, debug) < 0) {
@@ -611,6 +677,10 @@ int get_video_generic_info(const char *infile, int *width, int *height,
   *bit_depth_luma = static_cast<unsigned int>(frame_information.bit_depth_luma);
   *bit_depth_chroma =
       static_cast<unsigned int>(frame_information.bit_depth_chroma);
+  *video_full_range_flag = frame_information.video_full_range_flag;
+  *colour_primaries = frame_information.colour_primaries;
+  *transfer_characteristics = frame_information.transfer_characteristics;
+  *matrix_coeffs = frame_information.matrix_coeffs;
 
   return 0;
 }

@@ -53,6 +53,10 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
   fprintf(outfp,
           "infile,width,height,type,horizresolution,vertresolution,depth,"
           "chroma_format,bit_depth_luma,bit_depth_chroma,"
+          "video_full_range_flag,"
+          "colour_primaries,"
+          "transfer_characteristics,"
+          "matrix_coeffs,"
           "num_video_frames,frame_rate_fps_median,"
           "frame_rate_fps_average,frame_rate_fps_stddev,video_freeze,"
           "video_freeze_ratio,duration_video_sec,duration_audio_sec,"
@@ -77,11 +81,16 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     unsigned int chroma_format;
     unsigned int bit_depth_luma;
     unsigned int bit_depth_chroma;
+    int video_full_range_flag;
+    int colour_primaries;
+    int transfer_characteristics;
+    int matrix_coeffs;
 
-    int ret = get_video_generic_info(infile.c_str(), &width, &height, type,
-                                     &width2, &height2, &horizresolution,
-                                     &vertresolution, &depth, &chroma_format,
-                                     &bit_depth_luma, &bit_depth_chroma, debug);
+    int ret = get_video_generic_info(
+        infile.c_str(), &width, &height, type, &width2, &height2,
+        &horizresolution, &vertresolution, &depth, &chroma_format,
+        &bit_depth_luma, &bit_depth_chroma, &video_full_range_flag,
+        &colour_primaries, &transfer_characteristics, &matrix_coeffs, debug);
     if (ret < 0) {
       fprintf(stderr, "error: get_video_generic_info() in %s\n",
               infile.c_str());
@@ -150,6 +159,10 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     fprintf(outfp, ",%u", chroma_format);
     fprintf(outfp, ",%u", bit_depth_luma);
     fprintf(outfp, ",%u", bit_depth_chroma);
+    fprintf(outfp, ",%i", video_full_range_flag);
+    fprintf(outfp, ",%i", colour_primaries);
+    fprintf(outfp, ",%i", transfer_characteristics);
+    fprintf(outfp, ",%i", matrix_coeffs);
     fprintf(outfp, ",%i", num_video_frames);
     fprintf(outfp, ",%f", frame_rate_fps_median);
     fprintf(outfp, ",%f", frame_rate_fps_average);
