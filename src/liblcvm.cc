@@ -38,7 +38,11 @@ int get_timing_information(const char *infile,
                            int debug) {
   // 1. parse the input file
   ISOBMFF::Parser parser;
-  parser.Parse(infile);
+  try {
+    parser.Parse(infile);
+  } catch (std::runtime_error &e) {
+    return -1;
+  }
   std::shared_ptr<ISOBMFF::File> file = parser.GetFile();
   if (file == nullptr) {
     if (debug > 0) {
@@ -200,7 +204,11 @@ int get_frame_information(const char *infile,
                           int debug) {
   // 1. parse the input file
   ISOBMFF::Parser parser;
-  parser.Parse(infile);
+  try {
+    parser.Parse(infile);
+  } catch (std::runtime_error &e) {
+    return -1;
+  }
   std::shared_ptr<ISOBMFF::File> file = parser.GetFile();
   if (file == nullptr) {
     if (debug > 0) {

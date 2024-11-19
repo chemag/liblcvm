@@ -70,6 +70,7 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     if (ret < 0) {
       fprintf(stderr, "error: get_video_generic_info() in %s\n",
               infile.c_str());
+      continue;
     }
 
     // 2.1. get video freeze info
@@ -82,6 +83,7 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
                               &duration_video_sec, &duration_audio_sec, debug);
     if (ret < 0) {
       fprintf(stderr, "error: get_video_freeze_info() in %s\n", infile.c_str());
+      continue;
     }
 
     // 2.2. get frame drop info
