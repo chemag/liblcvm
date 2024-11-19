@@ -453,8 +453,8 @@ int get_video_freeze_info(const char *infile, bool *video_freeze,
     return -1;
   }
   if (*duration_audio_sec == -1.0) {
-    fprintf(stderr, "error: no audio track in %s\n", infile);
-    return -1;
+    fprintf(stderr, "warn: no audio track in %s\n", infile);
+    return 0;
   }
   if (*duration_video_sec < 2.0) {
     fprintf(stderr, "error: video track too short %s (%f seconds)\n", infile,
