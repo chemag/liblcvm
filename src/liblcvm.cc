@@ -313,11 +313,14 @@ int get_frame_information(const char *infile,
       return -1;
     }
 
-    // 10. look for a hvc1 (container) box
+    // 10. look for hvc1 or avc1 (container) boxes
     std::shared_ptr<ISOBMFF::HVC1> hvc1 =
         stsd->GetTypedBox<ISOBMFF::HVC1>("hvc1");
+    std::shared_ptr<ISOBMFF::AVC1> avc1 =
+        stsd->GetTypedBox<ISOBMFF::AVC1>("avc1");
+
     if (hvc1 != nullptr) {
-      // 11. look for an hvcC box
+      // 11.1. look for an hvcC box
       std::shared_ptr<ISOBMFF::HVCC> hvcc =
           hvc1->GetTypedBox<ISOBMFF::HVCC>("hvcC");
       if (hvcc == nullptr) {
@@ -338,9 +341,33 @@ int get_frame_information(const char *infile,
       frame_information->bit_depth_luma = 8 + hvcc->GetBitDepthLumaMinus8();
       frame_information->bit_depth_chroma = 8 + hvcc->GetBitDepthChromaMinus8();
 
+    } else if (avc1 != nullptr) {
+      // 11.2. look for an avcC box
+      std::shared_ptr<ISOBMFF::AVCC> avcc =
+          avc1->GetTypedBox<ISOBMFF::AVCC>("avcC");
+      if (avcc == nullptr) {
+        if (debug > 0) {
+          fprintf(stderr,
+                  "error: no /moov/trak/mdia/minf/stbl/stsd/avc1/avcC in %s\n",
+                  infile);
+        }
+        return -1;
+      }
+      frame_information->type = "avc1";
+      frame_information->width2 = avc1->GetWidth();
+      frame_information->height2 = avc1->GetHeight();
+      frame_information->horizresolution = avc1->GetHorizResolution();
+      frame_information->vertresolution = avc1->GetVertResolution();
+      frame_information->depth = avc1->GetDepth();
+      frame_information->chroma_format = 0;
+      frame_information->bit_depth_luma = 0;
+      frame_information->bit_depth_chroma = 0;
+
     } else {
       if (debug > 0) {
-        fprintf(stderr, "error: no /moov/trak/mdia/minf/stbl/stsd/hvc1 in %s\n",
+        fprintf(stderr,
+                "error: no /moov/trak/mdia/minf/stbl/stsd/hvc1 or "
+                "/moov/trak/mdia/minf/stbl/stsd/avc1 in %s\n",
                 infile);
       }
       return -1;
