@@ -44,14 +44,22 @@ execute_process(
 )
 
 
+# 1.2. add h265nal submodule
+add_subdirectory(${CMAKE_SOURCE_DIR}/lib/h265nal)
+
+
 # 2. build liblcvm library
 add_library(liblcvm src/liblcvm.cc)
 
 target_link_libraries(liblcvm
   ${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff/Build/Debug/Products/x86_64/libISOBMFF.a
+  h265nal
 )
 target_include_directories(liblcvm
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff/ISOBMFF/include
+)
+target_include_directories(liblcvm
+  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/h265nal/include
 )
 
 # set the output name to ensure the library is named liblcvm.a
