@@ -4,3 +4,6 @@
 [submodule "lib/h265nal"]
 	path = lib/h265nal
 	url = https://github.com/chemag/h265nal
+[submodule "lib/h264nal"]
+	path = lib/h264nal
+	url = https://github.com/chemag/h264nal
