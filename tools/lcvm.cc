@@ -20,6 +20,7 @@ extern int optind;
 /* option values */
 typedef struct arg_options {
   int debug;
+  int nruns;
   char *outfile;
   char *outfile_timestamps;
   std::vector<std::string> infile_list;
@@ -28,6 +29,7 @@ typedef struct arg_options {
 /* default option values */
 arg_options DEFAULT_OPTIONS{
     .debug = 0,
+    .nruns = 1,
     .outfile = nullptr,
     .outfile_timestamps = nullptr,
     .infile_list = {},
@@ -242,6 +244,8 @@ void usage(char *name) {
   fprintf(stderr, "\t-d:\t\tIncrease debug verbosity [%i]\n",
           DEFAULT_OPTIONS.debug);
   fprintf(stderr, "\t-q:\t\tZero debug verbosity\n");
+  fprintf(stderr, "\t--runs <nruns>:\t\tRun the analysis multiple times [%i]\n",
+          DEFAULT_OPTIONS.nruns);
   fprintf(stderr, "\t-o outfile:\t\tSelect outfile\n");
   fprintf(stderr,
           "\t--outfile-timestamps outfile_timestamps:\t\tSelect outfile to "
@@ -255,6 +259,7 @@ enum {
   QUIET_OPTION = CHAR_MAX + 1,
   HELP_OPTION,
   OUTFILE_TIMESTAMPS_OPTION,
+  RUNS_OPTION,
   VERSION_OPTION,
 };
 
@@ -276,6 +281,7 @@ arg_options *parse_args(int argc, char **argv) {
       {"outfile-timestamps", required_argument, nullptr,
        OUTFILE_TIMESTAMPS_OPTION},
       // options without a short option
+      {"runs", required_argument, nullptr, RUNS_OPTION},
       {"quiet", no_argument, nullptr, QUIET_OPTION},
       {"version", no_argument, NULL, VERSION_OPTION},
       {"help", no_argument, nullptr, HELP_OPTION},
@@ -311,6 +317,15 @@ arg_options *parse_args(int argc, char **argv) {
       case QUIET_OPTION:
         options.debug = 0;
         break;
+
+      case RUNS_OPTION: {
+        char *endptr;
+        options.nruns = strtol(optarg, &endptr, 0);
+        if (*endptr != '\0') {
+          fprintf(stderr, "error: invalid --runs parameter: %s\n", optarg);
+          exit(-1);
+        }
+      } break;
 
       case HELP_OPTION:
       case 'h':
@@ -360,14 +375,17 @@ int main(int argc, char **argv) {
            (options->outfile_timestamps == nullptr)
                ? "nullptr"
                : options->outfile_timestamps);
+    printf("options->nruns = %i\n", options->nruns);
 
     for (const auto &infile : options->infile_list) {
       printf("options->infile = %s\n", infile.c_str());
     }
   }
 
-  parse_files(options->infile_list, options->outfile,
-              options->outfile_timestamps, options->debug);
+  for (int i = 0; i < options->nruns; ++i) {
+    parse_files(options->infile_list, options->outfile,
+                options->outfile_timestamps, options->debug);
+  }
 
   return 0;
 }
