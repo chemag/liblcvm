@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.12)
 
 project(lcvm VERSION 0.3)
 
@@ -43,6 +43,9 @@ execute_process(
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff
 )
 
+
+# we do not care about fuzzing either h264nal nor h265nal
+set(BUILD_CLANG_FUZZER OFF)  # Set the variable here
 
 # 1.2. add h265nal submodule
 add_subdirectory(${CMAKE_SOURCE_DIR}/lib/h265nal)
