@@ -57,10 +57,14 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
 // @param[out] audio_video_ratio: Audio/video length ratio.
 // @param[out] duration_video_sec: Video length (seconds).
 // @param[out] duration_audio_sec: Audio length (seconds).
+// @param[out] timescale_video_hz: Video length (Hz).
+// @param[out] timescale_audio_hz: Audio length (Hz).
 // @param[in] debug: Debug level.
 int get_video_freeze_info(const char *infile, bool *video_freeze,
                           float *audio_video_ratio, float *duration_video_sec,
-                          float *duration_audio_sec, int debug);
+                          float *duration_audio_sec,
+                          uint32_t *timescale_video_hz,
+                          uint32_t *timescale_audio_hz, int debug);
 
 // @brief Calculates the video GoP structure info.
 //

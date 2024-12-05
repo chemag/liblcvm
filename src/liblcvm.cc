@@ -35,6 +35,8 @@ struct TimingInformation {
   int num_video_frames;
   float duration_video_sec;
   float duration_audio_sec;
+  uint32_t timescale_video_hz;
+  uint32_t timescale_audio_hz;
   std::vector<float> delta_timestamp_sec_list;
   std::vector<uint32_t> keyframe_sample_number_list;
 } TimingInformation;
@@ -107,19 +109,21 @@ int get_timing_information(const char *infile,
       }
       return -1;
     }
-    uint32_t timescale = mdhd->GetTimescale();
+    uint32_t timescale_hz = mdhd->GetTimescale();
     uint64_t duration = mdhd->GetDuration();
-    float duration_sec = (float)duration / timescale;
+    float duration_sec = (float)duration / timescale_hz;
     if (debug > 1) {
       fprintf(stdout, "-> handler_type: %s ", handler_type.c_str());
-      fprintf(stdout, "timescale: %u ", timescale);
+      fprintf(stdout, "timescale: %u ", timescale_hz);
       fprintf(stdout, "duration: %lu ", duration);
       fprintf(stdout, "duration_sec: %f\n", duration_sec);
     }
     if (handler_type.compare("soun") == 0) {
       timing_information->duration_audio_sec = duration_sec;
+      timing_information->timescale_audio_hz = timescale_hz;
     } else if (handler_type.compare("vide") == 0) {
       timing_information->duration_video_sec = duration_sec;
+      timing_information->timescale_video_hz = timescale_hz;
     }
 
     // only keep video processing
@@ -165,7 +169,7 @@ int get_timing_information(const char *infile,
       uint32_t sample_count = stts->GetSampleCount(i);
       timing_information->num_video_frames += sample_count;
       uint32_t sample_offset = stts->GetSampleOffset(i);
-      float sample_offset_sec = (float)sample_offset / timescale;
+      float sample_offset_sec = (float)sample_offset / timescale_hz;
       for (uint32_t sample = 0; sample < sample_count; sample++) {
         timing_information->delta_timestamp_sec_list.push_back(
             sample_offset_sec);
@@ -653,7 +657,9 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
 
 int get_video_freeze_info(const char *infile, bool *video_freeze,
                           float *audio_video_ratio, float *duration_video_sec,
-                          float *duration_audio_sec, int debug) {
+                          float *duration_audio_sec,
+                          uint32_t *timescale_video_hz,
+                          uint32_t *timescale_audio_hz, int debug) {
   // 0. get timing information
   struct TimingInformation timing_information;
   if (get_timing_information(infile, &timing_information, debug) < 0) {
@@ -661,6 +667,8 @@ int get_video_freeze_info(const char *infile, bool *video_freeze,
   }
   *duration_video_sec = timing_information.duration_video_sec;
   *duration_audio_sec = timing_information.duration_audio_sec;
+  *timescale_video_hz = timing_information.timescale_video_hz;
+  *timescale_audio_hz = timing_information.timescale_audio_hz;
 
   // 1. check both audio and video tracks, and video track at least 2 seconds
   if (*duration_video_sec == -1.0) {
