@@ -181,7 +181,7 @@ int get_timing_information(const char *infile,
       }
     }
 
-    // 11. look for a stss box in the video track
+    // 11. look for a stss box in the video track for key frames
     if (handler_type.compare("vide") == 0) {
       std::shared_ptr<ISOBMFF::STSS> stss =
           stbl->GetTypedBox<ISOBMFF::STSS>("stss");

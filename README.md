@@ -43,6 +43,21 @@ $ csvlook -I full.csv
 ```
 
 
+# 3. Technical Discussion
+
+liblcvm uses the [ISOBMFF](https://github.com/DigiDNA/ISOBMFF) library to
+parse a series of boxes in ISOBMFF files. More concretely, it gets the
+following information:
+
+* `/moov/trak/mdia/hdlr`: box to get whether a track is audio or video.
+* `/moov/trak/mdia/mdhd`: box to get track timescale and duration.
+* `/moov/trak/mdia/minf/stbl/stts`: box to get inter-sample distance.
+* `/moov/trak/mdia/minf/stbl/stss`: box to get keyframe information.
+
+Since v0.2, liblcvm also uses the [h264nal](https://github.com/chemag/h264nal)
+and [h265nal](https://github.com/chemag/h265nal) libraries to peek inside
+the SPS VUI in the actual media boxes, and get some information (e.g.
+colorimetry).
 
 
 # Appendix 1: Build Manually
