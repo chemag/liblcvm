@@ -37,7 +37,10 @@ struct TimingInformation {
   float duration_audio_sec;
   uint32_t timescale_video_hz;
   uint32_t timescale_audio_hz;
-  std::vector<float> delta_timestamp_sec_list;
+  std::vector<uint32_t> stts_unit_list;
+  std::vector<uint32_t> ctts_unit_list;
+  std::vector<float> dts_sec_list;
+  std::vector<float> pts_sec_list;
   std::vector<uint32_t> keyframe_sample_number_list;
 } TimingInformation;
 
@@ -162,22 +165,84 @@ int get_timing_information(const char *infile,
       return -1;
     }
 
-    // 10. gather the inter-frame timestamp deltas
-    timing_information->delta_timestamp_sec_list.clear();
+    // 9.1. gather the stts timestamp deltas
     timing_information->num_video_frames = 0;
+    timing_information->dts_sec_list.clear();
+    timing_information->pts_sec_list.clear();
+    timing_information->stts_unit_list.clear();
+    // first frame starts at 0.0
+    timing_information->dts_sec_list.push_back(0.0);
+    timing_information->pts_sec_list.push_back(0.0);
+    // run all through the stts table
+    uint32_t stts_sample_count = 0;
+    uint32_t last_dts_unit = 0.0;
     for (unsigned int i = 0; i < stts->GetEntryCount(); i++) {
       uint32_t sample_count = stts->GetSampleCount(i);
+      stts_sample_count += sample_count;
       timing_information->num_video_frames += sample_count;
       uint32_t sample_offset = stts->GetSampleOffset(i);
-      float sample_offset_sec = (float)sample_offset / timescale_hz;
       for (uint32_t sample = 0; sample < sample_count; sample++) {
-        timing_information->delta_timestamp_sec_list.push_back(
-            sample_offset_sec);
+        // store the new stts value
+        timing_information->stts_unit_list.push_back(sample_offset);
+        // set the dts value of the next frame
+        uint32_t dts_unit = last_dts_unit + sample_offset;
+        float dts_sec = (float)dts_unit / timescale_hz;
+        timing_information->dts_sec_list.push_back(dts_sec);
+        // init the pts value of the next frame
+        timing_information->pts_sec_list.push_back(dts_sec);
+        last_dts_unit = dts_unit;
       }
       if (debug > 2) {
-        fprintf(stdout, "sample_count: %u ", sample_count);
-        fprintf(stdout, "sample_offset: %u ", sample_offset);
-        fprintf(stdout, "sample_offset_sec: %f\n", sample_offset_sec);
+        fprintf(stdout, "stts::sample_count: %u ", sample_count);
+        fprintf(stdout, "stts::sample_offset: %u ", sample_offset);
+      }
+    }
+    // we need to remove the last element of the dts and pts lists, as we
+    // set them pointing at the start of the next frame (inexistent)
+    timing_information->dts_sec_list.pop_back();
+    timing_information->pts_sec_list.pop_back();
+
+    // 10. look for a ctts box
+    std::shared_ptr<ISOBMFF::CTTS> ctts =
+        stbl->GetTypedBox<ISOBMFF::CTTS>("ctts");
+    if (ctts != nullptr) {
+      float last_ctts_sample_offset_sec = 0.0;
+      // 10.1. adjust pts list using ctts timestamp deltas
+      uint32_t ctts_sample_count = 0;
+      uint32_t cur_video_frame = 0;
+      timing_information->ctts_unit_list.clear();
+      for (unsigned int i = 0; i < ctts->GetEntryCount(); i++) {
+        uint32_t sample_count = ctts->GetSampleCount(i);
+        ctts_sample_count += sample_count;
+        // update pts_sec_list
+        uint32_t sample_offset = ctts->GetSampleOffset(i);
+        float sample_offset_sec = (float)sample_offset / timescale_hz;
+        last_ctts_sample_offset_sec = sample_offset_sec;
+        for (uint32_t sample = 0; sample < sample_count; sample++) {
+          // store the new ctts value
+          timing_information->ctts_unit_list.push_back(sample_offset);
+          // update the pts value
+          timing_information->pts_sec_list[cur_video_frame] +=
+              sample_offset_sec;
+          ++cur_video_frame;
+        }
+        if (debug > 2) {
+          fprintf(stdout, "ctts::sample_count: %u ", sample_count);
+          fprintf(stdout, "ctts::sample_offset: %u ", sample_offset);
+        }
+      }
+      // standard suggests that, if there are less ctts than actual samples,
+      // the decoder reuses the latest ctts sample offset again and again
+      while (cur_video_frame < stts_sample_count) {
+        // update the pts value
+        timing_information->pts_sec_list[cur_video_frame] +=
+            last_ctts_sample_offset_sec;
+        ++cur_video_frame;
+      }
+      if (debug > 2) {
+        printf("cur_video_frame: %u\n", cur_video_frame);
+        printf("stts_sample_count: %u\n", stts_sample_count);
+        printf("ctts_sample_count: %u\n", ctts_sample_count);
       }
     }
 
@@ -497,16 +562,33 @@ int get_frame_information(const char *infile,
 }
 
 int get_frame_interframe_info(const char *infile, int *num_video_frames,
-                              std::vector<float> &delta_timestamp_sec_list,
-                              int debug) {
-  // get the list of inter-frame timestamp distances.
+                              std::vector<uint32_t> &stts_unit_list,
+                              std::vector<uint32_t> &ctts_unit_list,
+                              std::vector<float> &dts_sec_list,
+                              std::vector<float> &pts_sec_list, int debug) {
+  // get the list of frame durations
   struct TimingInformation timing_information;
   if (get_timing_information(infile, &timing_information, debug) < 0) {
     return -1;
   }
   *num_video_frames = timing_information.num_video_frames;
-  delta_timestamp_sec_list = timing_information.delta_timestamp_sec_list;
+  stts_unit_list = timing_information.stts_unit_list;
+  ctts_unit_list = timing_information.ctts_unit_list;
+  dts_sec_list = timing_information.dts_sec_list;
+  pts_sec_list = timing_information.pts_sec_list;
   return 0;
+}
+
+void calculate_vector_deltas(const std::vector<float> in,
+                             std::vector<float> &out) {
+  out.clear();
+  float last_val = -1.0;
+  for (const auto &val : in) {
+    if (last_val != -1.0) {
+      out.push_back(val - last_val);
+    }
+    last_val = val;
+  }
 }
 
 int get_frame_drop_info(const char *infile, int *num_video_frames,
@@ -520,27 +602,27 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
                         std::vector<int> consecutive_list,
                         std::vector<long int> &frame_drop_length_consecutive,
                         int debug) {
-  // 0. get the list of inter-frame timestamp distances.
+  // 0. get the list of inter-frame timestamp distances from the pts_sec_list
   struct TimingInformation timing_information;
   if (get_timing_information(infile, &timing_information, debug) < 0) {
     return -1;
   }
   *num_video_frames = timing_information.num_video_frames;
 
+  std::vector<float> pts_sec_delta_list;
+  calculate_vector_deltas(timing_information.pts_sec_list, pts_sec_delta_list);
+
   if (debug > 1) {
-    for (const auto &delta_timestamp_sec :
-         timing_information.delta_timestamp_sec_list) {
-      fprintf(stdout, "%f,", delta_timestamp_sec);
+    for (const auto &pts_sec_delta : pts_sec_delta_list) {
+      fprintf(stdout, "%f,", pts_sec_delta);
     }
     fprintf(stdout, "\n");
   }
 
   // 1. calculate the inter-frame distance statistics
   // 1.1. get the list of frame rates
-  std::vector<float> frame_rate_fps_list(
-      timing_information.delta_timestamp_sec_list.size());
-  std::transform(timing_information.delta_timestamp_sec_list.begin(),
-                 timing_information.delta_timestamp_sec_list.end(),
+  std::vector<float> frame_rate_fps_list(pts_sec_delta_list.size());
+  std::transform(pts_sec_delta_list.begin(), pts_sec_delta_list.end(),
                  frame_rate_fps_list.begin(), [](float val) {
                    // Handle division by zero
                    return val != 0.0f ? 1.0f / static_cast<float>(val) : 0.0f;
@@ -549,11 +631,9 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
   sort(frame_rate_fps_list.begin(), frame_rate_fps_list.end());
   *frame_rate_fps_median =
       frame_rate_fps_list[frame_rate_fps_list.size() / 2 - 1];
-  sort(timing_information.delta_timestamp_sec_list.begin(),
-       timing_information.delta_timestamp_sec_list.end());
-  float delta_timestamp_sec_median =
-      timing_information.delta_timestamp_sec_list
-          [timing_information.delta_timestamp_sec_list.size() / 2 - 1];
+  sort(pts_sec_delta_list.begin(), pts_sec_delta_list.end());
+  float pts_sec_delta_median =
+      pts_sec_delta_list[pts_sec_delta_list.size() / 2 - 1];
   // 1.3. average
   *frame_rate_fps_average =
       (1.0 * std::accumulate(frame_rate_fps_list.begin(),
@@ -575,14 +655,13 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
   // 2. calculate the threshold to consider frame drop: This should be 2
   // times the median, minus a factor
   double FACTOR = 0.75;
-  float delta_timestamp_sec_threshold = delta_timestamp_sec_median * FACTOR * 2;
+  float pts_sec_delta_threshold = pts_sec_delta_median * FACTOR * 2;
 
   // 3. get the list of all the drops (absolute inter-frame values)
   std::vector<float> drop_length_sec_list;
-  for (const auto &delta_timestamp_sec :
-       timing_information.delta_timestamp_sec_list) {
-    if (delta_timestamp_sec > delta_timestamp_sec_threshold) {
-      drop_length_sec_list.push_back(delta_timestamp_sec);
+  for (const auto &pts_sec_delta : pts_sec_delta_list) {
+    if (pts_sec_delta > pts_sec_delta_threshold) {
+      drop_length_sec_list.push_back(pts_sec_delta);
     }
   }
   // drop_length_sec_list: {0.6668900000000022, 0.10025600000000168, ...}
@@ -594,14 +673,13 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
   }
   float drop_length_duration_sec =
       drop_length_sec_list_sum -
-      delta_timestamp_sec_median * drop_length_sec_list.size();
+      pts_sec_delta_median * drop_length_sec_list.size();
   // drop_length_duration_sec: sum({33.35900000000022, 66.92600000000168, ...})
 
   // 5. get the total duration as the sum of all the inter-frame distances
   float total_duration_sec = 0.0;
-  for (const auto &delta_timestamp_sec :
-       timing_information.delta_timestamp_sec_list) {
-    total_duration_sec += delta_timestamp_sec;
+  for (const auto &pts_sec_delta : pts_sec_delta_list) {
+    total_duration_sec += pts_sec_delta;
   }
 
   // 6. calculate frame drop ratio as extra drop length over total duration
@@ -617,7 +695,7 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
     float frame_drop_average_length =
         drop_length_sec_list_sum / drop_length_sec_list.size();
     *normalized_frame_drop_average_length =
-        (frame_drop_average_length / delta_timestamp_sec_median);
+        (frame_drop_average_length / pts_sec_delta_median);
   }
 
   // 8. calculate percentile list
@@ -627,7 +705,7 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
     for (const float &percentile : percentile_list) {
       int position = (percentile / 100.0) * drop_length_sec_list.size();
       float frame_drop_length_percentile =
-          drop_length_sec_list[position] / delta_timestamp_sec_median;
+          drop_length_sec_list[position] / pts_sec_delta_median;
       frame_drop_length_percentile_list.push_back(frame_drop_length_percentile);
     }
   } else {
@@ -643,7 +721,7 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
   }
   if (drop_length_sec_list.size() > 0) {
     for (const auto &drop_length_sec : drop_length_sec_list) {
-      float drop_length = drop_length_sec / delta_timestamp_sec_median;
+      float drop_length = drop_length_sec / pts_sec_delta_median;
       for (unsigned int i = 0; i < consecutive_list.size(); i++) {
         if (drop_length >= consecutive_list[i]) {
           frame_drop_length_consecutive[i]++;

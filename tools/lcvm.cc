@@ -10,6 +10,7 @@
 #include <climits>
 #include <cstdio>
 #include <cstring>
+#include <map>
 #include <string>  // for basic_string, string
 #include <vector>
 
@@ -70,7 +71,10 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
           "num_video_keyframes,key_frame_ratio\n");
 
   // 2. write CSV rows
-  std::vector<std::vector<float>> delta_timestamp_sec_list_list;
+  std::map<std::string, std::vector<uint32_t>> stts_unit_list_dict;
+  std::map<std::string, std::vector<uint32_t>> ctts_unit_list_dict;
+  std::map<std::string, std::vector<float>> dts_sec_list_dict;
+  std::map<std::string, std::vector<float>> pts_sec_list_dict;
   for (const auto &infile : infile_list) {
     // 2.0. get generic info
     int width;
@@ -191,24 +195,32 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
 
     // 2.4. capture outfile timestamps
     if (outfile_timestamps != nullptr) {
-      std::vector<float> delta_timestamp_sec_list;
+      std::vector<uint32_t> stts_unit_list;
+      std::vector<uint32_t> ctts_unit_list;
+      std::vector<float> dts_sec_list;
+      std::vector<float> pts_sec_list;
       ret = get_frame_interframe_info(infile.c_str(), &num_video_frames,
-                                      delta_timestamp_sec_list, debug);
+                                      stts_unit_list, ctts_unit_list,
+                                      dts_sec_list, pts_sec_list, debug);
       if (ret < 0) {
         fprintf(stderr, "error: get_frame_interframe_info() in %s\n",
                 infile.c_str());
       }
-      delta_timestamp_sec_list_list.push_back(delta_timestamp_sec_list);
+      stts_unit_list_dict[infile] = stts_unit_list;
+      ctts_unit_list_dict[infile] = ctts_unit_list;
+      dts_sec_list_dict[infile] = dts_sec_list;
+      pts_sec_list_dict[infile] = pts_sec_list;
     }
   }
 
   // 3. dump outfile timestamps
   if (outfile_timestamps != nullptr) {
-    // 3.1. get the maximum number of frames
+    // 3.1. get the number of frames of the longest file
     size_t max_number_of_frames = 0;
-    for (const auto &delta_timestamp_sec_list : delta_timestamp_sec_list_list) {
+    for (const auto &entry : stts_unit_list_dict) {
+      const std::vector<uint32_t> &stts_unit_list = entry.second;
       max_number_of_frames =
-          std::max(max_number_of_frames, delta_timestamp_sec_list.size());
+          std::max(max_number_of_frames, stts_unit_list.size());
     }
     // 3.2. open outfile_timestamps
     FILE *outtsfp = fopen(outfile_timestamps, "wb");
@@ -220,18 +232,53 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     }
     // 3.3. dump the file names
     fprintf(outtsfp, "frame_num");
-    for (const auto &infile : infile_list) {
-      fprintf(outtsfp, ",%s", infile.c_str());
+    for (const auto &entry : stts_unit_list_dict) {
+      const std::string &infile = entry.first;
+      fprintf(outtsfp, ",stts_%s", infile.c_str());
+      fprintf(outtsfp, ",ctts_%s", infile.c_str());
+      fprintf(outtsfp, ",dts_%s", infile.c_str());
+      fprintf(outtsfp, ",pts_%s", infile.c_str());
     }
     fprintf(outtsfp, "\n");
     // 3.4. dump the columns of inter-frame timestamps
-    for (size_t i = 0; i < max_number_of_frames; ++i) {
-      fprintf(outtsfp, "%li", i);
-      for (const auto &delta_timestamp_sec_list :
-           delta_timestamp_sec_list_list) {
-        if (i < delta_timestamp_sec_list.size()) {
-          float delta_timestamp_sec = delta_timestamp_sec_list[i];
-          fprintf(outtsfp, ",%f", delta_timestamp_sec);
+    for (size_t frame_num = 0; frame_num < max_number_of_frames; ++frame_num) {
+      fprintf(outtsfp, "%li", frame_num);
+      // dump stts_unit_list[frame_num]
+      for (const auto &entry : stts_unit_list_dict) {
+        const std::vector<uint32_t> &stts_unit_list = entry.second;
+        if (frame_num < stts_unit_list.size()) {
+          uint32_t stts_unit = stts_unit_list[frame_num];
+          fprintf(outtsfp, ",%u", stts_unit);
+        } else {
+          fprintf(outtsfp, ",");
+        }
+      }
+      // dump ctts_sec_list[frame_num]
+      for (const auto &entry : ctts_unit_list_dict) {
+        const std::vector<uint32_t> &ctts_unit_list = entry.second;
+        if (frame_num < ctts_unit_list.size()) {
+          uint32_t ctts_unit = ctts_unit_list[frame_num];
+          fprintf(outtsfp, ",%u", ctts_unit);
+        } else {
+          fprintf(outtsfp, ",");
+        }
+      }
+      // dump dts_sec_list[frame_num]
+      for (const auto &entry : dts_sec_list_dict) {
+        const std::vector<float> &dts_sec_list = entry.second;
+        if (frame_num < dts_sec_list.size()) {
+          float dts = dts_sec_list[frame_num];
+          fprintf(outtsfp, ",%f", dts);
+        } else {
+          fprintf(outtsfp, ",");
+        }
+      }
+      // dump pts_sec_list[frame_num]
+      for (const auto &entry : pts_sec_list_dict) {
+        const std::vector<float> &pts_sec_list = entry.second;
+        if (frame_num < pts_sec_list.size()) {
+          float pts = pts_sec_list[frame_num];
+          fprintf(outtsfp, ",%f", pts);
         } else {
           fprintf(outtsfp, ",");
         }

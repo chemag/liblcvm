@@ -109,8 +109,13 @@ int get_video_generic_info(const char *infile, int *width, int *height,
 //
 // @param[in] infile: Name of the file to be parsed.
 // @param[out] num_video_frames: Number of video frames in the file.
-// @param[out] delta_timestamp_sec_list: Inter-frame distances (seconds).
+// @param[out] stts_unit_list: STTS values (units).
+// @param[out] ctts_unit_list: CTTS values (units).
+// @param[out] dts_list: DTS (decoding timestamp) list (seconds).
+// @param[out] pts_list: PTS (presentation timestamp) list (seconds).
 // @param[in] debug: Debug level.
 int get_frame_interframe_info(const char *infile, int *num_video_frames,
-                              std::vector<float> &delta_timestamp_sec_list,
-                              int debug);
+                              std::vector<uint32_t> &stts_unit_list,
+                              std::vector<uint32_t> &ctts_unit_list,
+                              std::vector<float> &dts_list,
+                              std::vector<float> &pts_list, int debug);
