@@ -212,6 +212,12 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
         fprintf(stderr, "error: get_frame_interframe_info() in %s\n",
                 infile.c_str());
       }
+      // store the values
+      frame_num_orig_list_dict[infile] = frame_num_orig_list;
+      stts_unit_list_dict[infile] = stts_unit_list;
+      ctts_unit_list_dict[infile] = ctts_unit_list;
+      dts_sec_list_dict[infile] = dts_sec_list;
+      pts_sec_list_dict[infile] = pts_sec_list;
     }
   }
 
