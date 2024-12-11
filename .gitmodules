@@ -1,6 +1,6 @@
 [submodule "lib/isobmff"]
 	path = lib/isobmff
-	url = https://github.com/DigiDNA/ISOBMFF
+	url = https://github.com/chemag/ISOBMFF
 [submodule "lib/h265nal"]
 	path = lib/h265nal
 	url = https://github.com/chemag/h265nal
