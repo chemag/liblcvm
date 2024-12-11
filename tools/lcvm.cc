@@ -24,6 +24,7 @@ typedef struct arg_options {
   int nruns;
   char *outfile;
   char *outfile_timestamps;
+  bool outfile_timestamps_sort_pts;
   std::vector<std::string> infile_list;
 } arg_options;
 
@@ -33,11 +34,13 @@ arg_options DEFAULT_OPTIONS{
     .nruns = 1,
     .outfile = nullptr,
     .outfile_timestamps = nullptr,
+    .outfile_timestamps_sort_pts = false,
     .infile_list = {},
 };
 
 int parse_files(std::vector<std::string> &infile_list, char *outfile,
-                char *outfile_timestamps, int debug) {
+                char *outfile_timestamps, bool outfile_timestamps_sort_pts,
+                int debug) {
   // 0. open outfile
   FILE *outfp;
   if (outfile == nullptr || (strlen(outfile) == 1 && outfile[0] == '-')) {
@@ -71,6 +74,7 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
           "num_video_keyframes,key_frame_ratio\n");
 
   // 2. write CSV rows
+  std::map<std::string, std::vector<uint32_t>> frame_num_orig_list_dict;
   std::map<std::string, std::vector<uint32_t>> stts_unit_list_dict;
   std::map<std::string, std::vector<uint32_t>> ctts_unit_list_dict;
   std::map<std::string, std::vector<float>> dts_sec_list_dict;
@@ -206,6 +210,43 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
         fprintf(stderr, "error: get_frame_interframe_info() in %s\n",
                 infile.c_str());
       }
+      std::vector<uint32_t> frame_num_orig_list(pts_sec_list.size());
+      for (uint32_t i = 0; i < pts_sec_list.size(); ++i) {
+        frame_num_orig_list[i] = i;
+      }
+      if (outfile_timestamps_sort_pts) {
+        // sort frame_num_orig_list elements based on the values in pts_sec_list
+        std::stable_sort(frame_num_orig_list.begin(), frame_num_orig_list.end(),
+                         [&pts_sec_list](int a, int b) {
+                           return pts_sec_list[a] < pts_sec_list[b];
+                         });
+        // sort all the others based in the new order
+        std::vector<uint32_t> stts_unit_list_alt(stts_unit_list.size());
+        for (uint32_t i = 0; i < stts_unit_list.size(); ++i) {
+          stts_unit_list_alt[i] = stts_unit_list[frame_num_orig_list[i]];
+        }
+        stts_unit_list = stts_unit_list_alt;
+
+        std::vector<uint32_t> ctts_unit_list_alt(ctts_unit_list.size());
+        for (uint32_t i = 0; i < ctts_unit_list.size(); ++i) {
+          ctts_unit_list_alt[i] = ctts_unit_list[frame_num_orig_list[i]];
+        }
+        ctts_unit_list = ctts_unit_list_alt;
+
+        std::vector<float> dts_sec_list_alt(dts_sec_list.size());
+        for (uint32_t i = 0; i < dts_sec_list.size(); ++i) {
+          dts_sec_list_alt[i] = dts_sec_list[frame_num_orig_list[i]];
+        }
+        dts_sec_list = dts_sec_list_alt;
+
+        std::vector<float> pts_sec_list_alt(pts_sec_list.size());
+        for (uint32_t i = 0; i < pts_sec_list.size(); ++i) {
+          pts_sec_list_alt[i] = pts_sec_list[frame_num_orig_list[i]];
+        }
+        pts_sec_list = pts_sec_list_alt;
+      }
+      // store the values
+      frame_num_orig_list_dict[infile] = frame_num_orig_list;
       stts_unit_list_dict[infile] = stts_unit_list;
       ctts_unit_list_dict[infile] = ctts_unit_list;
       dts_sec_list_dict[infile] = dts_sec_list;
@@ -217,10 +258,10 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
   if (outfile_timestamps != nullptr) {
     // 3.1. get the number of frames of the longest file
     size_t max_number_of_frames = 0;
-    for (const auto &entry : stts_unit_list_dict) {
-      const std::vector<uint32_t> &stts_unit_list = entry.second;
+    for (const auto &entry : frame_num_orig_list_dict) {
+      const std::vector<uint32_t> &frame_num_orig_list = entry.second;
       max_number_of_frames =
-          std::max(max_number_of_frames, stts_unit_list.size());
+          std::max(max_number_of_frames, frame_num_orig_list.size());
     }
     // 3.2. open outfile_timestamps
     FILE *outtsfp = fopen(outfile_timestamps, "wb");
@@ -232,6 +273,7 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     }
     // 3.3. dump the file names
     fprintf(outtsfp, "frame_num");
+    fprintf(outtsfp, ",frame_num_orig");
     for (const auto &entry : stts_unit_list_dict) {
       const std::string &infile = entry.first;
       fprintf(outtsfp, ",stts_%s", infile.c_str());
@@ -243,6 +285,16 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     // 3.4. dump the columns of inter-frame timestamps
     for (size_t frame_num = 0; frame_num < max_number_of_frames; ++frame_num) {
       fprintf(outtsfp, "%li", frame_num);
+      // get frame_num_orig_list[frame_num]
+      for (const auto &entry : frame_num_orig_list_dict) {
+        const std::vector<uint32_t> &frame_num_orig_list = entry.second;
+        if (frame_num < frame_num_orig_list.size()) {
+          uint32_t frame_num_orig = frame_num_orig_list[frame_num];
+          fprintf(outtsfp, ",%u", frame_num_orig);
+        } else {
+          fprintf(outtsfp, ",");
+        }
+      }
       // dump stts_unit_list[frame_num]
       for (const auto &entry : stts_unit_list_dict) {
         const std::vector<uint32_t> &stts_unit_list = entry.second;
@@ -302,6 +354,7 @@ void usage(char *name) {
   fprintf(stderr,
           "\t--outfile-timestamps outfile_timestamps:\t\tSelect outfile to "
           "dump timestamps\n");
+  fprintf(stderr, "\t--sort-pts:\t\tSort outfile timestamps by PTS\n");
   fprintf(stderr, "\t-h:\t\tHelp\n");
   exit(-1);
 }
@@ -311,6 +364,7 @@ enum {
   QUIET_OPTION = CHAR_MAX + 1,
   HELP_OPTION,
   OUTFILE_TIMESTAMPS_OPTION,
+  SORT_PTS_OPTION,
   RUNS_OPTION,
   VERSION_OPTION,
 };
@@ -332,6 +386,7 @@ arg_options *parse_args(int argc, char **argv) {
       {"outfile", required_argument, nullptr, 'o'},
       {"outfile-timestamps", required_argument, nullptr,
        OUTFILE_TIMESTAMPS_OPTION},
+      {"sort-pts", no_argument, nullptr, SORT_PTS_OPTION},
       // options without a short option
       {"runs", required_argument, nullptr, RUNS_OPTION},
       {"quiet", no_argument, nullptr, QUIET_OPTION},
@@ -364,6 +419,10 @@ arg_options *parse_args(int argc, char **argv) {
 
       case OUTFILE_TIMESTAMPS_OPTION:
         options.outfile_timestamps = optarg;
+        break;
+
+      case SORT_PTS_OPTION:
+        options.outfile_timestamps_sort_pts = true;
         break;
 
       case QUIET_OPTION:
@@ -427,6 +486,8 @@ int main(int argc, char **argv) {
            (options->outfile_timestamps == nullptr)
                ? "nullptr"
                : options->outfile_timestamps);
+    printf("options->outfile_timestamps_sort_pts = %i\n",
+           options->outfile_timestamps_sort_pts);
     printf("options->nruns = %i\n", options->nruns);
 
     for (const auto &infile : options->infile_list) {
@@ -436,7 +497,8 @@ int main(int argc, char **argv) {
 
   for (int i = 0; i < options->nruns; ++i) {
     parse_files(options->infile_list, options->outfile,
-                options->outfile_timestamps, options->debug);
+                options->outfile_timestamps,
+                options->outfile_timestamps_sort_pts, options->debug);
   }
 
   return 0;
