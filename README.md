@@ -26,7 +26,7 @@ $ cd liblcvm
 ```
 $ mkdir build
 $ cd build
-$ cmake ..
+$ CC=gcc CXX=g++ cmake -DBUILD_CLANG_FUZZER=OFF ..
 $ make
 ```
 
