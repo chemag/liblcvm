@@ -199,58 +199,19 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
 
     // 2.4. capture outfile timestamps
     if (outfile_timestamps != nullptr) {
+      std::vector<uint32_t> frame_num_orig_list;
       std::vector<uint32_t> stts_unit_list;
       std::vector<uint32_t> ctts_unit_list;
       std::vector<float> dts_sec_list;
       std::vector<float> pts_sec_list;
-      ret = get_frame_interframe_info(infile.c_str(), &num_video_frames,
-                                      stts_unit_list, ctts_unit_list,
-                                      dts_sec_list, pts_sec_list, debug);
+      ret = get_frame_interframe_info(
+          infile.c_str(), &num_video_frames, frame_num_orig_list,
+          stts_unit_list, ctts_unit_list, dts_sec_list, pts_sec_list,
+          outfile_timestamps_sort_pts, debug);
       if (ret < 0) {
         fprintf(stderr, "error: get_frame_interframe_info() in %s\n",
                 infile.c_str());
       }
-      std::vector<uint32_t> frame_num_orig_list(pts_sec_list.size());
-      for (uint32_t i = 0; i < pts_sec_list.size(); ++i) {
-        frame_num_orig_list[i] = i;
-      }
-      if (outfile_timestamps_sort_pts) {
-        // sort frame_num_orig_list elements based on the values in pts_sec_list
-        std::stable_sort(frame_num_orig_list.begin(), frame_num_orig_list.end(),
-                         [&pts_sec_list](int a, int b) {
-                           return pts_sec_list[a] < pts_sec_list[b];
-                         });
-        // sort all the others based in the new order
-        std::vector<uint32_t> stts_unit_list_alt(stts_unit_list.size());
-        for (uint32_t i = 0; i < stts_unit_list.size(); ++i) {
-          stts_unit_list_alt[i] = stts_unit_list[frame_num_orig_list[i]];
-        }
-        stts_unit_list = stts_unit_list_alt;
-
-        std::vector<uint32_t> ctts_unit_list_alt(ctts_unit_list.size());
-        for (uint32_t i = 0; i < ctts_unit_list.size(); ++i) {
-          ctts_unit_list_alt[i] = ctts_unit_list[frame_num_orig_list[i]];
-        }
-        ctts_unit_list = ctts_unit_list_alt;
-
-        std::vector<float> dts_sec_list_alt(dts_sec_list.size());
-        for (uint32_t i = 0; i < dts_sec_list.size(); ++i) {
-          dts_sec_list_alt[i] = dts_sec_list[frame_num_orig_list[i]];
-        }
-        dts_sec_list = dts_sec_list_alt;
-
-        std::vector<float> pts_sec_list_alt(pts_sec_list.size());
-        for (uint32_t i = 0; i < pts_sec_list.size(); ++i) {
-          pts_sec_list_alt[i] = pts_sec_list[frame_num_orig_list[i]];
-        }
-        pts_sec_list = pts_sec_list_alt;
-      }
-      // store the values
-      frame_num_orig_list_dict[infile] = frame_num_orig_list;
-      stts_unit_list_dict[infile] = stts_unit_list;
-      ctts_unit_list_dict[infile] = ctts_unit_list;
-      dts_sec_list_dict[infile] = dts_sec_list;
-      pts_sec_list_dict[infile] = pts_sec_list;
     }
   }
 

@@ -37,6 +37,7 @@ struct TimingInformation {
   float duration_audio_sec;
   uint32_t timescale_video_hz;
   uint32_t timescale_audio_hz;
+  std::vector<uint32_t> frame_num_orig_list;
   std::vector<uint32_t> stts_unit_list;
   std::vector<uint32_t> ctts_unit_list;
   std::vector<float> dts_sec_list;
@@ -46,7 +47,7 @@ struct TimingInformation {
 
 int get_timing_information(const char *infile,
                            struct TimingInformation *timing_information,
-                           int debug) {
+                           bool sort_by_pts, int debug) {
   // 1. parse the input file
   ISOBMFF::Parser parser;
   try {
@@ -264,6 +265,63 @@ int get_timing_information(const char *infile,
         }
       }
     }
+  }
+
+  // 12. set the frame_num_orig_list vector
+  timing_information->frame_num_orig_list.resize(
+      timing_information->pts_sec_list.size());
+  for (uint32_t i = 0; i < timing_information->pts_sec_list.size(); ++i) {
+    timing_information->frame_num_orig_list[i] = i;
+  }
+
+  // 13. sort the frames by pts value
+  if (sort_by_pts) {
+    // sort frame_num_orig_list elements based on the values in pts_sec_list
+    // TODO(chema): there should be a clear way to access the struct element
+    const auto& pts_sec_list = timing_information->pts_sec_list;
+    std::stable_sort(timing_information->frame_num_orig_list.begin(),
+                     timing_information->frame_num_orig_list.end(),
+                     [&pts_sec_list](int a, int b) {
+                       return pts_sec_list[a] <
+                              pts_sec_list[b];
+                     });
+    // sort all the others based in the new order
+    // 1. stts_unit_list
+    std::vector<uint32_t> stts_unit_list_alt(
+        timing_information->stts_unit_list.size());
+    for (uint32_t i = 0; i < timing_information->stts_unit_list.size(); ++i) {
+      stts_unit_list_alt[i] =
+          timing_information
+              ->stts_unit_list[timing_information->frame_num_orig_list[i]];
+    }
+    timing_information->stts_unit_list = stts_unit_list_alt;
+    // 2. ctts_unit_list
+    std::vector<uint32_t> ctts_unit_list_alt(
+        timing_information->ctts_unit_list.size());
+    for (uint32_t i = 0; i < timing_information->ctts_unit_list.size(); ++i) {
+      ctts_unit_list_alt[i] =
+          timing_information
+              ->ctts_unit_list[timing_information->frame_num_orig_list[i]];
+    }
+    timing_information->ctts_unit_list = ctts_unit_list_alt;
+    // 3. dts_sec_list
+    std::vector<float> dts_sec_list_alt(
+        timing_information->dts_sec_list.size());
+    for (uint32_t i = 0; i < timing_information->dts_sec_list.size(); ++i) {
+      dts_sec_list_alt[i] =
+          timing_information
+              ->dts_sec_list[timing_information->frame_num_orig_list[i]];
+    }
+    timing_information->dts_sec_list = dts_sec_list_alt;
+    // 4. pts_sec_list
+    std::vector<float> pts_sec_list_alt(
+        timing_information->pts_sec_list.size());
+    for (uint32_t i = 0; i < timing_information->pts_sec_list.size(); ++i) {
+      pts_sec_list_alt[i] =
+          timing_information
+              ->pts_sec_list[timing_information->frame_num_orig_list[i]];
+    }
+    timing_information->pts_sec_list = pts_sec_list_alt;
   }
 
   return 0;
@@ -562,20 +620,25 @@ int get_frame_information(const char *infile,
 }
 
 int get_frame_interframe_info(const char *infile, int *num_video_frames,
+                              std::vector<uint32_t> &frame_num_orig_list,
                               std::vector<uint32_t> &stts_unit_list,
                               std::vector<uint32_t> &ctts_unit_list,
                               std::vector<float> &dts_sec_list,
-                              std::vector<float> &pts_sec_list, int debug) {
+                              std::vector<float> &pts_sec_list,
+                              bool sort_by_pts, int debug) {
   // get the list of frame durations
   struct TimingInformation timing_information;
-  if (get_timing_information(infile, &timing_information, debug) < 0) {
+  if (get_timing_information(infile, &timing_information, sort_by_pts, debug) <
+      0) {
     return -1;
   }
   *num_video_frames = timing_information.num_video_frames;
+  frame_num_orig_list = timing_information.frame_num_orig_list;
   stts_unit_list = timing_information.stts_unit_list;
   ctts_unit_list = timing_information.ctts_unit_list;
   dts_sec_list = timing_information.dts_sec_list;
   pts_sec_list = timing_information.pts_sec_list;
+
   return 0;
 }
 
@@ -604,7 +667,7 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
                         int debug) {
   // 0. get the list of inter-frame timestamp distances from the pts_sec_list
   struct TimingInformation timing_information;
-  if (get_timing_information(infile, &timing_information, debug) < 0) {
+  if (get_timing_information(infile, &timing_information, true, debug) < 0) {
     return -1;
   }
   *num_video_frames = timing_information.num_video_frames;
@@ -740,7 +803,7 @@ int get_video_freeze_info(const char *infile, bool *video_freeze,
                           uint32_t *timescale_audio_hz, int debug) {
   // 0. get timing information
   struct TimingInformation timing_information;
-  if (get_timing_information(infile, &timing_information, debug) < 0) {
+  if (get_timing_information(infile, &timing_information, true, debug) < 0) {
     return -1;
   }
   *duration_video_sec = timing_information.duration_video_sec;
@@ -774,7 +837,7 @@ int get_video_structure_info(const char *infile, int *num_video_frames,
                              int *num_video_keyframes, int debug) {
   // 0. get timing information
   struct TimingInformation timing_information;
-  if (get_timing_information(infile, &timing_information, debug) < 0) {
+  if (get_timing_information(infile, &timing_information, true, debug) < 0) {
     return -1;
   }
   *num_video_frames = timing_information.num_video_frames;

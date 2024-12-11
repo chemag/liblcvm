@@ -109,13 +109,17 @@ int get_video_generic_info(const char *infile, int *width, int *height,
 //
 // @param[in] infile: Name of the file to be parsed.
 // @param[out] num_video_frames: Number of video frames in the file.
+// @param[out] frame_num_orig_list: original frame numbers (unitless).
 // @param[out] stts_unit_list: STTS values (units).
 // @param[out] ctts_unit_list: CTTS values (units).
 // @param[out] dts_list: DTS (decoding timestamp) list (seconds).
 // @param[out] pts_list: PTS (presentation timestamp) list (seconds).
+// @param[in] sort_by_pts: Whether to sort the frames by PTS values.
 // @param[in] debug: Debug level.
 int get_frame_interframe_info(const char *infile, int *num_video_frames,
+                              std::vector<uint32_t> &frame_num_orig_list,
                               std::vector<uint32_t> &stts_unit_list,
                               std::vector<uint32_t> &ctts_unit_list,
-                              std::vector<float> &dts_list,
-                              std::vector<float> &pts_list, int debug);
+                              std::vector<float> &dts_sec_list,
+                              std::vector<float> &pts_sec_list,
+                              bool sort_by_pts, int debug);
