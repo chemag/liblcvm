@@ -119,7 +119,7 @@ int get_video_generic_info(const char *infile, int *width, int *height,
 int get_frame_interframe_info(const char *infile, int *num_video_frames,
                               std::vector<uint32_t> &frame_num_orig_list,
                               std::vector<uint32_t> &stts_unit_list,
-                              std::vector<uint32_t> &ctts_unit_list,
+                              std::vector<int32_t> &ctts_unit_list,
                               std::vector<float> &dts_sec_list,
                               std::vector<float> &pts_sec_list,
                               bool sort_by_pts, int debug);

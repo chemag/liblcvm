@@ -39,7 +39,7 @@ struct TimingInformation {
   uint32_t timescale_audio_hz;
   std::vector<uint32_t> frame_num_orig_list;
   std::vector<uint32_t> stts_unit_list;
-  std::vector<uint32_t> ctts_unit_list;
+  std::vector<int32_t> ctts_unit_list;
   std::vector<float> dts_sec_list;
   std::vector<float> pts_sec_list;
   std::vector<uint32_t> keyframe_sample_number_list;
@@ -216,7 +216,7 @@ int get_timing_information(const char *infile,
         uint32_t sample_count = ctts->GetSampleCount(i);
         ctts_sample_count += sample_count;
         // update pts_sec_list
-        uint32_t sample_offset = ctts->GetSampleOffset(i);
+        int32_t sample_offset = ctts->GetSampleOffset(i);
         float sample_offset_sec = (float)sample_offset / timescale_hz;
         last_ctts_sample_offset_sec = sample_offset_sec;
         for (uint32_t sample = 0; sample < sample_count; sample++) {
@@ -229,7 +229,7 @@ int get_timing_information(const char *infile,
         }
         if (debug > 2) {
           fprintf(stdout, "ctts::sample_count: %u ", sample_count);
-          fprintf(stdout, "ctts::sample_offset: %u ", sample_offset);
+          fprintf(stdout, "ctts::sample_offset: %i ", sample_offset);
         }
       }
       // standard suggests that, if there are less ctts than actual samples,
@@ -278,12 +278,11 @@ int get_timing_information(const char *infile,
   if (sort_by_pts) {
     // sort frame_num_orig_list elements based on the values in pts_sec_list
     // TODO(chema): there should be a clear way to access the struct element
-    const auto& pts_sec_list = timing_information->pts_sec_list;
+    const auto &pts_sec_list = timing_information->pts_sec_list;
     std::stable_sort(timing_information->frame_num_orig_list.begin(),
                      timing_information->frame_num_orig_list.end(),
                      [&pts_sec_list](int a, int b) {
-                       return pts_sec_list[a] <
-                              pts_sec_list[b];
+                       return pts_sec_list[a] < pts_sec_list[b];
                      });
     // sort all the others based in the new order
     // 1. stts_unit_list
@@ -296,7 +295,7 @@ int get_timing_information(const char *infile,
     }
     timing_information->stts_unit_list = stts_unit_list_alt;
     // 2. ctts_unit_list
-    std::vector<uint32_t> ctts_unit_list_alt(
+    std::vector<int32_t> ctts_unit_list_alt(
         timing_information->ctts_unit_list.size());
     for (uint32_t i = 0; i < timing_information->ctts_unit_list.size(); ++i) {
       ctts_unit_list_alt[i] =
@@ -622,7 +621,7 @@ int get_frame_information(const char *infile,
 int get_frame_interframe_info(const char *infile, int *num_video_frames,
                               std::vector<uint32_t> &frame_num_orig_list,
                               std::vector<uint32_t> &stts_unit_list,
-                              std::vector<uint32_t> &ctts_unit_list,
+                              std::vector<int32_t> &ctts_unit_list,
                               std::vector<float> &dts_sec_list,
                               std::vector<float> &pts_sec_list,
                               bool sort_by_pts, int debug) {

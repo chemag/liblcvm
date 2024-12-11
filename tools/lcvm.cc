@@ -76,7 +76,7 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
   // 2. write CSV rows
   std::map<std::string, std::vector<uint32_t>> frame_num_orig_list_dict;
   std::map<std::string, std::vector<uint32_t>> stts_unit_list_dict;
-  std::map<std::string, std::vector<uint32_t>> ctts_unit_list_dict;
+  std::map<std::string, std::vector<int32_t>> ctts_unit_list_dict;
   std::map<std::string, std::vector<float>> dts_sec_list_dict;
   std::map<std::string, std::vector<float>> pts_sec_list_dict;
   for (const auto &infile : infile_list) {
@@ -201,7 +201,7 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     if (outfile_timestamps != nullptr) {
       std::vector<uint32_t> frame_num_orig_list;
       std::vector<uint32_t> stts_unit_list;
-      std::vector<uint32_t> ctts_unit_list;
+      std::vector<int32_t> ctts_unit_list;
       std::vector<float> dts_sec_list;
       std::vector<float> pts_sec_list;
       ret = get_frame_interframe_info(
@@ -268,10 +268,10 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
       }
       // dump ctts_sec_list[frame_num]
       for (const auto &entry : ctts_unit_list_dict) {
-        const std::vector<uint32_t> &ctts_unit_list = entry.second;
+        const std::vector<int32_t> &ctts_unit_list = entry.second;
         if (frame_num < ctts_unit_list.size()) {
-          uint32_t ctts_unit = ctts_unit_list[frame_num];
-          fprintf(outtsfp, ",%u", ctts_unit);
+          int32_t ctts_unit = ctts_unit_list[frame_num];
+          fprintf(outtsfp, ",%i", ctts_unit);
         } else {
           fprintf(outtsfp, ",");
         }
