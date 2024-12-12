@@ -4,6 +4,8 @@
 // A show case of using [ISOBMFF](https://github.com/DigiDNA/ISOBMFF) to
 // detect frame dups and video freezes in ISOBMFF files.
 
+#include "liblcvm.h"
+
 #include <h264_bitstream_parser.h>
 #include <h264_common.h>
 #include <h264_nal_unit_parser.h>
@@ -31,55 +33,15 @@ int get_liblcvm_version(std::string &version) {
   return 0;
 }
 
-struct TimingInformation {
-  int num_video_frames;
-  float duration_video_sec;
-  float duration_audio_sec;
-  uint32_t timescale_video_hz;
-  uint32_t timescale_audio_hz;
-  std::vector<uint32_t> frame_num_orig_list;
-  std::vector<uint32_t> stts_unit_list;
-  std::vector<int32_t> ctts_unit_list;
-  std::vector<float> dts_sec_list;
-  std::vector<float> pts_sec_list;
-  std::vector<uint32_t> keyframe_sample_number_list;
-} TimingInformation;
-
-struct FrameInformation {
-  float width;
-  float height;
-  std::string type;
-  int width2;
-  int height2;
-  int horizresolution;
-  int vertresolution;
-  int depth;
-  int chroma_format;
-  int bit_depth_luma;
-  int bit_depth_chroma;
-  int video_full_range_flag;
-  int colour_primaries;
-  int transfer_characteristics;
-  int matrix_coeffs;
-} FrameInformation;
-
-struct IsobmffFileInformation {
-  std::string filename;
-  struct TimingInformation timing;
-  struct FrameInformation frame;
-} IsobmffFileInformation;
-
 int get_timing_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
-                           const char *infile, uint32_t timescale_hz,
-                           struct TimingInformation &timing, int debug);
+                           uint32_t timescale_hz,
+                           struct IsobmffFileInformation &info, int debug);
 
 int get_keyframe_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
-                             const char *infile,
-                             struct TimingInformation &timing, int debug);
+                             struct IsobmffFileInformation &info, int debug);
 
 int get_frame_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
-                          const char *infile, struct FrameInformation &frame,
-                          int debug);
+                          struct IsobmffFileInformation &info, int debug);
 
 int derive_timing_info(struct TimingInformation &timing, bool sort_by_pts,
                        int debug);
@@ -87,17 +49,20 @@ int derive_timing_info(struct TimingInformation &timing, bool sort_by_pts,
 int get_isobmff_information(const char *infile,
                             struct IsobmffFileInformation &info,
                             bool sort_by_pts, int debug) {
+  // 0. store the filename
+  info.filename = infile;
+
   // 1. parse the input file
   ISOBMFF::Parser parser;
   try {
-    parser.Parse(infile);
+    parser.Parse(info.filename.c_str());
   } catch (std::runtime_error &e) {
     return -1;
   }
   std::shared_ptr<ISOBMFF::File> file = parser.GetFile();
   if (file == nullptr) {
     if (debug > 0) {
-      fprintf(stderr, "error: no file in %s\n", infile);
+      fprintf(stderr, "error: no file in %s\n", info.filename.c_str());
     }
     return -1;
   }
@@ -107,7 +72,7 @@ int get_isobmff_information(const char *infile,
       file->GetTypedBox<ISOBMFF::ContainerBox>("moov");
   if (moov == nullptr) {
     if (debug > 0) {
-      fprintf(stderr, "error: no /moov in %s\n", infile);
+      fprintf(stderr, "error: no /moov in %s\n", info.filename.c_str());
     }
     return -1;
   }
@@ -127,7 +92,8 @@ int get_isobmff_information(const char *infile,
         trak->GetTypedBox<ISOBMFF::ContainerBox>("mdia");
     if (mdia == nullptr) {
       if (debug > 0) {
-        fprintf(stderr, "error: no /moov/trak/mdia in %s\n", infile);
+        fprintf(stderr, "error: no /moov/trak/mdia in %s\n",
+                info.filename.c_str());
       }
       return -1;
     }
@@ -137,7 +103,8 @@ int get_isobmff_information(const char *infile,
         mdia->GetTypedBox<ISOBMFF::HDLR>("hdlr");
     if (hdlr == nullptr) {
       if (debug > 0) {
-        fprintf(stderr, "error: no /moov/trak/mdia/hdlr in %s\n", infile);
+        fprintf(stderr, "error: no /moov/trak/mdia/hdlr in %s\n",
+                info.filename.c_str());
       }
       return -1;
     }
@@ -148,7 +115,8 @@ int get_isobmff_information(const char *infile,
         mdia->GetTypedBox<ISOBMFF::MDHD>("mdhd");
     if (mdhd == nullptr) {
       if (debug > 0) {
-        fprintf(stderr, "error: no /moov/trak/mdia/mdhd in %s\n", infile);
+        fprintf(stderr, "error: no /moov/trak/mdia/mdhd in %s\n",
+                info.filename.c_str());
       }
       return -1;
     }
@@ -179,7 +147,8 @@ int get_isobmff_information(const char *infile,
         trak->GetTypedBox<ISOBMFF::TKHD>("tkhd");
     if (tkhd == nullptr) {
       if (debug > 0) {
-        fprintf(stderr, "error: no /moov/trak/tkhd in %s\n", infile);
+        fprintf(stderr, "error: no /moov/trak/tkhd in %s\n",
+                info.filename.c_str());
       }
       return -1;
     }
@@ -191,7 +160,8 @@ int get_isobmff_information(const char *infile,
         mdia->GetTypedBox<ISOBMFF::ContainerBox>("minf");
     if (minf == nullptr) {
       if (debug > 0) {
-        fprintf(stderr, "error: no /moov/trak/mdia/minf in %s\n", infile);
+        fprintf(stderr, "error: no /moov/trak/mdia/minf in %s\n",
+                info.filename.c_str());
       }
       return -1;
     }
@@ -201,7 +171,8 @@ int get_isobmff_information(const char *infile,
         minf->GetTypedBox<ISOBMFF::ContainerBox>("stbl");
     if (stbl == nullptr) {
       if (debug > 0) {
-        fprintf(stderr, "error: no /moov/trak/mdia/minf/stbl in %s\n", infile);
+        fprintf(stderr, "error: no /moov/trak/mdia/minf/stbl in %s\n",
+                info.filename.c_str());
       }
       return -1;
     }
@@ -216,27 +187,29 @@ int get_isobmff_information(const char *infile,
     // first frame starts at 0.0
     info.timing.dts_sec_list.push_back(0.0);
     info.timing.pts_sec_list.push_back(0.0);
-    if (get_timing_information(stbl, infile, timescale_hz, info.timing, debug) <
-        0) {
+    if (get_timing_information(stbl, timescale_hz, info, debug) < 0) {
       if (debug > 0) {
-        fprintf(stderr, "error: no timing information in %s\n", infile);
+        fprintf(stderr, "error: no timing information in %s\n",
+                info.filename.c_str());
       }
       return -1;
     }
 
     // 11. get video timing information
     info.timing.keyframe_sample_number_list.clear();
-    if (get_keyframe_information(stbl, infile, info.timing, debug) < 0) {
+    if (get_keyframe_information(stbl, info, debug) < 0) {
       if (debug > 0) {
-        fprintf(stderr, "error: no keyframe information in %s\n", infile);
+        fprintf(stderr, "error: no keyframe information in %s\n",
+                info.filename.c_str());
       }
       return -1;
     }
 
     // 12. get video frame information
-    if (get_frame_information(stbl, infile, info.frame, debug) < 0) {
+    if (get_frame_information(stbl, info, debug) < 0) {
       if (debug > 0) {
-        fprintf(stderr, "error: no frame information in %s\n", infile);
+        fprintf(stderr, "error: no frame information in %s\n",
+                info.filename.c_str());
       }
       return -1;
     }
@@ -246,7 +219,7 @@ int get_isobmff_information(const char *infile,
   if (derive_timing_info(info.timing, sort_by_pts, debug) < 0) {
     if (debug > 0) {
       fprintf(stderr, "error: cannot derive timing information in %s\n",
-              infile);
+              info.filename.c_str());
     }
     return -1;
   }
@@ -255,15 +228,15 @@ int get_isobmff_information(const char *infile,
 }
 
 int get_timing_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
-                           const char *infile, uint32_t timescale_hz,
-                           struct TimingInformation &timing, int debug) {
+                           uint32_t timescale_hz,
+                           struct IsobmffFileInformation &info, int debug) {
   // 1. look for a stts box
   std::shared_ptr<ISOBMFF::STTS> stts =
       stbl->GetTypedBox<ISOBMFF::STTS>("stts");
   if (stts == nullptr) {
     if (debug > 0) {
       fprintf(stderr, "error: no /moov/trak/mdia/minf/stbl/stts in %s\n",
-              infile);
+              info.filename.c_str());
     }
     return -1;
   }
@@ -275,17 +248,17 @@ int get_timing_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
   for (unsigned int i = 0; i < stts->GetEntryCount(); i++) {
     uint32_t sample_count = stts->GetSampleCount(i);
     stts_sample_count += sample_count;
-    timing.num_video_frames += sample_count;
+    info.timing.num_video_frames += sample_count;
     uint32_t sample_offset = stts->GetSampleOffset(i);
     for (uint32_t sample = 0; sample < sample_count; sample++) {
       // store the new stts value
-      timing.stts_unit_list.push_back(sample_offset);
+      info.timing.stts_unit_list.push_back(sample_offset);
       // set the dts value of the next frame
       uint32_t dts_unit = last_dts_unit + sample_offset;
       float dts_sec = (float)dts_unit / timescale_hz;
-      timing.dts_sec_list.push_back(dts_sec);
+      info.timing.dts_sec_list.push_back(dts_sec);
       // init the pts value of the next frame
-      timing.pts_sec_list.push_back(dts_sec);
+      info.timing.pts_sec_list.push_back(dts_sec);
       last_dts_unit = dts_unit;
     }
     if (debug > 2) {
@@ -295,8 +268,8 @@ int get_timing_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
   }
   // we need to remove the last element of the dts and pts lists, as we
   // set them pointing at the start of the next frame (inexistent)
-  timing.dts_sec_list.pop_back();
-  timing.pts_sec_list.pop_back();
+  info.timing.dts_sec_list.pop_back();
+  info.timing.pts_sec_list.pop_back();
 
   // 3. look for a ctts box
   std::shared_ptr<ISOBMFF::CTTS> ctts =
@@ -315,9 +288,9 @@ int get_timing_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
       last_ctts_sample_offset_sec = sample_offset_sec;
       for (uint32_t sample = 0; sample < sample_count; sample++) {
         // store the new ctts value
-        timing.ctts_unit_list.push_back(sample_offset);
+        info.timing.ctts_unit_list.push_back(sample_offset);
         // update the pts value
-        timing.pts_sec_list[cur_video_frame] += sample_offset_sec;
+        info.timing.pts_sec_list[cur_video_frame] += sample_offset_sec;
         ++cur_video_frame;
       }
       if (debug > 2) {
@@ -329,7 +302,7 @@ int get_timing_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
     // the decoder reuses the latest ctts sample offset again and again
     while (cur_video_frame < stts_sample_count) {
       // update the pts value
-      timing.pts_sec_list[cur_video_frame] += last_ctts_sample_offset_sec;
+      info.timing.pts_sec_list[cur_video_frame] += last_ctts_sample_offset_sec;
       ++cur_video_frame;
     }
     if (debug > 2) {
@@ -343,20 +316,19 @@ int get_timing_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
 }
 
 int get_keyframe_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
-                             const char *infile,
-                             struct TimingInformation &timing, int debug) {
+                             struct IsobmffFileInformation &info, int debug) {
   // look for a stss box in the video track for key frames
   std::shared_ptr<ISOBMFF::STSS> stss =
       stbl->GetTypedBox<ISOBMFF::STSS>("stss");
   if (stss == nullptr) {
     if (debug > 0) {
       fprintf(stderr, "warning: no /moov/trak/mdia/minf/stbl/stss in %s\n",
-              infile);
+              info.filename.c_str());
     }
   } else {
     for (unsigned int i = 0; i < stss->GetEntryCount(); i++) {
       uint32_t sample_count = stss->GetSampleNumber(i);
-      timing.keyframe_sample_number_list.push_back(sample_count);
+      info.timing.keyframe_sample_number_list.push_back(sample_count);
     }
   }
 
@@ -510,15 +482,14 @@ void parse_hvcc(std::shared_ptr<ISOBMFF::HVCC> hvcc,
 }
 
 int get_frame_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
-                          const char *infile, struct FrameInformation &frame,
-                          int debug) {
+                          struct IsobmffFileInformation &info, int debug) {
   // 1. look for a stsd container box
   std::shared_ptr<ISOBMFF::STSD> stsd =
       stbl->GetTypedBox<ISOBMFF::STSD>("stsd");
   if (stsd == nullptr) {
     if (debug > 0) {
       fprintf(stderr, "error: no /moov/trak/mdia/minf/stbl/stsd in %s\n",
-              infile);
+              info.filename.c_str());
     }
     return -1;
   }
@@ -537,24 +508,24 @@ int get_frame_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
       if (debug > 0) {
         fprintf(stderr,
                 "error: no /moov/trak/mdia/minf/stbl/stsd/hvc1/hvcC in %s\n",
-                infile);
+                info.filename.c_str());
       }
       return -1;
     }
-    frame.type = "hvc1";
-    frame.width2 = hvc1->GetWidth();
-    frame.height2 = hvc1->GetHeight();
-    frame.horizresolution = hvc1->GetHorizResolution();
-    frame.vertresolution = hvc1->GetVertResolution();
-    frame.depth = hvc1->GetDepth();
-    frame.chroma_format = hvcc->GetChromaFormat();
-    frame.bit_depth_luma = 8 + hvcc->GetBitDepthLumaMinus8();
-    frame.bit_depth_chroma = 8 + hvcc->GetBitDepthChromaMinus8();
-    frame.colour_primaries = -1;
-    frame.transfer_characteristics = -1;
-    frame.matrix_coeffs = -1;
-    frame.video_full_range_flag = -1;
-    parse_hvcc(hvcc, frame, debug);
+    info.frame.type = "hvc1";
+    info.frame.width2 = hvc1->GetWidth();
+    info.frame.height2 = hvc1->GetHeight();
+    info.frame.horizresolution = hvc1->GetHorizResolution();
+    info.frame.vertresolution = hvc1->GetVertResolution();
+    info.frame.depth = hvc1->GetDepth();
+    info.frame.chroma_format = hvcc->GetChromaFormat();
+    info.frame.bit_depth_luma = 8 + hvcc->GetBitDepthLumaMinus8();
+    info.frame.bit_depth_chroma = 8 + hvcc->GetBitDepthChromaMinus8();
+    info.frame.colour_primaries = -1;
+    info.frame.transfer_characteristics = -1;
+    info.frame.matrix_coeffs = -1;
+    info.frame.video_full_range_flag = -1;
+    parse_hvcc(hvcc, info.frame, debug);
 
   } else if (avc1 != nullptr) {
     // 4. look for an avcC box
@@ -564,27 +535,27 @@ int get_frame_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
       if (debug > 0) {
         fprintf(stderr,
                 "error: no /moov/trak/mdia/minf/stbl/stsd/avc1/avcC in %s\n",
-                infile);
+                info.filename.c_str());
       }
       return -1;
     }
-    frame.type = "avc1";
-    frame.width2 = avc1->GetWidth();
-    frame.height2 = avc1->GetHeight();
-    frame.horizresolution = avc1->GetHorizResolution();
-    frame.vertresolution = avc1->GetVertResolution();
-    frame.depth = avc1->GetDepth();
-    frame.chroma_format = -1;
-    frame.bit_depth_luma = -1;
-    frame.bit_depth_chroma = -1;
-    parse_avcc(avcc, frame, debug);
+    info.frame.type = "avc1";
+    info.frame.width2 = avc1->GetWidth();
+    info.frame.height2 = avc1->GetHeight();
+    info.frame.horizresolution = avc1->GetHorizResolution();
+    info.frame.vertresolution = avc1->GetVertResolution();
+    info.frame.depth = avc1->GetDepth();
+    info.frame.chroma_format = -1;
+    info.frame.bit_depth_luma = -1;
+    info.frame.bit_depth_chroma = -1;
+    parse_avcc(avcc, info.frame, debug);
 
   } else {
     if (debug > 0) {
       fprintf(stderr,
               "error: no /moov/trak/mdia/minf/stbl/stsd/hvc1 or "
               "/moov/trak/mdia/minf/stbl/stsd/avc1 in %s\n",
-              infile);
+              info.filename.c_str());
     }
     return -1;
   }
@@ -592,18 +563,14 @@ int get_frame_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
   return 0;
 }
 
-int get_frame_interframe_info(const char *infile, int *num_video_frames,
+int get_frame_interframe_info(const struct IsobmffFileInformation &info,
+                              int *num_video_frames,
                               std::vector<uint32_t> &frame_num_orig_list,
                               std::vector<uint32_t> &stts_unit_list,
                               std::vector<int32_t> &ctts_unit_list,
                               std::vector<float> &dts_sec_list,
                               std::vector<float> &pts_sec_list,
                               bool sort_by_pts, int debug) {
-  // analyze the file
-  struct IsobmffFileInformation info;
-  if (get_isobmff_information(infile, info, sort_by_pts, debug) < 0) {
-    return -1;
-  }
   // get the list of frame durations
   *num_video_frames = info.timing.num_video_frames;
   frame_num_orig_list = info.timing.frame_num_orig_list;
@@ -627,8 +594,8 @@ void calculate_vector_deltas(const std::vector<float> in,
   }
 }
 
-int get_frame_drop_info(const char *infile, int *num_video_frames,
-                        float *frame_rate_fps_median,
+int get_frame_drop_info(const struct IsobmffFileInformation &info,
+                        int *num_video_frames, float *frame_rate_fps_median,
                         float *frame_rate_fps_average,
                         float *frame_rate_fps_stddev, int *frame_drop_count,
                         float *frame_drop_ratio,
@@ -638,14 +605,7 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
                         std::vector<int> consecutive_list,
                         std::vector<long int> &frame_drop_length_consecutive,
                         int debug) {
-  // 0. analyze the file
-  struct IsobmffFileInformation info;
-  bool sort_by_pts = true;
-  if (get_isobmff_information(infile, info, sort_by_pts, debug) < 0) {
-    return -1;
-  }
-
-  // get the list of inter-frame timestamp distances from the pts_sec_list
+  // 0. get the list of inter-frame timestamp distances from the pts_sec_list
   *num_video_frames = info.timing.num_video_frames;
   std::vector<float> pts_sec_delta_list;
   calculate_vector_deltas(info.timing.pts_sec_list, pts_sec_delta_list);
@@ -771,18 +731,12 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
   return 0;
 }
 
-int get_video_freeze_info(const char *infile, bool *video_freeze,
-                          float *audio_video_ratio, float *duration_video_sec,
-                          float *duration_audio_sec,
+int get_video_freeze_info(const struct IsobmffFileInformation &info,
+                          bool *video_freeze, float *audio_video_ratio,
+                          float *duration_video_sec, float *duration_audio_sec,
                           uint32_t *timescale_video_hz,
                           uint32_t *timescale_audio_hz, int debug) {
-  // 0. analyze the file
-  struct IsobmffFileInformation info;
-  bool sort_by_pts = true;
-  if (get_isobmff_information(infile, info, sort_by_pts, debug) < 0) {
-    return -1;
-  }
-
+  // 0. init values
   *duration_video_sec = info.timing.duration_video_sec;
   *duration_audio_sec = info.timing.duration_audio_sec;
   *timescale_video_hz = info.timing.timescale_video_hz;
@@ -790,16 +744,16 @@ int get_video_freeze_info(const char *infile, bool *video_freeze,
 
   // 1. check both audio and video tracks, and video track at least 2 seconds
   if (*duration_video_sec == -1.0) {
-    fprintf(stderr, "error: no video track in %s\n", infile);
+    fprintf(stderr, "error: no video track in %s\n", info.filename.c_str());
     return -1;
   }
   if (*duration_audio_sec == -1.0) {
-    fprintf(stderr, "warn: no audio track in %s\n", infile);
+    fprintf(stderr, "warn: no audio track in %s\n", info.filename.c_str());
     return 0;
   }
   if (*duration_video_sec < 2.0) {
-    fprintf(stderr, "error: video track too short %s (%f seconds)\n", infile,
-            *duration_video_sec);
+    fprintf(stderr, "error: video track too short %s (%f seconds)\n",
+            info.filename.c_str(), *duration_video_sec);
     return -1;
   }
 
@@ -810,15 +764,10 @@ int get_video_freeze_info(const char *infile, bool *video_freeze,
   return 0;
 }
 
-int get_video_structure_info(const char *infile, int *num_video_frames,
-                             int *num_video_keyframes, int debug) {
-  // 0. analyze the file
-  struct IsobmffFileInformation info;
-  bool sort_by_pts = true;
-  if (get_isobmff_information(infile, info, sort_by_pts, debug) < 0) {
-    return -1;
-  }
-
+int get_video_structure_info(const struct IsobmffFileInformation &info,
+                             int *num_video_frames, int *num_video_keyframes,
+                             int debug) {
+  // 0. init values
   *num_video_frames = info.timing.num_video_frames;
 
   // 1. count the number of video keyframes from stss (0 if no stss)
@@ -827,20 +776,14 @@ int get_video_structure_info(const char *infile, int *num_video_frames,
   return 0;
 }
 
-int get_video_generic_info(const char *infile, int *width, int *height,
-                           std::string &type, int *width2, int *height2,
-                           int *horizresolution, int *vertresolution,
-                           int *depth, int *chroma_format, int *bit_depth_luma,
-                           int *bit_depth_chroma, int *video_full_range_flag,
-                           int *colour_primaries, int *transfer_characteristics,
-                           int *matrix_coeffs, int debug) {
-  // 0. analyze the file
-  struct IsobmffFileInformation info;
-  bool sort_by_pts = true;
-  if (get_isobmff_information(infile, info, sort_by_pts, debug) < 0) {
-    return -1;
-  }
-
+int get_video_generic_info(const struct IsobmffFileInformation &info,
+                           int *width, int *height, std::string &type,
+                           int *width2, int *height2, int *horizresolution,
+                           int *vertresolution, int *depth, int *chroma_format,
+                           int *bit_depth_luma, int *bit_depth_chroma,
+                           int *video_full_range_flag, int *colour_primaries,
+                           int *transfer_characteristics, int *matrix_coeffs,
+                           int debug) {
   // 1. convert width and height to integers
   type = info.frame.type;
   *width = static_cast<int>(info.frame.width);

@@ -21,9 +21,58 @@
 // @param[out] version: Version string.
 int get_liblcvm_version(std::string &version);
 
-// @brief Calculates the frame drop info.
+// Declaration of IsobmffFileInforrmation structure.
+struct TimingInformation {
+  int num_video_frames;
+  float duration_video_sec;
+  float duration_audio_sec;
+  uint32_t timescale_video_hz;
+  uint32_t timescale_audio_hz;
+  std::vector<uint32_t> frame_num_orig_list;
+  std::vector<uint32_t> stts_unit_list;
+  std::vector<int32_t> ctts_unit_list;
+  std::vector<float> dts_sec_list;
+  std::vector<float> pts_sec_list;
+  std::vector<uint32_t> keyframe_sample_number_list;
+};
+
+struct FrameInformation {
+  float width;
+  float height;
+  std::string type;
+  int width2;
+  int height2;
+  int horizresolution;
+  int vertresolution;
+  int depth;
+  int chroma_format;
+  int bit_depth_luma;
+  int bit_depth_chroma;
+  int video_full_range_flag;
+  int colour_primaries;
+  int transfer_characteristics;
+  int matrix_coeffs;
+};
+
+struct IsobmffFileInformation {
+  std::string filename;
+  struct TimingInformation timing;
+  struct FrameInformation frame;
+};
+
+// @brief Analyzes ISOBMFF file.
 //
 // @param[in] infile: Name of the file to be parsed.
+// @param[out] info: Full ISOBMFF information.
+// @param[in] sort_by_pts: Whether to sort the frames by PTS values.
+// @param[in] debug: Debug level.
+int get_isobmff_information(const char *infile,
+                            struct IsobmffFileInformation &info,
+                            bool sort_by_pts, int debug);
+
+// @brief Calculates the frame drop info.
+//
+// @param[in] info: ISOBMFF information from get_isobmff_information()
 // @param[out] num_video_frames: Number of video frames in the file.
 // @param[out] frame_rate_fps_median: Frame rate (median, fps).
 // @param[out] frame_rate_fps_average: Frame rate (average, fps).
@@ -38,8 +87,8 @@ int get_liblcvm_version(std::string &version);
 // @param[in] consecutive_list: Consecutive list.
 // @param[out] frame_drop_length_consecutive: Frame drop length consecutive.
 // @param[in] debug: Debug level.
-int get_frame_drop_info(const char *infile, int *num_video_frames,
-                        float *frame_rate_fps_median,
+int get_frame_drop_info(const struct IsobmffFileInformation &info,
+                        int *num_video_frames, float *frame_rate_fps_median,
                         float *frame_rate_fps_average,
                         float *frame_rate_fps_stddev, int *frame_drop_count,
                         float *frame_drop_ratio,
@@ -52,7 +101,7 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
 
 // @brief Calculates the video freeze info.
 //
-// @param[in] infile: Name of the file to be parsed.
+// @param[in] info: ISOBMFF information from get_isobmff_information()
 // @param[out] video_freeze: Whether there is a video freeze.
 // @param[out] audio_video_ratio: Audio/video length ratio.
 // @param[out] duration_video_sec: Video length (seconds).
@@ -60,24 +109,25 @@ int get_frame_drop_info(const char *infile, int *num_video_frames,
 // @param[out] timescale_video_hz: Video length (Hz).
 // @param[out] timescale_audio_hz: Audio length (Hz).
 // @param[in] debug: Debug level.
-int get_video_freeze_info(const char *infile, bool *video_freeze,
-                          float *audio_video_ratio, float *duration_video_sec,
-                          float *duration_audio_sec,
+int get_video_freeze_info(const struct IsobmffFileInformation &info,
+                          bool *video_freeze, float *audio_video_ratio,
+                          float *duration_video_sec, float *duration_audio_sec,
                           uint32_t *timescale_video_hz,
                           uint32_t *timescale_audio_hz, int debug);
 
 // @brief Calculates the video GoP structure info.
 //
-// @param[in] infile: Name of the file to be parsed.
+// @param[in] info: ISOBMFF information from get_isobmff_information()
 // @param[out] num_video_frames: Number of video frames in the file.
 // @param[out] num_video_keyframes: Number of video key frames in the file.
 // @param[in] debug: Debug level.
-int get_video_structure_info(const char *infile, int *num_video_frames,
-                             int *num_video_keyframes, int debug);
+int get_video_structure_info(const struct IsobmffFileInformation &info,
+                             int *num_video_frames, int *num_video_keyframes,
+                             int debug);
 
 // @brief Calculates the generic video info.
 //
-// @param[in] infile: Name of the file to be parsed.
+// @param[in] info: ISOBMFF information from get_isobmff_information()
 // @param[out] width: Video width.
 // @param[out] height: Video height.
 // @param[out] type: Video type ("hvc1" or "avc1").
@@ -95,19 +145,20 @@ int get_video_structure_info(const char *infile, int *num_video_frames,
 // HEVC/AVC SPS).
 // @param[out] matrix_coeffs: Video matrix coefficients (from HEVC/AVC SPS).
 // @param[in] debug: Debug level.
-int get_video_generic_info(const char *infile, int *width, int *height,
-                           std::string &type, int *width2, int *height2,
-                           int *horizresolution, int *vertresolution,
-                           int *depth, int *chroma_format, int *bit_depth_luma,
-                           int *bit_depth_chroma, int *video_full_range_flag,
-                           int *colour_primaries, int *transfer_characteristics,
-                           int *matrix_coeffs, int debug);
+int get_video_generic_info(const struct IsobmffFileInformation &info,
+                           int *width, int *height, std::string &type,
+                           int *width2, int *height2, int *horizresolution,
+                           int *vertresolution, int *depth, int *chroma_format,
+                           int *bit_depth_luma, int *bit_depth_chroma,
+                           int *video_full_range_flag, int *colour_primaries,
+                           int *transfer_characteristics, int *matrix_coeffs,
+                           int debug);
 
 // debug API
 
 // @brief Calculates full inter-frame time info.
 //
-// @param[in] infile: Name of the file to be parsed.
+// @param[in] info: ISOBMFF information from get_isobmff_information()
 // @param[out] num_video_frames: Number of video frames in the file.
 // @param[out] frame_num_orig_list: original frame numbers (unitless).
 // @param[out] stts_unit_list: STTS values (units).
@@ -116,7 +167,8 @@ int get_video_generic_info(const char *infile, int *width, int *height,
 // @param[out] pts_list: PTS (presentation timestamp) list (seconds).
 // @param[in] sort_by_pts: Whether to sort the frames by PTS values.
 // @param[in] debug: Debug level.
-int get_frame_interframe_info(const char *infile, int *num_video_frames,
+int get_frame_interframe_info(const struct IsobmffFileInformation &info,
+                              int *num_video_frames,
                               std::vector<uint32_t> &frame_num_orig_list,
                               std::vector<uint32_t> &stts_unit_list,
                               std::vector<int32_t> &ctts_unit_list,
