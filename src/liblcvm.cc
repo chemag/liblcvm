@@ -13,6 +13,7 @@
 #include <h265_common.h>
 #include <h265_nal_unit_parser.h>
 #include <stdint.h>  // for uint32_t, uint64_t
+#include <sys/stat.h>
 
 #include <ISOBMFF.hpp>         // for various
 #include <ISOBMFF/Parser.hpp>  // for Parser
@@ -777,8 +778,9 @@ int get_video_structure_info(const struct IsobmffFileInformation &info,
 }
 
 int get_video_generic_info(const struct IsobmffFileInformation &info,
-                           int *width, int *height, std::string &type,
-                           int *width2, int *height2, int *horizresolution,
+                           int *filesize, float *bitrate_bps, int *width,
+                           int *height, std::string &type, int *width2,
+                           int *height2, int *horizresolution,
                            int *vertresolution, int *depth, int *chroma_format,
                            int *bit_depth_luma, int *bit_depth_chroma,
                            int *video_full_range_flag, int *colour_primaries,
@@ -800,6 +802,19 @@ int get_video_generic_info(const struct IsobmffFileInformation &info,
   *colour_primaries = info.frame.colour_primaries;
   *transfer_characteristics = info.frame.transfer_characteristics;
   *matrix_coeffs = info.frame.matrix_coeffs;
+
+  // 2. get file size
+  struct stat stat_buf;
+  int rc = stat(info.filename.c_str(), &stat_buf);
+
+  // 3. get bitrate_bps
+  *bitrate_bps = -1.0;
+  *filesize = -1;
+  if (rc == 0) {
+    *filesize = stat_buf.st_size;
+    *bitrate_bps =
+        8.0 * (float)(*filesize) / (float)info.timing.duration_video_sec;
+  }
 
   return 0;
 }

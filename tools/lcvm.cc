@@ -57,8 +57,9 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
 
   // 1. write CSV header
   fprintf(outfp,
-          "infile,width,height,type,horizresolution,vertresolution,depth,"
-          "chroma_format,bit_depth_luma,bit_depth_chroma,"
+          "infile,filesize,bitrate_bps,width,height,type,"
+          "horizresolution,vertresolution,"
+          "depth,chroma_format,bit_depth_luma,bit_depth_chroma,"
           "video_full_range_flag,"
           "colour_primaries,"
           "transfer_characteristics,"
@@ -81,6 +82,8 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
   std::map<std::string, std::vector<float>> pts_sec_list_dict;
   for (const auto &infile : infile_list) {
     // 2.0. get generic info
+    int filesize;
+    float bitrate_bps;
     int width;
     int height;
     std::string type;
@@ -108,10 +111,10 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     }
 
     ret = get_video_generic_info(
-        info, &width, &height, type, &width2, &height2, &horizresolution,
-        &vertresolution, &depth, &chroma_format, &bit_depth_luma,
-        &bit_depth_chroma, &video_full_range_flag, &colour_primaries,
-        &transfer_characteristics, &matrix_coeffs, debug);
+        info, &filesize, &bitrate_bps, &width, &height, type, &width2, &height2,
+        &horizresolution, &vertresolution, &depth, &chroma_format,
+        &bit_depth_luma, &bit_depth_chroma, &video_full_range_flag,
+        &colour_primaries, &transfer_characteristics, &matrix_coeffs, debug);
     if (ret < 0) {
       fprintf(stderr, "error: get_video_generic_info() in %s\n",
               infile.c_str());
@@ -171,6 +174,8 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
 
     // 2.4. dump all output
     fprintf(outfp, "%s", infile.c_str());
+    fprintf(outfp, ",%i", filesize);
+    fprintf(outfp, ",%f", bitrate_bps);
     fprintf(outfp, ",%i", width);
     fprintf(outfp, ",%i", height);
     fprintf(outfp, ",%s", type.c_str());

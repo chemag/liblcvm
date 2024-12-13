@@ -128,6 +128,8 @@ int get_video_structure_info(const struct IsobmffFileInformation &info,
 // @brief Calculates the generic video info.
 //
 // @param[in] info: ISOBMFF information from get_isobmff_information()
+// @param[out] filesize: Video file size (bytes).
+// @param[out] bitrate_bps: Video bitrate (bps).
 // @param[out] width: Video width.
 // @param[out] height: Video height.
 // @param[out] type: Video type ("hvc1" or "avc1").
@@ -146,8 +148,9 @@ int get_video_structure_info(const struct IsobmffFileInformation &info,
 // @param[out] matrix_coeffs: Video matrix coefficients (from HEVC/AVC SPS).
 // @param[in] debug: Debug level.
 int get_video_generic_info(const struct IsobmffFileInformation &info,
-                           int *width, int *height, std::string &type,
-                           int *width2, int *height2, int *horizresolution,
+                           int *filesize, float *bitrate_bps, int *width,
+                           int *height, std::string &type, int *width2,
+                           int *height2, int *horizresolution,
                            int *vertresolution, int *depth, int *chroma_format,
                            int *bit_depth_luma, int *bit_depth_chroma,
                            int *video_full_range_flag, int *colour_primaries,
