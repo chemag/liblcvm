@@ -343,6 +343,7 @@ void usage(char *name) {
           "\t--outfile-timestamps outfile_timestamps:\t\tSelect outfile to "
           "dump timestamps\n");
   fprintf(stderr, "\t--sort-pts:\t\tSort outfile timestamps by PTS\n");
+  fprintf(stderr, "\t--no-sort-pts:\t\tDo not outfile timestamps by PTS\n");
   fprintf(stderr, "\t-h:\t\tHelp\n");
   exit(-1);
 }
@@ -353,6 +354,7 @@ enum {
   HELP_OPTION,
   OUTFILE_TIMESTAMPS_OPTION,
   SORT_PTS_OPTION,
+  NO_SORT_PTS_OPTION,
   RUNS_OPTION,
   VERSION_OPTION,
 };
@@ -375,6 +377,7 @@ arg_options *parse_args(int argc, char **argv) {
       {"outfile-timestamps", required_argument, nullptr,
        OUTFILE_TIMESTAMPS_OPTION},
       {"sort-pts", no_argument, nullptr, SORT_PTS_OPTION},
+      {"no-sort-pts", no_argument, nullptr, NO_SORT_PTS_OPTION},
       // options without a short option
       {"runs", required_argument, nullptr, RUNS_OPTION},
       {"quiet", no_argument, nullptr, QUIET_OPTION},
@@ -411,6 +414,10 @@ arg_options *parse_args(int argc, char **argv) {
 
       case SORT_PTS_OPTION:
         options.outfile_timestamps_sort_pts = true;
+        break;
+
+      case NO_SORT_PTS_OPTION:
+        options.outfile_timestamps_sort_pts = false;
         break;
 
       case QUIET_OPTION:
