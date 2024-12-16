@@ -35,6 +35,7 @@ struct TimingInformation {
   std::vector<int32_t> ctts_unit_list;
   std::vector<float> dts_sec_list;
   std::vector<float> pts_sec_list;
+  std::vector<float> pts_duration_sec_list;
   std::vector<uint32_t> keyframe_sample_number_list;
 };
 
@@ -173,15 +174,15 @@ int get_video_generic_info(const struct IsobmffFileInformation &info,
 // @param[out] frame_num_orig_list: original frame numbers (unitless).
 // @param[out] stts_unit_list: STTS values (units).
 // @param[out] ctts_unit_list: CTTS values (units).
-// @param[out] dts_list: DTS (decoding timestamp) list (seconds).
-// @param[out] pts_list: PTS (presentation timestamp) list (seconds).
+// @param[out] dts_sec_list: DTS (decoding timestamp) list (seconds).
+// @param[out] pts_sec_list: PTS (presentation timestamp) list (seconds).
+// @param[out] pts_duration_sec_list: PTS (presentation timestamp) duration list
+// (seconds).
 // @param[in] sort_by_pts: Whether to sort the frames by PTS values.
 // @param[in] debug: Debug level.
-int get_frame_interframe_info(const struct IsobmffFileInformation &info,
-                              int *num_video_frames,
-                              std::vector<uint32_t> &frame_num_orig_list,
-                              std::vector<uint32_t> &stts_unit_list,
-                              std::vector<int32_t> &ctts_unit_list,
-                              std::vector<float> &dts_sec_list,
-                              std::vector<float> &pts_sec_list,
-                              bool sort_by_pts, int debug);
+int get_frame_interframe_info(
+    const struct IsobmffFileInformation &info, int *num_video_frames,
+    std::vector<uint32_t> &frame_num_orig_list,
+    std::vector<uint32_t> &stts_unit_list, std::vector<int32_t> &ctts_unit_list,
+    std::vector<float> &dts_sec_list, std::vector<float> &pts_sec_list,
+    std::vector<float> &pts_duration_list, bool sort_by_pts, int debug);

@@ -450,6 +450,13 @@ int derive_timing_info(struct TimingInformation &timing, bool sort_by_pts,
   timing.pts_delta_abs_sec_median =
       calculate_median(pts_delta_abs_sec_average_list);
 
+  // 4. derive pts duration values
+  timing.pts_duration_sec_list.clear();
+  for (unsigned int i = 1; i < timing.pts_sec_list.size(); ++i) {
+    timing.pts_duration_sec_list.push_back(timing.pts_sec_list[i] -
+                                           timing.pts_sec_list[i - 1]);
+  }
+
   return 0;
 }
 
@@ -631,14 +638,12 @@ int get_frame_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
   return 0;
 }
 
-int get_frame_interframe_info(const struct IsobmffFileInformation &info,
-                              int *num_video_frames,
-                              std::vector<uint32_t> &frame_num_orig_list,
-                              std::vector<uint32_t> &stts_unit_list,
-                              std::vector<int32_t> &ctts_unit_list,
-                              std::vector<float> &dts_sec_list,
-                              std::vector<float> &pts_sec_list,
-                              bool sort_by_pts, int debug) {
+int get_frame_interframe_info(
+    const struct IsobmffFileInformation &info, int *num_video_frames,
+    std::vector<uint32_t> &frame_num_orig_list,
+    std::vector<uint32_t> &stts_unit_list, std::vector<int32_t> &ctts_unit_list,
+    std::vector<float> &dts_sec_list, std::vector<float> &pts_sec_list,
+    std::vector<float> &pts_duration_sec_list, bool sort_by_pts, int debug) {
   // get the list of frame durations
   *num_video_frames = info.timing.num_video_frames;
   frame_num_orig_list = info.timing.frame_num_orig_list;
@@ -646,6 +651,7 @@ int get_frame_interframe_info(const struct IsobmffFileInformation &info,
   ctts_unit_list = info.timing.ctts_unit_list;
   dts_sec_list = info.timing.dts_sec_list;
   pts_sec_list = info.timing.pts_sec_list;
+  pts_duration_sec_list = info.timing.pts_duration_sec_list;
 
   return 0;
 }
