@@ -34,7 +34,7 @@ arg_options DEFAULT_OPTIONS{
     .nruns = 1,
     .outfile = nullptr,
     .outfile_timestamps = nullptr,
-    .outfile_timestamps_sort_pts = false,
+    .outfile_timestamps_sort_pts = true,
     .infile_list = {},
 };
 
