@@ -68,6 +68,7 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
           "frame_rate_fps_average,frame_rate_fps_stddev,video_freeze,"
           "video_freeze_ratio,duration_video_sec,duration_audio_sec,"
           "timescale_video_hz,timescale_audio_hz,"
+          "pts_delta_sec_stddev,pts_delta_abs_sec_median,"
           "frame_drop_count,frame_drop_ratio,"
           "normalized_frame_drop_average_length,"
           "frame_drop_length_percentile_50,frame_drop_length_percentile_90,"
@@ -128,9 +129,12 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     float duration_audio_sec;
     uint32_t timescale_video_hz;
     uint32_t timescale_audio_hz;
+    float pts_delta_sec_stddev;
+    float pts_delta_abs_sec_median;
     ret = get_video_freeze_info(
         info, &video_freeze, &audio_video_ratio, &duration_video_sec,
-        &duration_audio_sec, &timescale_video_hz, &timescale_audio_hz, debug);
+        &duration_audio_sec, &timescale_video_hz, &timescale_audio_hz,
+        &pts_delta_sec_stddev, &pts_delta_abs_sec_median, debug);
     if (ret < 0) {
       fprintf(stderr, "error: get_video_freeze_info() in %s\n", infile.c_str());
       continue;
@@ -201,6 +205,8 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     fprintf(outfp, ",%f", duration_audio_sec);
     fprintf(outfp, ",%u", timescale_video_hz);
     fprintf(outfp, ",%u", timescale_audio_hz);
+    fprintf(outfp, ",%f", pts_delta_sec_stddev);
+    fprintf(outfp, ",%f", pts_delta_abs_sec_median);
     fprintf(outfp, ",%i", frame_drop_count);
     fprintf(outfp, ",%f", frame_drop_ratio);
     fprintf(outfp, ",%f", normalized_frame_drop_average_length);

@@ -242,7 +242,7 @@ int get_timing_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
     return -1;
   }
 
-  // 2. gather the stts timestamp deltas
+  // 2. gather the stts timestamp durations
   // run all through the stts table
   uint32_t stts_sample_count = 0;
   uint32_t last_dts_unit = 0.0;
@@ -277,7 +277,7 @@ int get_timing_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
       stbl->GetTypedBox<ISOBMFF::CTTS>("ctts");
   if (ctts != nullptr) {
     float last_ctts_sample_offset_sec = 0.0;
-    // 10.1. adjust pts list using ctts timestamp deltas
+    // 10.1. adjust pts list using ctts timestamp durations
     uint32_t ctts_sample_count = 0;
     uint32_t cur_video_frame = 0;
     for (unsigned int i = 0; i < ctts->GetEntryCount(); i++) {
@@ -336,6 +336,51 @@ int get_keyframe_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
   return 0;
 }
 
+// Function derives an (N-1)-element vector from an N-element vector by
+// setting element i-th as:
+//   out[i] = in[i] - in[i-1]
+//
+// The function will allocate all the N-1 elements.
+void calculate_vector_deltas(const std::vector<float> in,
+                             std::vector<float> &out) {
+  out.clear();
+  float last_val = -1.0;
+  for (const auto &val : in) {
+    if (last_val != -1.0) {
+      out.push_back(val - last_val);
+    }
+    last_val = val;
+  }
+}
+
+float calculate_median(std::vector<float> &vec) {
+  std::sort(vec.begin(), vec.end());
+  size_t n = vec.size();
+  if (n % 2 == 0) {
+    return (vec[n / 2 - 1] + vec[n / 2]) / 2.0f;
+  } else {
+    return vec[n / 2];
+  }
+}
+
+float calculate_average(const std::vector<float> &vec) {
+  return std::accumulate(vec.begin(), vec.end(), 0.0f) / vec.size();
+}
+
+float calculate_standard_deviation(const std::vector<float> &vec) {
+  if (vec.size() < 2) {
+    throw std::runtime_error("Input vector must have at least 2 elements");
+  }
+
+  float mean = calculate_average(vec);
+  float sum_squares = 0.0f;
+  for (const float &x : vec) {
+    sum_squares += (x - mean) * (x - mean);
+  }
+
+  return std::sqrt(sum_squares / (vec.size() - 1));
+}
+
 int derive_timing_info(struct TimingInformation &timing, bool sort_by_pts,
                        int debug) {
   // 1. set the frame_num_orig_list vector
@@ -355,33 +400,55 @@ int derive_timing_info(struct TimingInformation &timing, bool sort_by_pts,
                        return pts_sec_list[a] < pts_sec_list[b];
                      });
     // sort all the others based in the new order
-    // 1. stts_unit_list
+    // 2.1. stts_unit_list
     std::vector<uint32_t> stts_unit_list_alt(timing.stts_unit_list.size());
     for (uint32_t i = 0; i < timing.stts_unit_list.size(); ++i) {
       stts_unit_list_alt[i] =
           timing.stts_unit_list[timing.frame_num_orig_list[i]];
     }
     timing.stts_unit_list = stts_unit_list_alt;
-    // 2. ctts_unit_list
+    // 2.2. ctts_unit_list
     std::vector<int32_t> ctts_unit_list_alt(timing.ctts_unit_list.size());
     for (uint32_t i = 0; i < timing.ctts_unit_list.size(); ++i) {
       ctts_unit_list_alt[i] =
           timing.ctts_unit_list[timing.frame_num_orig_list[i]];
     }
     timing.ctts_unit_list = ctts_unit_list_alt;
-    // 3. dts_sec_list
+    // 2.3. dts_sec_list
     std::vector<float> dts_sec_list_alt(timing.dts_sec_list.size());
     for (uint32_t i = 0; i < timing.dts_sec_list.size(); ++i) {
       dts_sec_list_alt[i] = timing.dts_sec_list[timing.frame_num_orig_list[i]];
     }
     timing.dts_sec_list = dts_sec_list_alt;
-    // 4. pts_sec_list
+    // 2.4. pts_sec_list
     std::vector<float> pts_sec_list_alt(timing.pts_sec_list.size());
     for (uint32_t i = 0; i < timing.pts_sec_list.size(); ++i) {
       pts_sec_list_alt[i] = timing.pts_sec_list[timing.frame_num_orig_list[i]];
     }
     timing.pts_sec_list = pts_sec_list_alt;
   }
+
+  // 3. derived timing values
+  // 3.1. calculate the duration (inter-frame distance)
+  std::vector<float> pts_sec_duration_list;
+  calculate_vector_deltas(timing.pts_sec_list, pts_sec_duration_list);
+  // 3.2. calculate the duration average
+  float pts_sec_duration_average = calculate_average(pts_sec_duration_list);
+  // 3.3. calculate the delta to the average (inc. absolute)
+  std::vector<float> pts_delta_sec_average_list(pts_sec_duration_list.size());
+  std::vector<float> pts_delta_abs_sec_average_list(
+      pts_sec_duration_list.size());
+  for (size_t i = 0; i < pts_sec_duration_list.size(); i++) {
+    pts_delta_sec_average_list[i] =
+        pts_sec_duration_list[i] - pts_sec_duration_average;
+    pts_delta_abs_sec_average_list[i] = abs(pts_delta_sec_average_list[i]);
+  }
+  // 3.4. calculate the delta average and stddev
+  timing.pts_delta_sec_stddev =
+      calculate_standard_deviation(pts_delta_sec_average_list);
+  // 3.5. calculate the abs delta median
+  timing.pts_delta_abs_sec_median =
+      calculate_median(pts_delta_abs_sec_average_list);
 
   return 0;
 }
@@ -583,18 +650,6 @@ int get_frame_interframe_info(const struct IsobmffFileInformation &info,
   return 0;
 }
 
-void calculate_vector_deltas(const std::vector<float> in,
-                             std::vector<float> &out) {
-  out.clear();
-  float last_val = -1.0;
-  for (const auto &val : in) {
-    if (last_val != -1.0) {
-      out.push_back(val - last_val);
-    }
-    last_val = val;
-  }
-}
-
 int get_frame_drop_info(const struct IsobmffFileInformation &info,
                         int *num_video_frames, float *frame_rate_fps_median,
                         float *frame_rate_fps_average,
@@ -608,20 +663,20 @@ int get_frame_drop_info(const struct IsobmffFileInformation &info,
                         int debug) {
   // 0. get the list of inter-frame timestamp distances from the pts_sec_list
   *num_video_frames = info.timing.num_video_frames;
-  std::vector<float> pts_sec_delta_list;
-  calculate_vector_deltas(info.timing.pts_sec_list, pts_sec_delta_list);
+  std::vector<float> pts_sec_duration_list;
+  calculate_vector_deltas(info.timing.pts_sec_list, pts_sec_duration_list);
 
   if (debug > 1) {
-    for (const auto &pts_sec_delta : pts_sec_delta_list) {
-      fprintf(stdout, "%f,", pts_sec_delta);
+    for (const auto &pts_sec_duration : pts_sec_duration_list) {
+      fprintf(stdout, "%f,", pts_sec_duration);
     }
     fprintf(stdout, "\n");
   }
 
   // 1. calculate the inter-frame distance statistics
   // 1.1. get the list of frame rates
-  std::vector<float> frame_rate_fps_list(pts_sec_delta_list.size());
-  std::transform(pts_sec_delta_list.begin(), pts_sec_delta_list.end(),
+  std::vector<float> frame_rate_fps_list(pts_sec_duration_list.size());
+  std::transform(pts_sec_duration_list.begin(), pts_sec_duration_list.end(),
                  frame_rate_fps_list.begin(), [](float val) {
                    // Handle division by zero
                    return val != 0.0f ? 1.0f / static_cast<float>(val) : 0.0f;
@@ -630,9 +685,9 @@ int get_frame_drop_info(const struct IsobmffFileInformation &info,
   sort(frame_rate_fps_list.begin(), frame_rate_fps_list.end());
   *frame_rate_fps_median =
       frame_rate_fps_list[frame_rate_fps_list.size() / 2 - 1];
-  sort(pts_sec_delta_list.begin(), pts_sec_delta_list.end());
-  float pts_sec_delta_median =
-      pts_sec_delta_list[pts_sec_delta_list.size() / 2 - 1];
+  sort(pts_sec_duration_list.begin(), pts_sec_duration_list.end());
+  float pts_sec_duration_median =
+      pts_sec_duration_list[pts_sec_duration_list.size() / 2 - 1];
   // 1.3. average
   *frame_rate_fps_average =
       (1.0 * std::accumulate(frame_rate_fps_list.begin(),
@@ -654,13 +709,13 @@ int get_frame_drop_info(const struct IsobmffFileInformation &info,
   // 2. calculate the threshold to consider frame drop: This should be 2
   // times the median, minus a factor
   double FACTOR = 0.75;
-  float pts_sec_delta_threshold = pts_sec_delta_median * FACTOR * 2;
+  float pts_sec_duration_threshold = pts_sec_duration_median * FACTOR * 2;
 
   // 3. get the list of all the drops (absolute inter-frame values)
   std::vector<float> drop_length_sec_list;
-  for (const auto &pts_sec_delta : pts_sec_delta_list) {
-    if (pts_sec_delta > pts_sec_delta_threshold) {
-      drop_length_sec_list.push_back(pts_sec_delta);
+  for (const auto &pts_sec_duration : pts_sec_duration_list) {
+    if (pts_sec_duration > pts_sec_duration_threshold) {
+      drop_length_sec_list.push_back(pts_sec_duration);
     }
   }
   // drop_length_sec_list: {0.6668900000000022, 0.10025600000000168, ...}
@@ -672,13 +727,13 @@ int get_frame_drop_info(const struct IsobmffFileInformation &info,
   }
   float drop_length_duration_sec =
       drop_length_sec_list_sum -
-      pts_sec_delta_median * drop_length_sec_list.size();
+      pts_sec_duration_median * drop_length_sec_list.size();
   // drop_length_duration_sec: sum({33.35900000000022, 66.92600000000168, ...})
 
   // 5. get the total duration as the sum of all the inter-frame distances
   float total_duration_sec = 0.0;
-  for (const auto &pts_sec_delta : pts_sec_delta_list) {
-    total_duration_sec += pts_sec_delta;
+  for (const auto &pts_sec_duration : pts_sec_duration_list) {
+    total_duration_sec += pts_sec_duration;
   }
 
   // 6. calculate frame drop ratio as extra drop length over total duration
@@ -694,7 +749,7 @@ int get_frame_drop_info(const struct IsobmffFileInformation &info,
     float frame_drop_average_length =
         drop_length_sec_list_sum / drop_length_sec_list.size();
     *normalized_frame_drop_average_length =
-        (frame_drop_average_length / pts_sec_delta_median);
+        (frame_drop_average_length / pts_sec_duration_median);
   }
 
   // 8. calculate percentile list
@@ -704,7 +759,7 @@ int get_frame_drop_info(const struct IsobmffFileInformation &info,
     for (const float &percentile : percentile_list) {
       int position = (percentile / 100.0) * drop_length_sec_list.size();
       float frame_drop_length_percentile =
-          drop_length_sec_list[position] / pts_sec_delta_median;
+          drop_length_sec_list[position] / pts_sec_duration_median;
       frame_drop_length_percentile_list.push_back(frame_drop_length_percentile);
     }
   } else {
@@ -720,7 +775,7 @@ int get_frame_drop_info(const struct IsobmffFileInformation &info,
   }
   if (drop_length_sec_list.size() > 0) {
     for (const auto &drop_length_sec : drop_length_sec_list) {
-      float drop_length = drop_length_sec / pts_sec_delta_median;
+      float drop_length = drop_length_sec / pts_sec_duration_median;
       for (unsigned int i = 0; i < consecutive_list.size(); i++) {
         if (drop_length >= consecutive_list[i]) {
           frame_drop_length_consecutive[i]++;
@@ -736,12 +791,16 @@ int get_video_freeze_info(const struct IsobmffFileInformation &info,
                           bool *video_freeze, float *audio_video_ratio,
                           float *duration_video_sec, float *duration_audio_sec,
                           uint32_t *timescale_video_hz,
-                          uint32_t *timescale_audio_hz, int debug) {
+                          uint32_t *timescale_audio_hz,
+                          float *pts_delta_sec_stddev,
+                          float *pts_delta_abs_sec_median, int debug) {
   // 0. init values
   *duration_video_sec = info.timing.duration_video_sec;
   *duration_audio_sec = info.timing.duration_audio_sec;
   *timescale_video_hz = info.timing.timescale_video_hz;
   *timescale_audio_hz = info.timing.timescale_audio_hz;
+  *pts_delta_sec_stddev = info.timing.pts_delta_sec_stddev;
+  *pts_delta_abs_sec_median = info.timing.pts_delta_abs_sec_median;
 
   // 1. check both audio and video tracks, and video track at least 2 seconds
   if (*duration_video_sec == -1.0) {

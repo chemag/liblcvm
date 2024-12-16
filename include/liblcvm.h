@@ -28,6 +28,8 @@ struct TimingInformation {
   float duration_audio_sec;
   uint32_t timescale_video_hz;
   uint32_t timescale_audio_hz;
+  float pts_delta_sec_stddev;
+  float pts_delta_abs_sec_median;
   std::vector<uint32_t> frame_num_orig_list;
   std::vector<uint32_t> stts_unit_list;
   std::vector<int32_t> ctts_unit_list;
@@ -108,12 +110,17 @@ int get_frame_drop_info(const struct IsobmffFileInformation &info,
 // @param[out] duration_audio_sec: Audio length (seconds).
 // @param[out] timescale_video_hz: Video length (Hz).
 // @param[out] timescale_audio_hz: Audio length (Hz).
+// @param[out] pts_delta_sec_stddev: standard deviation of inter-frame deltas
+// @param[out] pts_delta_abs_sec_median: median of the absolute value of the
+//             inter-frame timestamp differences ("inter-frame deltas")
 // @param[in] debug: Debug level.
 int get_video_freeze_info(const struct IsobmffFileInformation &info,
                           bool *video_freeze, float *audio_video_ratio,
                           float *duration_video_sec, float *duration_audio_sec,
                           uint32_t *timescale_video_hz,
-                          uint32_t *timescale_audio_hz, int debug);
+                          uint32_t *timescale_audio_hz,
+                          float *pts_delta_sec_stddev,
+                          float *pts_delta_abs_sec_median, int debug);
 
 // @brief Calculates the video GoP structure info.
 //
