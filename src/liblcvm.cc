@@ -196,7 +196,7 @@ int get_isobmff_information(const char *infile,
       return -1;
     }
 
-    // 11. get video timing information
+    // 11. get video keyframe information
     info.timing.keyframe_sample_number_list.clear();
     if (get_keyframe_information(stbl, info, debug) < 0) {
       if (debug > 0) {
