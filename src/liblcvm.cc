@@ -432,15 +432,16 @@ int derive_timing_info(struct TimingInformation &timing, bool sort_by_pts,
   // 3.1. calculate the duration (inter-frame distance)
   std::vector<float> pts_sec_duration_list;
   calculate_vector_deltas(timing.pts_sec_list, pts_sec_duration_list);
-  // 3.2. calculate the duration average
-  float pts_sec_duration_average = calculate_average(pts_sec_duration_list);
+  // 3.2. calculate the duration average/median
+  timing.pts_sec_duration_average = calculate_average(pts_sec_duration_list);
+  timing.pts_sec_duration_median = calculate_median(pts_sec_duration_list);
   // 3.3. calculate the delta to the average (inc. absolute)
   std::vector<float> pts_delta_sec_average_list(pts_sec_duration_list.size());
   std::vector<float> pts_delta_abs_sec_average_list(
       pts_sec_duration_list.size());
   for (size_t i = 0; i < pts_sec_duration_list.size(); i++) {
     pts_delta_sec_average_list[i] =
-        pts_sec_duration_list[i] - pts_sec_duration_average;
+        pts_sec_duration_list[i] - timing.pts_sec_duration_average;
     pts_delta_abs_sec_average_list[i] = abs(pts_delta_sec_average_list[i]);
   }
   // 3.4. calculate the delta average and stddev
@@ -798,6 +799,8 @@ int get_video_freeze_info(const struct IsobmffFileInformation &info,
                           float *duration_video_sec, float *duration_audio_sec,
                           uint32_t *timescale_video_hz,
                           uint32_t *timescale_audio_hz,
+                          float *pts_sec_duration_average,
+                          float *pts_sec_duration_median,
                           float *pts_delta_sec_stddev,
                           float *pts_delta_abs_sec_median, int debug) {
   // 0. init values
@@ -805,6 +808,8 @@ int get_video_freeze_info(const struct IsobmffFileInformation &info,
   *duration_audio_sec = info.timing.duration_audio_sec;
   *timescale_video_hz = info.timing.timescale_video_hz;
   *timescale_audio_hz = info.timing.timescale_audio_hz;
+  *pts_sec_duration_average = info.timing.pts_sec_duration_average;
+  *pts_sec_duration_median = info.timing.pts_sec_duration_median;
   *pts_delta_sec_stddev = info.timing.pts_delta_sec_stddev;
   *pts_delta_abs_sec_median = info.timing.pts_delta_abs_sec_median;
 

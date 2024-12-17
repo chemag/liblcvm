@@ -28,6 +28,8 @@ struct TimingInformation {
   float duration_audio_sec;
   uint32_t timescale_video_hz;
   uint32_t timescale_audio_hz;
+  float pts_sec_duration_average;
+  float pts_sec_duration_median;
   float pts_delta_sec_stddev;
   float pts_delta_abs_sec_median;
   std::vector<uint32_t> frame_num_orig_list;
@@ -104,22 +106,26 @@ int get_frame_drop_info(const struct IsobmffFileInformation &info,
 
 // @brief Calculates the video freeze info.
 //
-// @param[in] info: ISOBMFF information from get_isobmff_information()
+// @param[in] info: ISOBMFF information from get_isobmff_information().
 // @param[out] video_freeze: Whether there is a video freeze.
 // @param[out] audio_video_ratio: Audio/video length ratio.
 // @param[out] duration_video_sec: Video length (seconds).
 // @param[out] duration_audio_sec: Audio length (seconds).
 // @param[out] timescale_video_hz: Video length (Hz).
 // @param[out] timescale_audio_hz: Audio length (Hz).
-// @param[out] pts_delta_sec_stddev: standard deviation of inter-frame deltas
+// @param[out] pts_sec_duration_average: average pts duration (sec).
+// @param[out] pts_sec_duration_median: median pts duration (sec).
+// @param[out] pts_delta_sec_stddev: standard deviation of inter-frame deltas.
 // @param[out] pts_delta_abs_sec_median: median of the absolute value of the
-//             inter-frame timestamp differences ("inter-frame deltas")
+//             inter-frame timestamp differences ("inter-frame deltas").
 // @param[in] debug: Debug level.
 int get_video_freeze_info(const struct IsobmffFileInformation &info,
                           bool *video_freeze, float *audio_video_ratio,
                           float *duration_video_sec, float *duration_audio_sec,
                           uint32_t *timescale_video_hz,
                           uint32_t *timescale_audio_hz,
+                          float *pts_sec_duration_average,
+                          float *pts_sec_duration_median,
                           float *pts_delta_sec_stddev,
                           float *pts_delta_abs_sec_median, int debug);
 
