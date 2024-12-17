@@ -128,4 +128,9 @@ $ csvlook -I /tmp/full.csv
 | /tmp/test/c.mp4 | 570              | 29.910269      | 0            | -0.011072          | 0.124218         | 2.035057                             |
 ```
 
+### Known Build Errors ###
+```
+clang: error: no such sysroot directory: '/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS17.5.sdk' [-Werror,-Wmissing-sysroot]
+```
+To resolve this issue, update the Xcode path in the Common.mk file: ```lib/isobmff/Submodules/makelib/Common.mk +75```
 
