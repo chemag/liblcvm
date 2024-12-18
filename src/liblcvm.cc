@@ -27,7 +27,7 @@
 
 #include "config.h"
 
-#define MAX_AUDIO_VIDEO_RATIO 0.05
+#define MAX_AUDIO_VIDEO_RATIO 1.05
 
 int get_liblcvm_version(std::string &version) {
   version = PROJECT_VER;
@@ -829,8 +829,7 @@ int get_video_freeze_info(const struct IsobmffFileInformation &info,
   }
 
   // 2. calculate audio to video ratio
-  *audio_video_ratio =
-      (*duration_audio_sec - *duration_video_sec) / *duration_audio_sec;
+  *audio_video_ratio = *duration_audio_sec / *duration_video_sec;
   *video_freeze = *audio_video_ratio > MAX_AUDIO_VIDEO_RATIO;
   return 0;
 }
