@@ -807,16 +807,19 @@ int get_frame_drop_info(const std::shared_ptr<IsobmffFileInformation> ptr,
   *normalized_frame_drop_average_length =
       ptr->get_timing().get_normalized_frame_drop_average_length();
 
+  // copy the frame drop length vector to allow modifying it
+  std::vector<float> frame_drop_length_sec_list =
+      ptr->get_timing().get_frame_drop_length_sec_list();
+
   // calculate percentile list
   frame_drop_length_percentile_list.clear();
-  if (ptr->get_timing().get_frame_drop_length_sec_list().size() > 0) {
-    std::sort(ptr->get_timing().get_frame_drop_length_sec_list().begin(),
-              ptr->get_timing().get_frame_drop_length_sec_list().end());
+  if (frame_drop_length_sec_list.size() > 0) {
+    std::sort(frame_drop_length_sec_list.begin(),
+              frame_drop_length_sec_list.end());
     for (const float &percentile : percentile_list) {
-      int position = (percentile / 100.0) *
-                     ptr->get_timing().get_frame_drop_length_sec_list().size();
+      int position = (percentile / 100.0) * frame_drop_length_sec_list.size();
       float frame_drop_length_percentile =
-          ptr->get_timing().get_frame_drop_length_sec_list()[position] /
+          frame_drop_length_sec_list[position] /
           ptr->get_timing().get_pts_duration_sec_median();
       frame_drop_length_percentile_list.push_back(frame_drop_length_percentile);
     }
@@ -831,11 +834,10 @@ int get_frame_drop_info(const std::shared_ptr<IsobmffFileInformation> ptr,
   for (int _ : consecutive_list) {
     frame_drop_length_consecutive.push_back(0);
   }
-  if (ptr->get_timing().get_frame_drop_length_sec_list().size() > 0) {
-    for (const auto &drop_length_sec :
-         ptr->get_timing().get_frame_drop_length_sec_list()) {
-      float drop_length =
-          drop_length_sec / ptr->get_timing().get_pts_duration_sec_median();
+  if (frame_drop_length_sec_list.size() > 0) {
+    for (const auto &frame_drop_length_sec : frame_drop_length_sec_list) {
+      float drop_length = frame_drop_length_sec /
+                          ptr->get_timing().get_pts_duration_sec_median();
       for (unsigned int i = 0; i < consecutive_list.size(); i++) {
         if (drop_length >= consecutive_list[i]) {
           frame_drop_length_consecutive[i]++;
