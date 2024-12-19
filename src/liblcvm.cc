@@ -219,6 +219,15 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     return nullptr;
   }
 
+  // 14. derive frame info
+  if (ptr->frame.derive_frame_info(ptr, sort_by_pts, debug) < 0) {
+    if (debug > 0) {
+      fprintf(stderr, "error: cannot derive frame information in %s\n",
+              ptr->filename.c_str());
+    }
+    return nullptr;
+  }
+
   return ptr;
 }
 
@@ -459,6 +468,22 @@ int TimingInformation::derive_timing_info(
     ptr->timing.pts_duration_sec_list.push_back(
         ptr->timing.pts_sec_list[i] - ptr->timing.pts_sec_list[i - 1]);
   }
+
+  return 0;
+}
+
+int FrameInformation::derive_frame_info(
+    std::shared_ptr<IsobmffFileInformation> ptr, bool sort_by_pts, int debug) {
+  // 1. get basic file info
+  struct stat stat_buf;
+  int rc = stat(ptr->get_filename().c_str(), &stat_buf);
+  if (rc < 0) {
+    fprintf(stderr, "error: cannot access %s\n", ptr->filename.c_str());
+    return -1;
+  }
+  ptr->frame.filesize = stat_buf.st_size;
+  ptr->frame.bitrate_bps = 8.0 * (float)(ptr->frame.filesize) /
+                           (float)ptr->get_timing().get_duration_video_sec();
 
   return 0;
 }
@@ -879,18 +904,9 @@ int get_video_generic_info(const std::shared_ptr<IsobmffFileInformation> ptr,
   *transfer_characteristics = ptr->get_frame().get_transfer_characteristics();
   *matrix_coeffs = ptr->get_frame().get_matrix_coeffs();
 
-  // 2. get file size
-  struct stat stat_buf;
-  int rc = stat(ptr->get_filename().c_str(), &stat_buf);
-
-  // 3. get bitrate_bps
-  *bitrate_bps = -1.0;
-  *filesize = -1;
-  if (rc == 0) {
-    *filesize = stat_buf.st_size;
-    *bitrate_bps = 8.0 * (float)(*filesize) /
-                   (float)ptr->get_timing().get_duration_video_sec();
-  }
+  // 2. get file size and bitrate_bps
+  *filesize = ptr->get_frame().get_filesize();
+  *bitrate_bps = ptr->get_frame().get_bitrate_bps();
 
   return 0;
 }

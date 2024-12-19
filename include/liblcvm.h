@@ -74,6 +74,8 @@ class TimingInformation {
 
 class FrameInformation {
  private:
+  int filesize;
+  float bitrate_bps;
   float width;
   float height;
   std::string type;
@@ -94,6 +96,8 @@ class FrameInformation {
   void parse_avcc(std::shared_ptr<ISOBMFF::AVCC> avcc, int debug);
 
  public:
+  DECL_GETTER(filesize, int)
+  DECL_GETTER(bitrate_bps, float)
   DECL_GETTER(width, float)
   DECL_GETTER(height, float)
   DECL_GETTER(type, std::string)
@@ -113,6 +117,9 @@ class FrameInformation {
   int parse_frame_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
                               std::shared_ptr<IsobmffFileInformation> ptr,
                               int debug);
+
+  static int derive_frame_info(std::shared_ptr<IsobmffFileInformation> ptr,
+                               bool sort_by_pts, int debug);
 
   friend class IsobmffFileInformation;
 };
