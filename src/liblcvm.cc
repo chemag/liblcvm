@@ -353,12 +353,12 @@ int TimingInformation::parse_keyframe_information(
 //   out[i] = in[i] - in[i-1]
 //
 // The function will allocate all the N-1 elements.
-void calculate_vector_deltas(const std::vector<float> in,
-                             std::vector<float> &out) {
+void calculate_vector_deltas_int32_t(const std::vector<int32_t> in,
+                                     std::vector<int32_t> &out) {
   out.clear();
-  float last_val = -1.0;
+  int32_t last_val = -1;
   for (const auto &val : in) {
-    if (last_val != -1.0) {
+    if (last_val != -1) {
       out.push_back(val - last_val);
     }
     last_val = val;
@@ -465,9 +465,14 @@ int TimingInformation::derive_timing_info(
 
   // 3. derived timing values
   // 3.1. calculate the duration (inter-frame distance)
-  ptr->timing.pts_duration_sec_list.clear();
-  calculate_vector_deltas(ptr->timing.pts_sec_list,
-                          ptr->timing.pts_duration_sec_list);
+  std::vector<int32_t> pts_duration_unit_list;
+  calculate_vector_deltas_int32_t(ptr->timing.pts_unit_list,
+                                  pts_duration_unit_list);
+  ptr->timing.pts_duration_sec_list.resize(pts_duration_unit_list.size());
+  for (uint32_t i = 0; i < pts_duration_unit_list.size(); ++i) {
+    ptr->timing.pts_duration_sec_list[i] =
+        ((float)pts_duration_unit_list[i]) / ptr->timing.timescale_video_hz;
+  }
   // 3.2. calculate the duration average/median
   ptr->timing.pts_duration_sec_average =
       calculate_average(ptr->timing.pts_duration_sec_list);
