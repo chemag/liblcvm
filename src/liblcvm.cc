@@ -284,7 +284,6 @@ int TimingInformation::parse_timing_information(
       stbl->GetTypedBox<ISOBMFF::CTTS>("ctts");
   if (ctts != nullptr) {
     int32_t last_ctts_sample_offset_unit = 0;
-    float last_ctts_sample_offset_sec = 0.0;
     // 10.1. adjust pts list using ctts timestamp durations
     uint32_t ctts_sample_count = 0;
     uint32_t cur_video_frame = 0;
@@ -293,9 +292,7 @@ int TimingInformation::parse_timing_information(
       ctts_sample_count += sample_count;
       // update pts_sec_list
       int32_t sample_offset = ctts->GetSampleOffset(i);
-      float sample_offset_sec = (float)sample_offset / timescale_hz;
       last_ctts_sample_offset_unit = sample_offset;
-      last_ctts_sample_offset_sec = sample_offset_sec;
       for (uint32_t sample = 0; sample < sample_count; sample++) {
         // store the new ctts value
         ptr->timing.ctts_unit_list.push_back(sample_offset);
@@ -316,7 +313,8 @@ int TimingInformation::parse_timing_information(
       // update the pts value
       ptr->timing.pts_unit_list[cur_video_frame] +=
           last_ctts_sample_offset_unit;
-      ptr->timing.pts_sec_list[cur_video_frame] += last_ctts_sample_offset_sec;
+      ptr->timing.pts_sec_list[cur_video_frame] =
+          ((float)ptr->timing.pts_unit_list[cur_video_frame]) / timescale_hz;
       ++cur_video_frame;
     }
     if (debug > 2) {
