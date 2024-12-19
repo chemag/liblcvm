@@ -469,6 +469,10 @@ int TimingInformation::derive_timing_info(
         ptr->timing.pts_sec_list[i] - ptr->timing.pts_sec_list[i - 1]);
   }
 
+  // 5. derive keyframe-related values
+  ptr->timing.num_video_keyframes =
+      ptr->timing.get_keyframe_sample_number_list().size();
+
   return 0;
 }
 
@@ -872,8 +876,7 @@ int get_video_structure_info(const std::shared_ptr<IsobmffFileInformation> ptr,
   *num_video_frames = ptr->get_timing().get_num_video_frames();
 
   // 1. count the number of video keyframes from stss (0 if no stss)
-  *num_video_keyframes =
-      ptr->get_timing().get_keyframe_sample_number_list().size();
+  *num_video_keyframes = ptr->get_timing().get_num_video_keyframes();
 
   return 0;
 }

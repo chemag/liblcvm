@@ -24,6 +24,7 @@ class IsobmffFileInformation;
 // Declaration of IsobmffFileInforrmation structure.
 class TimingInformation {
   int num_video_frames;
+  int num_video_keyframes;
   float duration_video_sec;
   float duration_audio_sec;
   uint32_t timescale_video_hz;
@@ -42,6 +43,7 @@ class TimingInformation {
 
  public:
   DECL_GETTER(num_video_frames, int)
+  DECL_GETTER(num_video_keyframes, int)
   DECL_GETTER(duration_video_sec, float)
   DECL_GETTER(duration_audio_sec, float)
   DECL_GETTER(timescale_video_hz, uint32_t)
