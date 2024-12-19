@@ -365,13 +365,14 @@ void calculate_vector_deltas_int32_t(const std::vector<int32_t> in,
   }
 }
 
-float calculate_median(std::vector<float> &vec) {
-  std::sort(vec.begin(), vec.end());
-  size_t n = vec.size();
+float calculate_median(const std::vector<float> &vec) {
+  std::vector<float> vec2 = vec;
+  std::sort(vec2.begin(), vec2.end());
+  size_t n = vec2.size();
   if (n % 2 == 0) {
-    return (vec[n / 2 - 1] + vec[n / 2]) / 2.0f;
+    return (vec2[n / 2 - 1] + vec2[n / 2]) / 2.0f;
   } else {
-    return vec[n / 2];
+    return vec2[n / 2];
   }
 }
 
@@ -394,7 +395,7 @@ float calculate_standard_deviation(const std::vector<float> &vec) {
 }
 
 // https://en.wikipedia.org/wiki/Median_absolute_deviation
-float calculate_median_absolute_deviation(std::vector<float> &vec) {
+float calculate_median_absolute_deviation(const std::vector<float> &vec) {
   // \tilde(X): median(vec)
   float median = calculate_median(vec);
   // |Xi - \tilde(X)|: vector of absolute differences to the median
