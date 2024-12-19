@@ -480,21 +480,23 @@ int TimingInformation::derive_timing_info(
 
   // 6. calculate framerate statistics
   // 6.1. get the framerate series
-  std::vector<float> frame_rate_fps_list(
+  ptr->timing.frame_rate_fps_list.resize(
       ptr->timing.pts_duration_sec_list.size());
   std::transform(ptr->timing.pts_duration_sec_list.begin(),
                  ptr->timing.pts_duration_sec_list.end(),
-                 frame_rate_fps_list.begin(), [](float val) {
+                 ptr->timing.frame_rate_fps_list.begin(), [](float val) {
                    // Handle division by zero
                    return val != 0.0f ? 1.0f / static_cast<float>(val) : 0.0f;
                  });
   // 6.2. median
-  ptr->timing.frame_rate_fps_median = calculate_median(frame_rate_fps_list);
+  ptr->timing.frame_rate_fps_median =
+      calculate_median(ptr->timing.frame_rate_fps_list);
   // 6.3. average
-  ptr->timing.frame_rate_fps_average = calculate_average(frame_rate_fps_list);
+  ptr->timing.frame_rate_fps_average =
+      calculate_average(ptr->timing.frame_rate_fps_list);
   // 6.4. stddev
   ptr->timing.frame_rate_fps_stddev =
-      calculate_standard_deviation(frame_rate_fps_list);
+      calculate_standard_deviation(ptr->timing.frame_rate_fps_list);
 
   // 7. calculate the threshold to consider frame drop: This should be 2
   // times the median, minus a factor

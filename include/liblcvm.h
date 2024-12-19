@@ -42,6 +42,7 @@ class TimingInformation {
   int num_video_keyframes;
   float audio_video_ratio;
   bool video_freeze;
+  std::vector<float> frame_rate_fps_list;
   float frame_rate_fps_median;
   float frame_rate_fps_average;
   float frame_rate_fps_stddev;
@@ -70,6 +71,7 @@ class TimingInformation {
   DECL_GETTER(num_video_keyframes, int)
   DECL_GETTER(audio_video_ratio, float)
   DECL_GETTER(video_freeze, bool)
+  DECL_GETTER(frame_rate_fps_list, std::vector<float>)
   DECL_GETTER(frame_rate_fps_median, float)
   DECL_GETTER(frame_rate_fps_average, float)
   DECL_GETTER(frame_rate_fps_stddev, float)
