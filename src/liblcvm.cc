@@ -193,7 +193,6 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     }
 
     // 11. get video keyframe information
-    ptr->timing.keyframe_sample_number_list.clear();
     if (ptr->timing.parse_keyframe_information(stbl, ptr, debug) < 0) {
       if (debug > 0) {
         fprintf(stderr, "error: no keyframe information in %s\n",
@@ -333,6 +332,7 @@ int TimingInformation::parse_keyframe_information(
   // look for a stss box in the video track for key frames
   std::shared_ptr<ISOBMFF::STSS> stss =
       stbl->GetTypedBox<ISOBMFF::STSS>("stss");
+  ptr->timing.keyframe_sample_number_list.clear();
   if (stss == nullptr) {
     if (debug > 0) {
       fprintf(stderr, "warning: no /moov/trak/mdia/minf/stbl/stss in %s\n",
@@ -341,7 +341,7 @@ int TimingInformation::parse_keyframe_information(
   } else {
     for (unsigned int i = 0; i < stss->GetEntryCount(); i++) {
       uint32_t sample_count = stss->GetSampleNumber(i);
-      ptr->get_timing().keyframe_sample_number_list.push_back(sample_count);
+      ptr->timing.keyframe_sample_number_list.push_back(sample_count);
     }
   }
 
