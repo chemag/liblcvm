@@ -40,6 +40,8 @@ class TimingInformation {
   std::vector<float> pts_sec_list;
   std::vector<float> pts_duration_sec_list;
   std::vector<uint32_t> keyframe_sample_number_list;
+  float audio_video_ratio;
+  bool video_freeze;
 
  public:
   DECL_GETTER(num_video_frames, int)
@@ -59,6 +61,8 @@ class TimingInformation {
   DECL_GETTER(pts_sec_list, std::vector<float>)
   DECL_GETTER(pts_duration_sec_list, std::vector<float>)
   DECL_GETTER(keyframe_sample_number_list, std::vector<uint32_t>)
+  DECL_GETTER(audio_video_ratio, float)
+  DECL_GETTER(video_freeze, bool)
 
   static int parse_timing_information(
       std::shared_ptr<ISOBMFF::ContainerBox> stbl, uint32_t timescale_hz,

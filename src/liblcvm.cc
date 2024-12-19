@@ -473,6 +473,16 @@ int TimingInformation::derive_timing_info(
   ptr->timing.num_video_keyframes =
       ptr->timing.get_keyframe_sample_number_list().size();
 
+  // 6. audio/video ratio and video freeze info
+  if ((ptr->timing.duration_video_sec != -1.0) &&
+      (ptr->timing.duration_audio_sec == -1.0) &&
+      (ptr->timing.duration_video_sec < 2.0)) {
+    ptr->timing.audio_video_ratio =
+        ptr->timing.duration_audio_sec / ptr->timing.duration_video_sec;
+    ptr->timing.video_freeze =
+        ptr->timing.audio_video_ratio > MAX_AUDIO_VIDEO_RATIO;
+  }
+
   return 0;
 }
 
@@ -864,8 +874,8 @@ int get_video_freeze_info(const std::shared_ptr<IsobmffFileInformation> ptr,
   }
 
   // 2. calculate audio to video ratio
-  *audio_video_ratio = *duration_audio_sec / *duration_video_sec;
-  *video_freeze = *audio_video_ratio > MAX_AUDIO_VIDEO_RATIO;
+  *audio_video_ratio = ptr->get_timing().get_audio_video_ratio();
+  *video_freeze = ptr->get_timing().get_video_freeze();
   return 0;
 }
 
