@@ -116,7 +116,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     }
     uint32_t timescale_hz = mdhd->GetTimescale();
     uint64_t duration = mdhd->GetDuration();
-    float duration_sec = (float)duration / timescale_hz;
+    float duration_sec = ((float)duration) / timescale_hz;
     if (debug > 1) {
       fprintf(stdout, "-> handler_type: %s ", handler_type.c_str());
       fprintf(stdout, "timescale: %u ", timescale_hz);
@@ -261,7 +261,7 @@ int TimingInformation::parse_timing_information(
       ptr->timing.stts_unit_list.push_back(sample_offset);
       // set the dts value of the next frame
       uint32_t dts_unit = last_dts_unit + sample_offset;
-      float dts_sec = (float)dts_unit / timescale_hz;
+      float dts_sec = ((float)dts_unit) / timescale_hz;
       ptr->timing.dts_sec_list.push_back(dts_sec);
       // init the pts value of the next frame
       ptr->timing.pts_unit_list.push_back(dts_unit);
@@ -577,8 +577,8 @@ int FrameInformation::derive_frame_info(
     return -1;
   }
   ptr->frame.filesize = stat_buf.st_size;
-  ptr->frame.bitrate_bps = 8.0 * (float)(ptr->frame.filesize) /
-                           (float)ptr->get_timing().get_duration_video_sec();
+  ptr->frame.bitrate_bps = 8.0 * ((float)(ptr->frame.filesize)) /
+                           ((float)ptr->get_timing().get_duration_video_sec());
 
   return 0;
 }
