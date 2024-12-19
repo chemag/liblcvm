@@ -104,17 +104,16 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     int matrix_coeffs;
 
     // 2.1. analyze file
-    struct IsobmffFileInformation info;
-    int ret = get_isobmff_information(infile.c_str(), info,
-                                      outfile_timestamps_sort_pts, debug);
-    if (ret < 0) {
-      fprintf(stderr, "error: get_isobmff_information() in %s\n",
+    std::shared_ptr<IsobmffFileInformation> ptr = IsobmffFileInformation::parse(
+        infile.c_str(), outfile_timestamps_sort_pts, debug);
+    if (ptr == nullptr) {
+      fprintf(stderr, "error: IsobmffFileInformation::parse() in %s\n",
               infile.c_str());
       continue;
     }
 
-    ret = get_video_generic_info(
-        info, &filesize, &bitrate_bps, &width, &height, type, &width2, &height2,
+    int ret = get_video_generic_info(
+        ptr, &filesize, &bitrate_bps, &width, &height, type, &width2, &height2,
         &horizresolution, &vertresolution, &depth, &chroma_format,
         &bit_depth_luma, &bit_depth_chroma, &video_full_range_flag,
         &colour_primaries, &transfer_characteristics, &matrix_coeffs, debug);
@@ -136,7 +135,7 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     float pts_sec_duration_stddev;
     float pts_sec_duration_mad;
     ret = get_video_freeze_info(
-        info, &video_freeze, &audio_video_ratio, &duration_video_sec,
+        ptr, &video_freeze, &audio_video_ratio, &duration_video_sec,
         &duration_audio_sec, &timescale_video_hz, &timescale_audio_hz,
         &pts_sec_duration_average, &pts_sec_duration_median,
         &pts_sec_duration_stddev, &pts_sec_duration_mad, debug);
@@ -158,10 +157,10 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     std::vector<int> consecutive_list = {2, 5};
     std::vector<long int> frame_drop_length_consecutive;
     ret = get_frame_drop_info(
-        info, &num_video_frames, &frame_rate_fps_median,
-        &frame_rate_fps_average, &frame_rate_fps_stddev, &frame_drop_count,
-        &frame_drop_ratio, &normalized_frame_drop_average_length,
-        percentile_list, frame_drop_length_percentile_list, consecutive_list,
+        ptr, &num_video_frames, &frame_rate_fps_median, &frame_rate_fps_average,
+        &frame_rate_fps_stddev, &frame_drop_count, &frame_drop_ratio,
+        &normalized_frame_drop_average_length, percentile_list,
+        frame_drop_length_percentile_list, consecutive_list,
         frame_drop_length_consecutive, debug);
     if (ret < 0) {
       fprintf(stderr, "error: get_frame_drop_info() in %s\n", infile.c_str());
@@ -170,8 +169,8 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
 
     // 2.3. get video structure info
     int num_video_keyframes;
-    ret = get_video_structure_info(info, &num_video_frames,
-                                   &num_video_keyframes, debug);
+    ret = get_video_structure_info(ptr, &num_video_frames, &num_video_keyframes,
+                                   debug);
     if (ret < 0) {
       fprintf(stderr, "error: get_video_structure_info() in %s\n",
               infile.c_str());
@@ -234,7 +233,7 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
       std::vector<float> pts_sec_list;
       std::vector<float> pts_duration_sec_list;
       ret = get_frame_interframe_info(
-          info, &num_video_frames, frame_num_orig_list, stts_unit_list,
+          ptr, &num_video_frames, frame_num_orig_list, stts_unit_list,
           ctts_unit_list, dts_sec_list, pts_sec_list, pts_duration_sec_list,
           outfile_timestamps_sort_pts, debug);
       if (ret < 0) {
@@ -460,7 +459,7 @@ arg_options *parse_args(int argc, char **argv) {
 
       case VERSION_OPTION: {
         std::string version;
-        get_liblcvm_version(version);
+        IsobmffFileInformation::get_liblcvm_version(version);
         fprintf(stdout, "version: %s\n", version.c_str());
         exit(0);
       } break;

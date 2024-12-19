@@ -60,6 +60,37 @@ the SPS VUI in the actual media boxes, and get some information (e.g.
 colorimetry).
 
 
+
+# 4. Library Operation
+
+The library is based on a few classes. The main one is IsobmffFileInformation,
+which contains a factory method ("parse()") which does the full analysis.
+
+```
+std::shared_ptr<IsobmffFileInformation> ptr = IsobmffFileInformation::parse(
+    infile.c_str(), outfile_timestamps_sort_pts, debug);
+```
+
+The output IsobmffFileInformation pointer can be used directly through its
+getters. For example, to get the video timescale, use the getter under the
+TimingInformation class:
+
+```
+uint32_t timescale_video_hz = pts->get_timing()->get_timescale_video_hz();
+```
+
+As an alternative, and to keep backwards compatibility, we will keep for
+a while the old API that returned a set of variables at the same time. These
+include:
+* `get_frame_drop_info()`
+* `get_video_freeze_info()`
+* `get_video_structure_info()`
+* `get_video_generic_info()`
+* `get_frame_interframe_info()`
+
+
+
+
 # Appendix 1: Build Manually
 
 1. Clone the repository
