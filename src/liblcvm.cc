@@ -175,11 +175,13 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     // init timing info
     ptr->timing.num_video_frames = 0;
     ptr->timing.dts_sec_list.clear();
+    ptr->timing.pts_unit_list.clear();
     ptr->timing.pts_sec_list.clear();
     ptr->timing.stts_unit_list.clear();
     ptr->timing.ctts_unit_list.clear();
     // first frame starts at 0.0
     ptr->timing.dts_sec_list.push_back(0.0);
+    ptr->timing.pts_unit_list.push_back(0);
     ptr->timing.pts_sec_list.push_back(0.0);
     if (ptr->timing.parse_timing_information(stbl, timescale_hz, ptr, debug) <
         0) {
@@ -262,6 +264,7 @@ int TimingInformation::parse_timing_information(
       float dts_sec = (float)dts_unit / timescale_hz;
       ptr->timing.dts_sec_list.push_back(dts_sec);
       // init the pts value of the next frame
+      ptr->timing.pts_unit_list.push_back(dts_unit);
       ptr->timing.pts_sec_list.push_back(dts_sec);
       last_dts_unit = dts_unit;
     }
@@ -273,12 +276,14 @@ int TimingInformation::parse_timing_information(
   // we need to remove the last element of the dts and pts lists, as we
   // set them pointing at the start of the next frame (inexistent)
   ptr->timing.dts_sec_list.pop_back();
+  ptr->timing.pts_unit_list.pop_back();
   ptr->timing.pts_sec_list.pop_back();
 
   // 3. look for a ctts box
   std::shared_ptr<ISOBMFF::CTTS> ctts =
       stbl->GetTypedBox<ISOBMFF::CTTS>("ctts");
   if (ctts != nullptr) {
+    int32_t last_ctts_sample_offset_unit = 0;
     float last_ctts_sample_offset_sec = 0.0;
     // 10.1. adjust pts list using ctts timestamp durations
     uint32_t ctts_sample_count = 0;
@@ -289,11 +294,13 @@ int TimingInformation::parse_timing_information(
       // update pts_sec_list
       int32_t sample_offset = ctts->GetSampleOffset(i);
       float sample_offset_sec = (float)sample_offset / timescale_hz;
+      last_ctts_sample_offset_unit = sample_offset;
       last_ctts_sample_offset_sec = sample_offset_sec;
       for (uint32_t sample = 0; sample < sample_count; sample++) {
         // store the new ctts value
         ptr->timing.ctts_unit_list.push_back(sample_offset);
         // update the pts value
+        ptr->timing.pts_unit_list[cur_video_frame] += sample_offset;
         ptr->timing.pts_sec_list[cur_video_frame] += sample_offset_sec;
         ++cur_video_frame;
       }
@@ -306,6 +313,8 @@ int TimingInformation::parse_timing_information(
     // the decoder reuses the latest ctts sample offset again and again
     while (cur_video_frame < stts_sample_count) {
       // update the pts value
+      ptr->timing.pts_unit_list[cur_video_frame] +=
+          last_ctts_sample_offset_unit;
       ptr->timing.pts_sec_list[cur_video_frame] += last_ctts_sample_offset_sec;
       ++cur_video_frame;
     }
@@ -439,7 +448,14 @@ int TimingInformation::derive_timing_info(
           ptr->timing.dts_sec_list[ptr->timing.frame_num_orig_list[i]];
     }
     ptr->timing.dts_sec_list = dts_sec_list_alt;
-    // 2.4. pts_sec_list
+    // 2.4. pts_unit_list
+    std::vector<int32_t> pts_unit_list_alt(ptr->timing.pts_unit_list.size());
+    for (uint32_t i = 0; i < ptr->timing.pts_unit_list.size(); ++i) {
+      pts_unit_list_alt[i] =
+          ptr->timing.pts_unit_list[ptr->timing.frame_num_orig_list[i]];
+    }
+    ptr->timing.pts_unit_list = pts_unit_list_alt;
+    // 2.5. pts_sec_list
     std::vector<float> pts_sec_list_alt(ptr->timing.pts_sec_list.size());
     for (uint32_t i = 0; i < ptr->timing.pts_sec_list.size(); ++i) {
       pts_sec_list_alt[i] =

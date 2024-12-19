@@ -32,6 +32,7 @@ class TimingInformation {
   std::vector<uint32_t> stts_unit_list;
   std::vector<int32_t> ctts_unit_list;
   std::vector<float> dts_sec_list;
+  std::vector<int32_t> pts_unit_list;
   std::vector<float> pts_sec_list;
   std::vector<float> pts_duration_sec_list;
   float pts_duration_sec_average;
@@ -61,6 +62,7 @@ class TimingInformation {
   DECL_GETTER(stts_unit_list, std::vector<uint32_t>)
   DECL_GETTER(ctts_unit_list, std::vector<int32_t>)
   DECL_GETTER(dts_sec_list, std::vector<float>)
+  DECL_GETTER(pts_unit_list, std::vector<int32_t>)
   DECL_GETTER(pts_sec_list, std::vector<float>)
   DECL_GETTER(pts_duration_sec_list, std::vector<float>)
   DECL_GETTER(pts_duration_sec_average, float)
