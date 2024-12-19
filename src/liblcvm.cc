@@ -450,30 +450,25 @@ int TimingInformation::derive_timing_info(
 
   // 3. derived timing values
   // 3.1. calculate the duration (inter-frame distance)
-  std::vector<float> pts_sec_duration_list;
-  calculate_vector_deltas(ptr->timing.pts_sec_list, pts_sec_duration_list);
-  // 3.2. calculate the duration average/median
-  ptr->timing.pts_sec_duration_average =
-      calculate_average(pts_sec_duration_list);
-  ptr->timing.pts_sec_duration_median = calculate_median(pts_sec_duration_list);
-  // 3.3. calculate the duration stddev and median absolute difference (MAD)
-  ptr->timing.pts_sec_duration_stddev =
-      calculate_standard_deviation(pts_sec_duration_list);
-  ptr->timing.pts_sec_duration_mad =
-      calculate_median_absolute_deviation(pts_sec_duration_list);
-
-  // 4. derive pts duration values
   ptr->timing.pts_duration_sec_list.clear();
-  for (unsigned int i = 1; i < ptr->timing.pts_sec_list.size(); ++i) {
-    ptr->timing.pts_duration_sec_list.push_back(
-        ptr->timing.pts_sec_list[i] - ptr->timing.pts_sec_list[i - 1]);
-  }
+  calculate_vector_deltas(ptr->timing.pts_sec_list,
+                          ptr->timing.pts_duration_sec_list);
+  // 3.2. calculate the duration average/median
+  ptr->timing.pts_duration_sec_average =
+      calculate_average(ptr->timing.pts_duration_sec_list);
+  ptr->timing.pts_duration_sec_median =
+      calculate_median(ptr->timing.pts_duration_sec_list);
+  // 3.3. calculate the duration stddev and median absolute difference (MAD)
+  ptr->timing.pts_duration_sec_stddev =
+      calculate_standard_deviation(ptr->timing.pts_duration_sec_list);
+  ptr->timing.pts_duration_sec_mad =
+      calculate_median_absolute_deviation(ptr->timing.pts_duration_sec_list);
 
-  // 5. derive keyframe-related values
+  // 4. derive keyframe-related values
   ptr->timing.num_video_keyframes =
       ptr->timing.get_keyframe_sample_number_list().size();
 
-  // 6. audio/video ratio and video freeze info
+  // 5. audio/video ratio and video freeze info
   if ((ptr->timing.duration_video_sec != -1.0) &&
       (ptr->timing.duration_audio_sec == -1.0) &&
       (ptr->timing.duration_video_sec < 2.0)) {
@@ -481,6 +476,75 @@ int TimingInformation::derive_timing_info(
         ptr->timing.duration_audio_sec / ptr->timing.duration_video_sec;
     ptr->timing.video_freeze =
         ptr->timing.audio_video_ratio > MAX_AUDIO_VIDEO_RATIO;
+  }
+
+  // 6. calculate framerate statistics
+  // 6.1. get the framerate series
+  std::vector<float> frame_rate_fps_list(
+      ptr->timing.pts_duration_sec_list.size());
+  std::transform(ptr->timing.pts_duration_sec_list.begin(),
+                 ptr->timing.pts_duration_sec_list.end(),
+                 frame_rate_fps_list.begin(), [](float val) {
+                   // Handle division by zero
+                   return val != 0.0f ? 1.0f / static_cast<float>(val) : 0.0f;
+                 });
+  // 6.2. median
+  ptr->timing.frame_rate_fps_median = calculate_median(frame_rate_fps_list);
+  // 6.3. average
+  ptr->timing.frame_rate_fps_average = calculate_average(frame_rate_fps_list);
+  // 6.4. stddev
+  ptr->timing.frame_rate_fps_stddev =
+      calculate_standard_deviation(frame_rate_fps_list);
+
+  // 7. calculate the threshold to consider frame drop: This should be 2
+  // times the median, minus a factor
+  double FACTOR = 0.75;
+  float pts_duration_sec_threshold =
+      ptr->timing.pts_duration_sec_median * FACTOR * 2;
+
+  // 8. get the list of all the drops (absolute inter-frame values)
+  for (const auto &pts_duration_sec : ptr->timing.pts_duration_sec_list) {
+    if (pts_duration_sec > pts_duration_sec_threshold) {
+      ptr->timing.frame_drop_length_sec_list.push_back(pts_duration_sec);
+    }
+  }
+  // ptr->timing.frame_drop_length_sec_list: {0.6668900000000022,
+  // 0.10025600000000168,
+  // ...}
+
+  // 9. sum all the drops, but adding only the length over 1x frame time
+  float frame_drop_length_sec_list = 0.0;
+  for (const auto &drop_length_sec : ptr->timing.frame_drop_length_sec_list) {
+    frame_drop_length_sec_list += drop_length_sec;
+  }
+  float drop_length_duration_sec =
+      frame_drop_length_sec_list -
+      ptr->timing.pts_duration_sec_median *
+          ptr->timing.frame_drop_length_sec_list.size();
+  // drop_length_duration_sec: sum({33.35900000000022, 66.92600000000168, ...})
+
+  // 10. get the total duration as the sum of all the inter-frame distances
+  float total_duration_sec = 0.0;
+  for (const auto &pts_duration_sec : ptr->timing.pts_duration_sec_list) {
+    total_duration_sec += pts_duration_sec;
+  }
+
+  // 11. calculate frame drop ratio as extra drop length over total duration
+  ptr->timing.frame_drop_ratio = drop_length_duration_sec / total_duration_sec;
+  ptr->timing.frame_drop_count =
+      int((ptr->timing.frame_drop_ratio) * (ptr->timing.num_video_frames));
+
+  // 12. calculate average drop length, normalized to framerate. Note that
+  // a single frame drop is a normalized frame drop length of 2. When
+  // frame drops are uncorrelated, the normalized average drop length
+  // should be close to 2
+  ptr->timing.normalized_frame_drop_average_length = 0.0;
+  if (ptr->timing.frame_drop_length_sec_list.size() > 0) {
+    float frame_drop_average_length =
+        frame_drop_length_sec_list /
+        ptr->timing.frame_drop_length_sec_list.size();
+    ptr->timing.normalized_frame_drop_average_length =
+        (frame_drop_average_length / ptr->timing.pts_duration_sec_median);
   }
 
   return 0;
@@ -710,106 +774,27 @@ int get_frame_drop_info(const std::shared_ptr<IsobmffFileInformation> ptr,
                         std::vector<int> consecutive_list,
                         std::vector<long int> &frame_drop_length_consecutive,
                         int debug) {
-  // 0. get the list of inter-frame timestamp distances from the pts_sec_list
+  // get all the per-calculated values
   *num_video_frames = ptr->get_timing().get_num_video_frames();
-  std::vector<float> pts_sec_duration_list;
-  calculate_vector_deltas(ptr->get_timing().get_pts_sec_list(),
-                          pts_sec_duration_list);
+  *frame_rate_fps_median = ptr->get_timing().get_frame_rate_fps_median();
+  *frame_rate_fps_average = ptr->get_timing().get_frame_rate_fps_average();
+  *frame_rate_fps_stddev = ptr->get_timing().get_frame_rate_fps_stddev();
+  *frame_drop_count = ptr->get_timing().get_frame_drop_count();
+  *frame_drop_ratio = ptr->get_timing().get_frame_drop_ratio();
+  *normalized_frame_drop_average_length =
+      ptr->get_timing().get_normalized_frame_drop_average_length();
 
-  if (debug > 1) {
-    for (const auto &pts_sec_duration : pts_sec_duration_list) {
-      fprintf(stdout, "%f,", pts_sec_duration);
-    }
-    fprintf(stdout, "\n");
-  }
-
-  // 1. calculate the inter-frame distance statistics
-  // 1.1. get the list of frame rates
-  std::vector<float> frame_rate_fps_list(pts_sec_duration_list.size());
-  std::transform(pts_sec_duration_list.begin(), pts_sec_duration_list.end(),
-                 frame_rate_fps_list.begin(), [](float val) {
-                   // Handle division by zero
-                   return val != 0.0f ? 1.0f / static_cast<float>(val) : 0.0f;
-                 });
-  // 1.2. median
-  sort(frame_rate_fps_list.begin(), frame_rate_fps_list.end());
-  *frame_rate_fps_median =
-      frame_rate_fps_list[frame_rate_fps_list.size() / 2 - 1];
-  sort(pts_sec_duration_list.begin(), pts_sec_duration_list.end());
-  float pts_sec_duration_median =
-      pts_sec_duration_list[pts_sec_duration_list.size() / 2 - 1];
-  // 1.3. average
-  *frame_rate_fps_average =
-      (1.0 * std::accumulate(frame_rate_fps_list.begin(),
-                             frame_rate_fps_list.end(), 0.0)) /
-      frame_rate_fps_list.size();
-  // 1.4. stddev
-  // vmas := value minus average square
-  std::vector<float> frame_rate_fps_vmas_list(frame_rate_fps_list.size());
-  std::transform(frame_rate_fps_list.begin(), frame_rate_fps_list.end(),
-                 frame_rate_fps_vmas_list.begin(), [=](float val) {
-                   return (val - (*frame_rate_fps_average)) *
-                          (val - (*frame_rate_fps_average));
-                 });
-  double frame_rate_fps_square_sum = std::accumulate(
-      frame_rate_fps_vmas_list.begin(), frame_rate_fps_vmas_list.end(), 0.0);
-  *frame_rate_fps_stddev =
-      std::sqrt(frame_rate_fps_square_sum / frame_rate_fps_vmas_list.size());
-
-  // 2. calculate the threshold to consider frame drop: This should be 2
-  // times the median, minus a factor
-  double FACTOR = 0.75;
-  float pts_sec_duration_threshold = pts_sec_duration_median * FACTOR * 2;
-
-  // 3. get the list of all the drops (absolute inter-frame values)
-  std::vector<float> drop_length_sec_list;
-  for (const auto &pts_sec_duration : pts_sec_duration_list) {
-    if (pts_sec_duration > pts_sec_duration_threshold) {
-      drop_length_sec_list.push_back(pts_sec_duration);
-    }
-  }
-  // drop_length_sec_list: {0.6668900000000022, 0.10025600000000168, ...}
-
-  // 4. sum all the drops, but adding only the length over 1x frame time
-  float drop_length_sec_list_sum = 0.0;
-  for (const auto &drop_length_sec : drop_length_sec_list) {
-    drop_length_sec_list_sum += drop_length_sec;
-  }
-  float drop_length_duration_sec =
-      drop_length_sec_list_sum -
-      pts_sec_duration_median * drop_length_sec_list.size();
-  // drop_length_duration_sec: sum({33.35900000000022, 66.92600000000168, ...})
-
-  // 5. get the total duration as the sum of all the inter-frame distances
-  float total_duration_sec = 0.0;
-  for (const auto &pts_sec_duration : pts_sec_duration_list) {
-    total_duration_sec += pts_sec_duration;
-  }
-
-  // 6. calculate frame drop ratio as extra drop length over total duration
-  *frame_drop_ratio = drop_length_duration_sec / total_duration_sec;
-  *frame_drop_count = int((*frame_drop_ratio) * (*num_video_frames));
-
-  // 7. calculate average drop length, normalized to framerate. Note that
-  // a single frame drop is a normalized frame drop length of 2. When
-  // frame drops are uncorrelated, the normalized average drop length
-  // should be close to 2
-  *normalized_frame_drop_average_length = 0.0;
-  if (drop_length_sec_list.size() > 0) {
-    float frame_drop_average_length =
-        drop_length_sec_list_sum / drop_length_sec_list.size();
-    *normalized_frame_drop_average_length =
-        (frame_drop_average_length / pts_sec_duration_median);
-  }
-
-  // 8. calculate percentile list
+  // calculate percentile list
   frame_drop_length_percentile_list.clear();
-  if (drop_length_sec_list.size() > 0) {
-    sort(drop_length_sec_list.begin(), drop_length_sec_list.end());
+  if (ptr->get_timing().get_frame_drop_length_sec_list().size() > 0) {
+    std::sort(ptr->get_timing().get_frame_drop_length_sec_list().begin(),
+              ptr->get_timing().get_frame_drop_length_sec_list().end());
     for (const float &percentile : percentile_list) {
-      int position = (percentile / 100.0) * drop_length_sec_list.size();
+      int position = (percentile / 100.0) *
+                     ptr->get_timing().get_frame_drop_length_sec_list().size();
       float frame_drop_length_percentile =
-          drop_length_sec_list[position] / pts_sec_duration_median;
+          ptr->get_timing().get_frame_drop_length_sec_list()[position] /
+          ptr->get_timing().get_pts_duration_sec_median();
       frame_drop_length_percentile_list.push_back(frame_drop_length_percentile);
     }
   } else {
@@ -818,14 +803,16 @@ int get_frame_drop_info(const std::shared_ptr<IsobmffFileInformation> ptr,
     }
   }
 
-  // 9. calculate consecutive list
+  // calculate consecutive list
   frame_drop_length_consecutive.clear();
   for (int _ : consecutive_list) {
     frame_drop_length_consecutive.push_back(0);
   }
-  if (drop_length_sec_list.size() > 0) {
-    for (const auto &drop_length_sec : drop_length_sec_list) {
-      float drop_length = drop_length_sec / pts_sec_duration_median;
+  if (ptr->get_timing().get_frame_drop_length_sec_list().size() > 0) {
+    for (const auto &drop_length_sec :
+         ptr->get_timing().get_frame_drop_length_sec_list()) {
+      float drop_length =
+          drop_length_sec / ptr->get_timing().get_pts_duration_sec_median();
       for (unsigned int i = 0; i < consecutive_list.size(); i++) {
         if (drop_length >= consecutive_list[i]) {
           frame_drop_length_consecutive[i]++;
@@ -842,19 +829,19 @@ int get_video_freeze_info(const std::shared_ptr<IsobmffFileInformation> ptr,
                           float *duration_video_sec, float *duration_audio_sec,
                           uint32_t *timescale_video_hz,
                           uint32_t *timescale_audio_hz,
-                          float *pts_sec_duration_average,
-                          float *pts_sec_duration_median,
-                          float *pts_sec_duration_stddev,
-                          float *pts_sec_duration_mad, int debug) {
+                          float *pts_duration_sec_average,
+                          float *pts_duration_sec_median,
+                          float *pts_duration_sec_stddev,
+                          float *pts_duration_sec_mad, int debug) {
   // 0. init values
   *duration_video_sec = ptr->get_timing().get_duration_video_sec();
   *duration_audio_sec = ptr->get_timing().get_duration_audio_sec();
   *timescale_video_hz = ptr->get_timing().get_timescale_video_hz();
   *timescale_audio_hz = ptr->get_timing().get_timescale_audio_hz();
-  *pts_sec_duration_average = ptr->get_timing().get_pts_sec_duration_average();
-  *pts_sec_duration_median = ptr->get_timing().get_pts_sec_duration_median();
-  *pts_sec_duration_stddev = ptr->get_timing().get_pts_sec_duration_stddev();
-  *pts_sec_duration_mad = ptr->get_timing().get_pts_sec_duration_mad();
+  *pts_duration_sec_average = ptr->get_timing().get_pts_duration_sec_average();
+  *pts_duration_sec_median = ptr->get_timing().get_pts_duration_sec_median();
+  *pts_duration_sec_stddev = ptr->get_timing().get_pts_duration_sec_stddev();
+  *pts_duration_sec_mad = ptr->get_timing().get_pts_duration_sec_mad();
 
   // 1. check both audio and video tracks, and video track at least 2 seconds
   if (*duration_video_sec == -1.0) {

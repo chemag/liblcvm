@@ -24,45 +24,59 @@ class IsobmffFileInformation;
 // Declaration of IsobmffFileInforrmation structure.
 class TimingInformation {
   int num_video_frames;
-  int num_video_keyframes;
   float duration_video_sec;
   float duration_audio_sec;
   uint32_t timescale_video_hz;
   uint32_t timescale_audio_hz;
-  float pts_sec_duration_average;
-  float pts_sec_duration_median;
-  float pts_sec_duration_stddev;
-  float pts_sec_duration_mad;
   std::vector<uint32_t> frame_num_orig_list;
   std::vector<uint32_t> stts_unit_list;
   std::vector<int32_t> ctts_unit_list;
   std::vector<float> dts_sec_list;
   std::vector<float> pts_sec_list;
   std::vector<float> pts_duration_sec_list;
+  float pts_duration_sec_average;
+  float pts_duration_sec_median;
+  float pts_duration_sec_stddev;
+  float pts_duration_sec_mad;
   std::vector<uint32_t> keyframe_sample_number_list;
+  int num_video_keyframes;
   float audio_video_ratio;
   bool video_freeze;
+  float frame_rate_fps_median;
+  float frame_rate_fps_average;
+  float frame_rate_fps_stddev;
+  std::vector<float> frame_drop_length_sec_list;
+  int frame_drop_count;
+  float frame_drop_ratio;
+  float normalized_frame_drop_average_length;
 
  public:
   DECL_GETTER(num_video_frames, int)
-  DECL_GETTER(num_video_keyframes, int)
   DECL_GETTER(duration_video_sec, float)
   DECL_GETTER(duration_audio_sec, float)
   DECL_GETTER(timescale_video_hz, uint32_t)
   DECL_GETTER(timescale_audio_hz, uint32_t)
-  DECL_GETTER(pts_sec_duration_average, float)
-  DECL_GETTER(pts_sec_duration_median, float)
-  DECL_GETTER(pts_sec_duration_stddev, float)
-  DECL_GETTER(pts_sec_duration_mad, float)
   DECL_GETTER(frame_num_orig_list, std::vector<uint32_t>)
   DECL_GETTER(stts_unit_list, std::vector<uint32_t>)
   DECL_GETTER(ctts_unit_list, std::vector<int32_t>)
   DECL_GETTER(dts_sec_list, std::vector<float>)
   DECL_GETTER(pts_sec_list, std::vector<float>)
   DECL_GETTER(pts_duration_sec_list, std::vector<float>)
+  DECL_GETTER(pts_duration_sec_average, float)
+  DECL_GETTER(pts_duration_sec_median, float)
+  DECL_GETTER(pts_duration_sec_stddev, float)
+  DECL_GETTER(pts_duration_sec_mad, float)
   DECL_GETTER(keyframe_sample_number_list, std::vector<uint32_t>)
+  DECL_GETTER(num_video_keyframes, int)
   DECL_GETTER(audio_video_ratio, float)
   DECL_GETTER(video_freeze, bool)
+  DECL_GETTER(frame_rate_fps_median, float)
+  DECL_GETTER(frame_rate_fps_average, float)
+  DECL_GETTER(frame_rate_fps_stddev, float)
+  DECL_GETTER(frame_drop_length_sec_list, std::vector<float>)
+  DECL_GETTER(frame_drop_count, int)
+  DECL_GETTER(frame_drop_ratio, float)
+  DECL_GETTER(normalized_frame_drop_average_length, float)
 
   static int parse_timing_information(
       std::shared_ptr<ISOBMFF::ContainerBox> stbl, uint32_t timescale_hz,
@@ -204,10 +218,10 @@ int get_frame_drop_info(const std::shared_ptr<IsobmffFileInformation> ptr,
 // @param[out] duration_audio_sec: Audio length (seconds).
 // @param[out] timescale_video_hz: Video length (Hz).
 // @param[out] timescale_audio_hz: Audio length (Hz).
-// @param[out] pts_sec_duration_average: pts duration average (sec).
-// @param[out] pts_sec_duration_median: pts duration median (sec).
-// @param[out] pts_sec_duration_stddev: pts duration standard deviation (sec).
-// @param[out] pts_sec_duration_mad: pts duration MAD (median absolute
+// @param[out] pts_duration_sec_average: pts duration average (sec).
+// @param[out] pts_duration_sec_median: pts duration median (sec).
+// @param[out] pts_duration_sec_stddev: pts duration standard deviation (sec).
+// @param[out] pts_duration_sec_mad: pts duration MAD (median absolute
 //             deviation) (sec).
 // @param[in] debug: Debug level.
 int get_video_freeze_info(const std::shared_ptr<IsobmffFileInformation> ptr,
@@ -215,10 +229,10 @@ int get_video_freeze_info(const std::shared_ptr<IsobmffFileInformation> ptr,
                           float *duration_video_sec, float *duration_audio_sec,
                           uint32_t *timescale_video_hz,
                           uint32_t *timescale_audio_hz,
-                          float *pts_sec_duration_average,
-                          float *pts_sec_duration_median,
-                          float *pts_sec_duration_stddev,
-                          float *pts_sec_duration_mad, int debug);
+                          float *pts_duration_sec_average,
+                          float *pts_duration_sec_median,
+                          float *pts_duration_sec_stddev,
+                          float *pts_duration_sec_mad, int debug);
 
 // @brief Calculates the video GoP structure info.
 //
