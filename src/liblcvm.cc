@@ -301,7 +301,8 @@ int TimingInformation::parse_timing_information(
         ptr->timing.ctts_unit_list.push_back(sample_offset);
         // update the pts value
         ptr->timing.pts_unit_list[cur_video_frame] += sample_offset;
-        ptr->timing.pts_sec_list[cur_video_frame] += sample_offset_sec;
+        ptr->timing.pts_sec_list[cur_video_frame] =
+            ((float)ptr->timing.pts_unit_list[cur_video_frame]) / timescale_hz;
         ++cur_video_frame;
       }
       if (debug > 2) {
