@@ -95,6 +95,14 @@ class TimingInformation {
   static int derive_timing_info(std::shared_ptr<IsobmffFileInformation> ptr,
                                 bool sort_by_pts, int debug);
 
+  void calculate_percentile_list(
+      const std::vector<float> percentile_list,
+      std::vector<float> &frame_drop_length_percentile_list, int debug);
+
+  void calculate_consecutive_list(
+      std::vector<int> consecutive_list,
+      std::vector<long int> &frame_drop_length_consecutive, int debug);
+
   friend class IsobmffFileInformation;
 };
 

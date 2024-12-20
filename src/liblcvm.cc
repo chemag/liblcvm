@@ -577,6 +577,49 @@ int TimingInformation::derive_timing_info(
   return 0;
 }
 
+void TimingInformation::calculate_percentile_list(
+    const std::vector<float> percentile_list,
+    std::vector<float> &frame_drop_length_percentile_list, int debug) {
+  // calculate percentile list
+  frame_drop_length_percentile_list.clear();
+  if (frame_drop_length_sec_list.size() > 0) {
+    std::sort(frame_drop_length_sec_list.begin(),
+              frame_drop_length_sec_list.end());
+    for (const float &percentile : percentile_list) {
+      int position = (percentile / 100.0) * frame_drop_length_sec_list.size();
+      float frame_drop_length_percentile =
+          frame_drop_length_sec_list[position] /
+          this->get_pts_duration_sec_median();
+      frame_drop_length_percentile_list.push_back(frame_drop_length_percentile);
+    }
+  } else {
+    for (const float &_ : percentile_list) {
+      frame_drop_length_percentile_list.push_back(0.0);
+    }
+  }
+}
+
+void TimingInformation::calculate_consecutive_list(
+    std::vector<int> consecutive_list,
+    std::vector<long int> &frame_drop_length_consecutive, int debug) {
+  // calculate consecutive list
+  frame_drop_length_consecutive.clear();
+  for (int _ : consecutive_list) {
+    frame_drop_length_consecutive.push_back(0);
+  }
+  if (frame_drop_length_sec_list.size() > 0) {
+    for (const auto &frame_drop_length_sec : frame_drop_length_sec_list) {
+      float drop_length =
+          frame_drop_length_sec / this->get_pts_duration_sec_median();
+      for (unsigned int i = 0; i < consecutive_list.size(); i++) {
+        if (drop_length >= consecutive_list[i]) {
+          frame_drop_length_consecutive[i]++;
+        }
+      }
+    }
+  }
+}
+
 int FrameInformation::derive_frame_info(
     std::shared_ptr<IsobmffFileInformation> ptr, bool sort_by_pts, int debug) {
   // 1. get basic file info
@@ -816,39 +859,12 @@ int get_frame_drop_info(const std::shared_ptr<IsobmffFileInformation> ptr,
       ptr->get_timing().get_frame_drop_length_sec_list();
 
   // calculate percentile list
-  frame_drop_length_percentile_list.clear();
-  if (frame_drop_length_sec_list.size() > 0) {
-    std::sort(frame_drop_length_sec_list.begin(),
-              frame_drop_length_sec_list.end());
-    for (const float &percentile : percentile_list) {
-      int position = (percentile / 100.0) * frame_drop_length_sec_list.size();
-      float frame_drop_length_percentile =
-          frame_drop_length_sec_list[position] /
-          ptr->get_timing().get_pts_duration_sec_median();
-      frame_drop_length_percentile_list.push_back(frame_drop_length_percentile);
-    }
-  } else {
-    for (const float &_ : percentile_list) {
-      frame_drop_length_percentile_list.push_back(0.0);
-    }
-  }
+  ptr->get_timing().calculate_percentile_list(
+      percentile_list, frame_drop_length_percentile_list, debug);
 
   // calculate consecutive list
-  frame_drop_length_consecutive.clear();
-  for (int _ : consecutive_list) {
-    frame_drop_length_consecutive.push_back(0);
-  }
-  if (frame_drop_length_sec_list.size() > 0) {
-    for (const auto &frame_drop_length_sec : frame_drop_length_sec_list) {
-      float drop_length = frame_drop_length_sec /
-                          ptr->get_timing().get_pts_duration_sec_median();
-      for (unsigned int i = 0; i < consecutive_list.size(); i++) {
-        if (drop_length >= consecutive_list[i]) {
-          frame_drop_length_consecutive[i]++;
-        }
-      }
-    }
-  }
+  ptr->get_timing().calculate_consecutive_list(
+      consecutive_list, frame_drop_length_consecutive, debug);
 
   return 0;
 }
