@@ -68,8 +68,8 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
           "frame_rate_fps_average,frame_rate_fps_stddev,video_freeze,"
           "video_freeze_ratio,duration_video_sec,duration_audio_sec,"
           "timescale_video_hz,timescale_audio_hz,"
-          "pts_sec_duration_average,pts_sec_duration_median,"
-          "pts_sec_duration_stddev,pts_sec_duration_mad,"
+          "pts_duration_sec_average,pts_duration_sec_median,"
+          "pts_duration_sec_stddev,pts_duration_sec_mad,"
           "frame_drop_count,frame_drop_ratio,"
           "normalized_frame_drop_average_length,"
           "frame_drop_length_percentile_50,frame_drop_length_percentile_90,"
@@ -84,25 +84,6 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
   std::map<std::string, std::vector<float>> pts_sec_list_dict;
   std::map<std::string, std::vector<float>> pts_duration_sec_list_dict;
   for (const auto &infile : infile_list) {
-    // 2.0. get generic info
-    int filesize;
-    float bitrate_bps;
-    int width;
-    int height;
-    std::string type;
-    int width2;
-    int height2;
-    int horizresolution;
-    int vertresolution;
-    int depth;
-    int chroma_format;
-    int bit_depth_luma;
-    int bit_depth_chroma;
-    int video_full_range_flag;
-    int colour_primaries;
-    int transfer_characteristics;
-    int matrix_coeffs;
-
     // 2.1. analyze file
     std::shared_ptr<IsobmffFileInformation> ptr = IsobmffFileInformation::parse(
         infile.c_str(), outfile_timestamps_sort_pts, debug);
@@ -112,70 +93,61 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
       continue;
     }
 
-    int ret = get_video_generic_info(
-        ptr, &filesize, &bitrate_bps, &width, &height, type, &width2, &height2,
-        &horizresolution, &vertresolution, &depth, &chroma_format,
-        &bit_depth_luma, &bit_depth_chroma, &video_full_range_flag,
-        &colour_primaries, &transfer_characteristics, &matrix_coeffs, debug);
-    if (ret < 0) {
-      fprintf(stderr, "error: get_video_generic_info() in %s\n",
-              infile.c_str());
-      continue;
-    }
+    // 2.2 get information
+    int filesize = ptr->get_frame().get_filesize();
+    float bitrate_bps = ptr->get_frame().get_bitrate_bps();
+    int width = ptr->get_frame().get_width();
+    int height = ptr->get_frame().get_height();
+    std::string type = ptr->get_frame().get_type();
+    // int width2 = ptr->get_frame().get_width2();
+    // int height2 = ptr->get_frame().get_height2();
+    int horizresolution = ptr->get_frame().get_horizresolution();
+    int vertresolution = ptr->get_frame().get_vertresolution();
+    int depth = ptr->get_frame().get_depth();
+    int chroma_format = ptr->get_frame().get_chroma_format();
+    int bit_depth_luma = ptr->get_frame().get_bit_depth_luma();
+    int bit_depth_chroma = ptr->get_frame().get_bit_depth_chroma();
+    int video_full_range_flag = ptr->get_frame().get_video_full_range_flag();
+    int colour_primaries = ptr->get_frame().get_colour_primaries();
+    int transfer_characteristics =
+        ptr->get_frame().get_transfer_characteristics();
+    int matrix_coeffs = ptr->get_frame().get_matrix_coeffs();
 
-    // 2.1. get video freeze info
-    bool video_freeze;
-    float audio_video_ratio;
-    float duration_video_sec;
-    float duration_audio_sec;
-    uint32_t timescale_video_hz;
-    uint32_t timescale_audio_hz;
-    float pts_sec_duration_average;
-    float pts_sec_duration_median;
-    float pts_sec_duration_stddev;
-    float pts_sec_duration_mad;
-    ret = get_video_freeze_info(
-        ptr, &video_freeze, &audio_video_ratio, &duration_video_sec,
-        &duration_audio_sec, &timescale_video_hz, &timescale_audio_hz,
-        &pts_sec_duration_average, &pts_sec_duration_median,
-        &pts_sec_duration_stddev, &pts_sec_duration_mad, debug);
-    if (ret < 0) {
-      fprintf(stderr, "error: get_video_freeze_info() in %s\n", infile.c_str());
-      continue;
-    }
+    bool video_freeze = ptr->get_timing().get_video_freeze();
+    float audio_video_ratio = ptr->get_timing().get_audio_video_ratio();
+    float duration_video_sec = ptr->get_timing().get_duration_video_sec();
+    float duration_audio_sec = ptr->get_timing().get_duration_audio_sec();
+    uint32_t timescale_video_hz = ptr->get_timing().get_timescale_video_hz();
+    uint32_t timescale_audio_hz = ptr->get_timing().get_timescale_audio_hz();
+    float pts_duration_sec_average =
+        ptr->get_timing().get_pts_duration_sec_average();
+    float pts_duration_sec_median =
+        ptr->get_timing().get_pts_duration_sec_median();
+    float pts_duration_sec_stddev =
+        ptr->get_timing().get_pts_duration_sec_stddev();
+    float pts_duration_sec_mad = ptr->get_timing().get_pts_duration_sec_mad();
+    int num_video_frames = ptr->get_timing().get_num_video_frames();
+    float frame_rate_fps_median = ptr->get_timing().get_frame_rate_fps_median();
+    float frame_rate_fps_average =
+        ptr->get_timing().get_frame_rate_fps_average();
+    float frame_rate_fps_stddev = ptr->get_timing().get_frame_rate_fps_stddev();
+    int frame_drop_count = ptr->get_timing().get_frame_drop_count();
+    float frame_drop_ratio = ptr->get_timing().get_frame_drop_ratio();
+    float normalized_frame_drop_average_length =
+        ptr->get_timing().get_normalized_frame_drop_average_length();
 
-    // 2.2. get frame drop info
-    int num_video_frames;
-    float frame_rate_fps_median;
-    float frame_rate_fps_average;
-    float frame_rate_fps_stddev;
-    int frame_drop_count;
-    float frame_drop_ratio;
     std::vector<float> percentile_list = {50, 90};
     std::vector<float> frame_drop_length_percentile_list;
-    float normalized_frame_drop_average_length;
+    ptr->get_timing().calculate_percentile_list(
+        percentile_list, frame_drop_length_percentile_list, debug);
+
     std::vector<int> consecutive_list = {2, 5};
     std::vector<long int> frame_drop_length_consecutive;
-    ret = get_frame_drop_info(
-        ptr, &num_video_frames, &frame_rate_fps_median, &frame_rate_fps_average,
-        &frame_rate_fps_stddev, &frame_drop_count, &frame_drop_ratio,
-        &normalized_frame_drop_average_length, percentile_list,
-        frame_drop_length_percentile_list, consecutive_list,
-        frame_drop_length_consecutive, debug);
-    if (ret < 0) {
-      fprintf(stderr, "error: get_frame_drop_info() in %s\n", infile.c_str());
-      return -1;
-    }
+    ptr->get_timing().calculate_consecutive_list(
+        consecutive_list, frame_drop_length_consecutive, debug);
 
     // 2.3. get video structure info
-    int num_video_keyframes;
-    ret = get_video_structure_info(ptr, &num_video_frames, &num_video_keyframes,
-                                   debug);
-    if (ret < 0) {
-      fprintf(stderr, "error: get_video_structure_info() in %s\n",
-              infile.c_str());
-      return -1;
-    }
+    int num_video_keyframes = ptr->get_timing().get_num_video_keyframes();
     float key_frame_ratio = ptr->get_timing().get_key_frame_ratio();
 
     // 2.4. dump all output
@@ -207,10 +179,10 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     fprintf(outfp, ",%f", duration_audio_sec);
     fprintf(outfp, ",%u", timescale_video_hz);
     fprintf(outfp, ",%u", timescale_audio_hz);
-    fprintf(outfp, ",%f", pts_sec_duration_average);
-    fprintf(outfp, ",%f", pts_sec_duration_median);
-    fprintf(outfp, ",%f", pts_sec_duration_stddev);
-    fprintf(outfp, ",%f", pts_sec_duration_mad);
+    fprintf(outfp, ",%f", pts_duration_sec_average);
+    fprintf(outfp, ",%f", pts_duration_sec_median);
+    fprintf(outfp, ",%f", pts_duration_sec_stddev);
+    fprintf(outfp, ",%f", pts_duration_sec_mad);
     fprintf(outfp, ",%i", frame_drop_count);
     fprintf(outfp, ",%f", frame_drop_ratio);
     fprintf(outfp, ",%f", normalized_frame_drop_average_length);
@@ -224,20 +196,16 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
 
     // 2.4. capture outfile timestamps
     if (outfile_timestamps != nullptr) {
-      std::vector<uint32_t> frame_num_orig_list;
-      std::vector<uint32_t> stts_unit_list;
-      std::vector<int32_t> ctts_unit_list;
-      std::vector<float> dts_sec_list;
-      std::vector<float> pts_sec_list;
-      std::vector<float> pts_duration_sec_list;
-      ret = get_frame_interframe_info(
-          ptr, &num_video_frames, frame_num_orig_list, stts_unit_list,
-          ctts_unit_list, dts_sec_list, pts_sec_list, pts_duration_sec_list,
-          outfile_timestamps_sort_pts, debug);
-      if (ret < 0) {
-        fprintf(stderr, "error: get_frame_interframe_info() in %s\n",
-                infile.c_str());
-      }
+      std::vector<uint32_t> frame_num_orig_list =
+          ptr->get_timing().get_frame_num_orig_list();
+      std::vector<uint32_t> stts_unit_list =
+          ptr->get_timing().get_stts_unit_list();
+      std::vector<int32_t> ctts_unit_list =
+          ptr->get_timing().get_ctts_unit_list();
+      std::vector<float> dts_sec_list = ptr->get_timing().get_dts_sec_list();
+      std::vector<float> pts_sec_list = ptr->get_timing().get_pts_sec_list();
+      std::vector<float> pts_duration_sec_list =
+          ptr->get_timing().get_pts_duration_sec_list();
       // store the values
       frame_num_orig_list_dict[infile] = frame_num_orig_list;
       stts_unit_list_dict[infile] = stts_unit_list;
