@@ -176,9 +176,7 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
               infile.c_str());
       return -1;
     }
-    float key_frame_ratio = (num_video_keyframes > 0)
-                                ? (1.0 * num_video_frames) / num_video_keyframes
-                                : 0.0;
+    float key_frame_ratio = ptr->get_timing().get_key_frame_ratio();
 
     // 2.4. dump all output
     fprintf(outfp, "%s", infile.c_str());

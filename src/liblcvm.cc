@@ -488,6 +488,10 @@ int TimingInformation::derive_timing_info(
   // 4. derive keyframe-related values
   ptr->timing.num_video_keyframes =
       ptr->timing.get_keyframe_sample_number_list().size();
+  ptr->timing.key_frame_ratio = (ptr->timing.num_video_keyframes > 0)
+                                    ? (1.0 * ptr->timing.num_video_frames) /
+                                          ptr->timing.num_video_keyframes
+                                    : 0.0;
 
   // 5. audio/video ratio and video freeze info
   if ((ptr->timing.duration_video_sec != -1.0) &&
