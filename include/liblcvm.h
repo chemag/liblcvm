@@ -23,34 +23,62 @@ class IsobmffFileInformation;
 
 // Declaration of IsobmffFileInforrmation structure.
 class TimingInformation {
+  // num_video_frames: Number of video frames in the file.
   int num_video_frames;
+  // duration_video_sec: Video length (seconds).
   float duration_video_sec;
+  // duration_audio_sec: Audio length (seconds).
   float duration_audio_sec;
+  // timescale_video_hz: Video length (Hz).
   uint32_t timescale_video_hz;
+  // timescale_audio_hz: Audio length (Hz).
   uint32_t timescale_audio_hz;
+  // frame_num_orig_list: original frame numbers (unitless).
   std::vector<uint32_t> frame_num_orig_list;
+  // stts_unit_list: STTS values (units).
   std::vector<uint32_t> stts_unit_list;
+  // ctts_unit_list: CTTS values (units).
   std::vector<int32_t> ctts_unit_list;
+  // dts_sec_list: DTS (decoding timestamp) list (seconds).
   std::vector<float> dts_sec_list;
+  // pts_sec_list: PTS (presentation timestamp) list (units).
   std::vector<int32_t> pts_unit_list;
+  // pts_sec_list: PTS (presentation timestamp) list (seconds).
   std::vector<float> pts_sec_list;
+  // pts_duration_sec_list: PTS (presentation timestamp) duration list
+  // (seconds).
   std::vector<float> pts_duration_sec_list;
+  // pts_duration_sec_average: pts duration average (sec).
   float pts_duration_sec_average;
+  // pts_duration_sec_median: pts duration median (sec).
   float pts_duration_sec_median;
+  // pts_duration_sec_stddev: pts duration standard deviation (sec).
   float pts_duration_sec_stddev;
+  // pts_duration_sec_mad: pts duration MAD (median absolute deviation) (sec).
   float pts_duration_sec_mad;
   std::vector<uint32_t> keyframe_sample_number_list;
+  // num_video_keyframes: Number of video key frames in the file.
   int num_video_keyframes;
   float key_frame_ratio;
+  // audio_video_ratio: Audio/video length ratio.
   float audio_video_ratio;
+  // video_freeze: Whether there is a video freeze.
   bool video_freeze;
+  // frame_rate_fps_list: Vector of per-frame frame rates (fps).
   std::vector<float> frame_rate_fps_list;
+  // frame_rate_fps_median: Frame rate (median, fps).
   float frame_rate_fps_median;
+  // frame_rate_fps_average: Frame rate (average, fps).
   float frame_rate_fps_average;
+  // frame_rate_fps_stddev: Frame rate (stddev).
   float frame_rate_fps_stddev;
+  // frame_drop_length_sec_list: Vector of lengths between frame drops.
   std::vector<float> frame_drop_length_sec_list;
+  // frame_drop_count: Frame drop count.
   int frame_drop_count;
+  // frame_drop_ratio: Frame drop ratio (unitless).
   float frame_drop_ratio;
+  // normalized_frame_drop_average_length: Normalized frame drop length.
   float normalized_frame_drop_average_length;
 
  public:
@@ -95,10 +123,15 @@ class TimingInformation {
   static int derive_timing_info(std::shared_ptr<IsobmffFileInformation> ptr,
                                 bool sort_by_pts, int debug);
 
+  // @param[in] percentile_list: Percentile list.
+  // @param[out] frame_drop_length_percentile_list: Frame drop length percentile
+  // list.
   void calculate_percentile_list(
       const std::vector<float> percentile_list,
       std::vector<float> &frame_drop_length_percentile_list, int debug);
 
+  // @param[in] consecutive_list: Consecutive list.
+  // @param[out] frame_drop_length_consecutive: Frame drop length consecutive.
   void calculate_consecutive_list(
       std::vector<int> consecutive_list,
       std::vector<long int> &frame_drop_length_consecutive, int debug);
@@ -108,24 +141,43 @@ class TimingInformation {
 
 class FrameInformation {
  private:
+  // filesize: Video file size (bytes).
   int filesize;
+  // bitrate_bps: Video bitrate (bps).
   float bitrate_bps;
+  // width: Video width.
   float width;
+  // height: Video height.
   float height;
+  // type: Video type ("hvc1" or "avc1").
   std::string type;
+  // width2: Video width (from hvc1/avc1).
   int width2;
+  // height2: Video height (from hvc1/avc1).
   int height2;
+  // horizresolution: Video horizresolution (from hvc1/avc1).
   int horizresolution;
+  // vertresolution: Video vertresolution (from hvc1/avc1).
   int vertresolution;
+  // depth: Video depth (from hvc1/avc1).
   int depth;
+  // chroma_format: Video chroma format (from hvcC/avcC).
   int chroma_format;
+  // bit_depth_luma: Video luma bit depth (from hvcC/avcC).
   int bit_depth_luma;
+  // bit_depth_chroma: Video chroma bit depth (from hvcC/avcC).
   int bit_depth_chroma;
+  // video_full_range_flag: Video range (from HEVC/AVC SPS).
   int video_full_range_flag;
+  // colour_primaries: Video color primaries (from HEVC/AVC SPS).
   int colour_primaries;
+  // transfer_characteristics: Video transfer characteristics (from
+  // HEVC/AVC SPS).
   int transfer_characteristics;
+  // matrix_coeffs: Video matrix coefficients (from HEVC/AVC SPS).
   int matrix_coeffs;
 
+  // internal functions
   void parse_hvcc(std::shared_ptr<ISOBMFF::HVCC> hvcc, int debug);
   void parse_avcc(std::shared_ptr<ISOBMFF::AVCC> avcc, int debug);
 
@@ -192,7 +244,7 @@ class IsobmffFileInformation {
   friend class FrameInformation;
 };
 
-// Old API (do not use).
+// DEPRECATED API (do not use).
 
 // @brief Calculates the frame drop info.
 //

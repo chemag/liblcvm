@@ -815,6 +815,7 @@ int FrameInformation::parse_frame_information(
   return 0;
 }
 
+// DEPRECATED API: DO NOT USE
 int get_frame_interframe_info(
     const std::shared_ptr<IsobmffFileInformation> ptr, int *num_video_frames,
     std::vector<uint32_t> &frame_num_orig_list,
