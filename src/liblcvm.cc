@@ -495,8 +495,8 @@ int TimingInformation::derive_timing_info(
 
   // 5. audio/video ratio and video freeze info
   if ((ptr->timing.duration_video_sec != -1.0) &&
-      (ptr->timing.duration_audio_sec == -1.0) &&
-      (ptr->timing.duration_video_sec < 2.0)) {
+      (ptr->timing.duration_audio_sec != -1.0) &&
+      (ptr->timing.duration_video_sec >= 2.0)) {
     ptr->timing.audio_video_ratio =
         ptr->timing.duration_audio_sec / ptr->timing.duration_video_sec;
     ptr->timing.video_freeze =
