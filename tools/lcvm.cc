@@ -66,7 +66,7 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
           "matrix_coeffs,"
           "num_video_frames,frame_rate_fps_median,"
           "frame_rate_fps_average,frame_rate_fps_stddev,video_freeze,"
-          "video_freeze_ratio,duration_video_sec,duration_audio_sec,"
+          "audio_video_ratio,duration_video_sec,duration_audio_sec,"
           "timescale_video_hz,timescale_audio_hz,"
           "pts_duration_sec_average,pts_duration_sec_median,"
           "pts_duration_sec_stddev,pts_duration_sec_mad,"
