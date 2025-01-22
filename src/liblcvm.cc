@@ -519,7 +519,19 @@ int TimingInformation::derive_timing_info(
   // 6.3. average
   ptr->timing.frame_rate_fps_average =
       calculate_average(ptr->timing.frame_rate_fps_list);
-  // 6.4. stddev
+  // 6.4. reverse average
+  // Considering the sample_duration of different frames inside boxes
+  // as a series X: {x1, x2, ..., xn}, for calculating average FPS from this,
+  // consider the reciprocal series Y = 1/X = {1/x1, 1/x2, ..., 1/xn}
+  // The average of X is $\hat{X}$.
+  // The average of Y is $\hat{Y}$.
+  // A single, very small number $xi$ can cause this average ($\hat{Y}$) to be
+  // extreme, leading to extreme values in frame_rate_fps_average calculation.
+  // In contrast, the reverse of the average of X ($1/\hat{X}$) should not
+  // have this biased to extreme value.
+  ptr->timing.frame_rate_fps_reverse_average =
+      1.0/ptr->timing.pts_duration_sec_average;
+  // 6.5. stddev
   ptr->timing.frame_rate_fps_stddev =
       calculate_standard_deviation(ptr->timing.frame_rate_fps_list);
 
