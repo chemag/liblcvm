@@ -64,8 +64,8 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
           "colour_primaries,"
           "transfer_characteristics,"
           "matrix_coeffs,"
-          "num_video_frames,frame_rate_fps_median,"
-          "frame_rate_fps_average,frame_rate_fps_stddev,video_freeze,"
+          "num_video_frames,frame_rate_fps_median,frame_rate_fps_average,"
+          "frame_rate_fps_reverse_average,frame_rate_fps_stddev,video_freeze,"
           "audio_video_ratio,duration_video_sec,duration_audio_sec,"
           "timescale_video_hz,timescale_audio_hz,"
           "pts_duration_sec_average,pts_duration_sec_median,"
@@ -130,6 +130,8 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     float frame_rate_fps_median = ptr->get_timing().get_frame_rate_fps_median();
     float frame_rate_fps_average =
         ptr->get_timing().get_frame_rate_fps_average();
+    float frame_rate_fps_reverse_average =
+        ptr->get_timing().get_frame_rate_fps_reverse_average();
     float frame_rate_fps_stddev = ptr->get_timing().get_frame_rate_fps_stddev();
     int frame_drop_count = ptr->get_timing().get_frame_drop_count();
     float frame_drop_ratio = ptr->get_timing().get_frame_drop_ratio();
@@ -172,6 +174,7 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     fprintf(outfp, ",%i", num_video_frames);
     fprintf(outfp, ",%f", frame_rate_fps_median);
     fprintf(outfp, ",%f", frame_rate_fps_average);
+    fprintf(outfp, ",%f", frame_rate_fps_reverse_average);
     fprintf(outfp, ",%f", frame_rate_fps_stddev);
     fprintf(outfp, ",%i", video_freeze ? 1 : 0);
     fprintf(outfp, ",%f", audio_video_ratio);

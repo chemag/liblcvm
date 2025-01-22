@@ -70,6 +70,9 @@ class TimingInformation {
   float frame_rate_fps_median;
   // frame_rate_fps_average: Frame rate (average, fps).
   float frame_rate_fps_average;
+  // frame_rate_fps_reverse_average: Average frame rate calculated
+  // as the reverse of average PTS duration (sec)
+  float frame_rate_fps_reverse_average;
   // frame_rate_fps_stddev: Frame rate (stddev).
   float frame_rate_fps_stddev;
   // frame_drop_length_sec_list: Vector of lengths between frame drops.
@@ -106,6 +109,7 @@ class TimingInformation {
   DECL_GETTER(frame_rate_fps_list, std::vector<float>)
   DECL_GETTER(frame_rate_fps_median, float)
   DECL_GETTER(frame_rate_fps_average, float)
+  DECL_GETTER(frame_rate_fps_reverse_average, float)
   DECL_GETTER(frame_rate_fps_stddev, float)
   DECL_GETTER(frame_drop_length_sec_list, std::vector<float>)
   DECL_GETTER(frame_drop_count, int)
