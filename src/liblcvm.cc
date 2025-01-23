@@ -51,6 +51,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
   try {
     parser.Parse(ptr->filename.c_str());
   } catch (std::runtime_error &e) {
+    fprintf(stderr, "error: %s\n", e.what());
     return nullptr;
   }
   std::shared_ptr<ISOBMFF::File> file = parser.GetFile();
@@ -365,7 +366,11 @@ void calculate_vector_deltas_int32_t(const std::vector<int32_t> in,
   }
 }
 
-float calculate_median(const std::vector<float> &vec) {
+float calculate_median(const std::vector<float> &vec) { 
+  if (vec.empty()) {
+    fprintf(stderr, "error: calculate_median empty input vector\n");
+    return 0.0f;
+  }
   std::vector<float> vec2 = vec;
   std::sort(vec2.begin(), vec2.end());
   size_t n = vec2.size();
@@ -382,7 +387,9 @@ float calculate_average(const std::vector<float> &vec) {
 
 float calculate_standard_deviation(const std::vector<float> &vec) {
   if (vec.size() < 2) {
-    throw std::runtime_error("Input vector must have at least 2 elements");
+    fprintf(stderr, "error: calculate_standard_deviation needs at least 2 "
+            "elements\n");
+    return 0.0f;
   }
 
   float mean = calculate_average(vec);
