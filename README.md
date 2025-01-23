@@ -18,7 +18,7 @@ it in devices with battery and thermal constrains.
 1. Clone the repository.
 
 ```
-$ git clone --recursive http://github.com/chemag/liblcvm
+$ git clone --recursive https://github.com/chemag/liblcvm
 $ cd liblcvm
 ```
 
