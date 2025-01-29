@@ -132,12 +132,46 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
       ptr->timing.timescale_video_hz = timescale_hz;
     }
 
-    // only keep video processing
-    if (handler_type.compare("vide") != 0) {
+    if (handler_type.compare("vide") != 0 && handler_type.compare("soun") != 0) {
       continue;
     }
 
-    // 7. look for a tkhd box
+    // 7. look for a minf container box
+    std::shared_ptr<ISOBMFF::ContainerBox> minf =
+        mdia->GetTypedBox<ISOBMFF::ContainerBox>("minf");
+    if (minf == nullptr) {
+      if (debug > 0) {
+        fprintf(stderr, "error: no /moov/trak/mdia/minf in %s\n",
+                ptr->filename.c_str());
+      }
+      return nullptr;
+    }
+
+    // 8. look for a stbl container box
+    std::shared_ptr<ISOBMFF::ContainerBox> stbl =
+        minf->GetTypedBox<ISOBMFF::ContainerBox>("stbl");
+    if (stbl == nullptr) {
+      if (debug > 0) {
+        fprintf(stderr, "error: no /moov/trak/mdia/minf/stbl in %s\n",
+                ptr->filename.c_str());
+      }
+      return nullptr;
+    }
+
+    // 8.1 Audio processing
+    if (handler_type.compare("soun") == 0) {
+        if (ptr->audio.parse_mp4a(stbl, ptr, debug) <
+        0) {
+        if (debug > 0) {
+          fprintf(stderr, "error: in getting audio information in %s\n",
+                  ptr->filename.c_str());
+        }
+        return nullptr;
+      }
+      continue;
+    }
+
+    // 9. look for a tkhd box
     std::shared_ptr<ISOBMFF::TKHD> tkhd =
         trak->GetTypedBox<ISOBMFF::TKHD>("tkhd");
     if (tkhd == nullptr) {
@@ -150,27 +184,6 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     ptr->frame.width = tkhd->GetWidth();
     ptr->frame.height = tkhd->GetHeight();
 
-    // 8. look for a minf container box
-    std::shared_ptr<ISOBMFF::ContainerBox> minf =
-        mdia->GetTypedBox<ISOBMFF::ContainerBox>("minf");
-    if (minf == nullptr) {
-      if (debug > 0) {
-        fprintf(stderr, "error: no /moov/trak/mdia/minf in %s\n",
-                ptr->filename.c_str());
-      }
-      return nullptr;
-    }
-
-    // 9. look for a stbl container box
-    std::shared_ptr<ISOBMFF::ContainerBox> stbl =
-        minf->GetTypedBox<ISOBMFF::ContainerBox>("stbl");
-    if (stbl == nullptr) {
-      if (debug > 0) {
-        fprintf(stderr, "error: no /moov/trak/mdia/minf/stbl in %s\n",
-                ptr->filename.c_str());
-      }
-      return nullptr;
-    }
 
     // 10. get video timing information
     // init timing info
@@ -750,6 +763,38 @@ void FrameInformation::parse_hvcc(std::shared_ptr<ISOBMFF::HVCC> hvcc,
     }
   }
 }
+
+int AudioInformation::parse_mp4a(
+    std::shared_ptr<ISOBMFF::ContainerBox> stbl,
+    std::shared_ptr<IsobmffFileInformation> ptr, int debug) {
+
+    // 1. look for a stsd container box
+    std::shared_ptr<ISOBMFF::STSD> stsd =
+        stbl->GetTypedBox<ISOBMFF::STSD>("stsd");
+    if (stsd == nullptr) {
+      if (debug > 0) {
+        fprintf(stderr, "error: no /moov/trak/mdia/minf/stbl/stsd in %s\n",
+                ptr->filename.c_str());
+      }
+      return -1;
+    }
+
+      // 2. look for a MP4A container box
+    std::shared_ptr<ISOBMFF::MP4A> mp4a =
+        stsd->GetTypedBox<ISOBMFF::MP4A>("mp4a");
+    if (mp4a == nullptr) {
+      if (debug > 0) {
+        fprintf(stderr, "error: no /moov/trak2/mdia/minf/stbl/stsd/mp4a in %s\n",
+                ptr->filename.c_str());
+      }
+      return -1;
+    }
+    ptr->audio.audio_type = "mp4a";
+    ptr->audio.channel_count = mp4a->GetChannelCount();
+    ptr->audio.sample_size = mp4a->GetSampleSize();
+    ptr->audio.sample_rate = mp4a->GetSampleRate();
+    return 0;
+  }
 
 int FrameInformation::parse_frame_information(
     std::shared_ptr<ISOBMFF::ContainerBox> stbl,

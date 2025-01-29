@@ -143,6 +143,28 @@ class TimingInformation {
   friend class IsobmffFileInformation;
 };
 
+class AudioInformation {
+  private:
+  // audio_type: Audio type ("mp4a" or "mp4s").
+  std::string audio_type;
+  // audio_object_type: Audio object type (from mp4a/mp4s).
+  int channel_count;
+  // audio_sample_rate: Audio sample rate (Hz).
+  int sample_rate;
+  // audio_sample_size:
+  int sample_size;
+  public:
+  DECL_GETTER(audio_type, std::string)
+  DECL_GETTER(channel_count, int)
+  DECL_GETTER(sample_rate, int)
+  DECL_GETTER(sample_size, int)
+
+  int parse_mp4a(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
+                              std::shared_ptr<IsobmffFileInformation> ptr,
+                              int debug);
+  friend class IsobmffFileInformation;
+};
+
 class FrameInformation {
  private:
   // filesize: Video file size (bytes).
@@ -220,11 +242,13 @@ class IsobmffFileInformation {
   std::string filename;
   TimingInformation timing;
   FrameInformation frame;
+  AudioInformation audio;
 
  public:
   DECL_GETTER(filename, std::string)
   DECL_GETTER(timing, TimingInformation)
   DECL_GETTER(frame, FrameInformation)
+  DECL_GETTER(audio, AudioInformation)
 
   // @brief Gets the library version.
   //
@@ -246,6 +270,7 @@ class IsobmffFileInformation {
 
   friend class TimingInformation;
   friend class FrameInformation;
+  friend class AudioInformation;
 };
 
 // DEPRECATED API (do not use).
