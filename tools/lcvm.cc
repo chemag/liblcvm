@@ -74,7 +74,8 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
           "normalized_frame_drop_average_length,"
           "frame_drop_length_percentile_50,frame_drop_length_percentile_90,"
           "frame_drop_length_consecutive_2,frame_drop_length_consecutive_5,"
-          "num_video_keyframes,key_frame_ratio\n");
+          "num_video_keyframes,key_frame_ratio,"
+          "audio_type,channel_count,sample_rate,sample_size\n");
 
   // 2. write CSV rows
   std::map<std::string, std::vector<uint32_t>> frame_num_orig_list_dict;
@@ -152,6 +153,12 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     int num_video_keyframes = ptr->get_timing().get_num_video_keyframes();
     float key_frame_ratio = ptr->get_timing().get_key_frame_ratio();
 
+    //2.3.1 get audio structure info
+    std::string audio_type = ptr->get_audio().get_audio_type();
+    int channel_count = ptr->get_audio().get_channel_count();
+    int sample_rate = ptr->get_audio().get_sample_rate();
+    int sample_size = ptr->get_audio().get_sample_size();
+
     // 2.4. dump all output
     fprintf(outfp, "%s", infile.c_str());
     fprintf(outfp, ",%i", filesize);
@@ -195,6 +202,10 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     fprintf(outfp, ",%ld", frame_drop_length_consecutive[1]);
     fprintf(outfp, ",%i", num_video_keyframes);
     fprintf(outfp, ",%f", key_frame_ratio);
+    fprintf(outfp, ",%s", audio_type.c_str());
+    fprintf(outfp, ",%i", channel_count);
+    fprintf(outfp, ",%i", sample_rate);
+    fprintf(outfp, ",%i", sample_size);
     fprintf(outfp, "\n");
 
     // 2.4. capture outfile timestamps
