@@ -144,7 +144,7 @@ class TimingInformation {
 };
 
 class AudioInformation {
-  private:
+ private:
   // audio_type: Audio type ("mp4a" or "mp4s").
   std::string audio_type;
   // audio_object_type: Audio object type (from mp4a/mp4s).
@@ -153,15 +153,15 @@ class AudioInformation {
   int sample_rate;
   // audio_sample_size:
   int sample_size;
-  public:
+
+ public:
   DECL_GETTER(audio_type, std::string)
   DECL_GETTER(channel_count, int)
   DECL_GETTER(sample_rate, int)
   DECL_GETTER(sample_size, int)
 
   int parse_mp4a(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
-                              std::shared_ptr<IsobmffFileInformation> ptr,
-                              int debug);
+                 std::shared_ptr<IsobmffFileInformation> ptr, int debug);
   friend class IsobmffFileInformation;
 };
 

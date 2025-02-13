@@ -153,7 +153,7 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     int num_video_keyframes = ptr->get_timing().get_num_video_keyframes();
     float key_frame_ratio = ptr->get_timing().get_key_frame_ratio();
 
-    //2.3.1 get audio structure info
+    // 2.3.1 get audio structure info
     std::string audio_type = ptr->get_audio().get_audio_type();
     int channel_count = ptr->get_audio().get_channel_count();
     int sample_rate = ptr->get_audio().get_sample_rate();

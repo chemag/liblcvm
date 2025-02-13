@@ -132,7 +132,8 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
       ptr->timing.timescale_video_hz = timescale_hz;
     }
 
-    if (handler_type.compare("vide") != 0 && handler_type.compare("soun") != 0) {
+    if (handler_type.compare("vide") != 0 &&
+        handler_type.compare("soun") != 0) {
       continue;
     }
 
@@ -160,8 +161,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
 
     // 8.1 Audio processing
     if (handler_type.compare("soun") == 0) {
-        if (ptr->audio.parse_mp4a(stbl, ptr, debug) <
-        0) {
+      if (ptr->audio.parse_mp4a(stbl, ptr, debug) < 0) {
         if (debug > 0) {
           fprintf(stderr, "error: in getting audio information in %s\n",
                   ptr->filename.c_str());
@@ -183,7 +183,6 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     }
     ptr->frame.width = tkhd->GetWidth();
     ptr->frame.height = tkhd->GetHeight();
-
 
     // 10. get video timing information
     // init timing info
@@ -379,7 +378,7 @@ void calculate_vector_deltas_int32_t(const std::vector<int32_t> in,
   }
 }
 
-float calculate_median(const std::vector<float> &vec) { 
+float calculate_median(const std::vector<float> &vec) {
   if (vec.empty()) {
     fprintf(stderr, "error: calculate_median empty input vector\n");
     return 0.0f;
@@ -400,7 +399,8 @@ float calculate_average(const std::vector<float> &vec) {
 
 float calculate_standard_deviation(const std::vector<float> &vec) {
   if (vec.size() < 2) {
-    fprintf(stderr, "error: calculate_standard_deviation needs at least 2 "
+    fprintf(stderr,
+            "error: calculate_standard_deviation needs at least 2 "
             "elements\n");
     return 0.0f;
   }
@@ -550,7 +550,7 @@ int TimingInformation::derive_timing_info(
   // In contrast, the reverse of the average of X ($1/\hat{X}$) should not
   // have this biased to extreme value.
   ptr->timing.frame_rate_fps_reverse_average =
-      1.0/ptr->timing.pts_duration_sec_average;
+      1.0 / ptr->timing.pts_duration_sec_average;
   // 6.5. stddev
   ptr->timing.frame_rate_fps_stddev =
       calculate_standard_deviation(ptr->timing.frame_rate_fps_list);
@@ -764,37 +764,36 @@ void FrameInformation::parse_hvcc(std::shared_ptr<ISOBMFF::HVCC> hvcc,
   }
 }
 
-int AudioInformation::parse_mp4a(
-    std::shared_ptr<ISOBMFF::ContainerBox> stbl,
-    std::shared_ptr<IsobmffFileInformation> ptr, int debug) {
-
-    // 1. look for a stsd container box
-    std::shared_ptr<ISOBMFF::STSD> stsd =
-        stbl->GetTypedBox<ISOBMFF::STSD>("stsd");
-    if (stsd == nullptr) {
-      if (debug > 0) {
-        fprintf(stderr, "error: no /moov/trak/mdia/minf/stbl/stsd in %s\n",
-                ptr->filename.c_str());
-      }
-      return -1;
+int AudioInformation::parse_mp4a(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
+                                 std::shared_ptr<IsobmffFileInformation> ptr,
+                                 int debug) {
+  // 1. look for a stsd container box
+  std::shared_ptr<ISOBMFF::STSD> stsd =
+      stbl->GetTypedBox<ISOBMFF::STSD>("stsd");
+  if (stsd == nullptr) {
+    if (debug > 0) {
+      fprintf(stderr, "error: no /moov/trak/mdia/minf/stbl/stsd in %s\n",
+              ptr->filename.c_str());
     }
-
-      // 2. look for a MP4A container box
-    std::shared_ptr<ISOBMFF::MP4A> mp4a =
-        stsd->GetTypedBox<ISOBMFF::MP4A>("mp4a");
-    if (mp4a == nullptr) {
-      if (debug > 0) {
-        fprintf(stderr, "error: no /moov/trak2/mdia/minf/stbl/stsd/mp4a in %s\n",
-                ptr->filename.c_str());
-      }
-      return -1;
-    }
-    ptr->audio.audio_type = "mp4a";
-    ptr->audio.channel_count = mp4a->GetChannelCount();
-    ptr->audio.sample_size = mp4a->GetSampleSize();
-    ptr->audio.sample_rate = mp4a->GetSampleRate();
-    return 0;
+    return -1;
   }
+
+  // 2. look for a MP4A container box
+  std::shared_ptr<ISOBMFF::MP4A> mp4a =
+      stsd->GetTypedBox<ISOBMFF::MP4A>("mp4a");
+  if (mp4a == nullptr) {
+    if (debug > 0) {
+      fprintf(stderr, "error: no /moov/trak2/mdia/minf/stbl/stsd/mp4a in %s\n",
+              ptr->filename.c_str());
+    }
+    return -1;
+  }
+  ptr->audio.audio_type = "mp4a";
+  ptr->audio.channel_count = mp4a->GetChannelCount();
+  ptr->audio.sample_size = mp4a->GetSampleSize();
+  ptr->audio.sample_rate = mp4a->GetSampleRate();
+  return 0;
+}
 
 int FrameInformation::parse_frame_information(
     std::shared_ptr<ISOBMFF::ContainerBox> stbl,
