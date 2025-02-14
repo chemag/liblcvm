@@ -64,11 +64,17 @@ colorimetry).
 # 4. Library Operation
 
 The library is based on a few classes. The main one is IsobmffFileInformation,
-which contains a factory method ("parse()") which does the full analysis.
+which contains a factory method ("parse()") which does the full analysis. The
+"parse()" method expects a configuration object.
 
 ```
-std::shared_ptr<IsobmffFileInformation> ptr = IsobmffFileInformation::parse(
-    infile.c_str(), outfile_timestamps_sort_pts, debug);
+// create the config object
+auto *liblcvm_config = new LiblcvmConfig();
+// init any parameters where you do not like the default
+liblcvm_config->set_debug(debug);
+// parse the file
+std::shared_ptr<IsobmffFileInformation> ptr =
+    IsobmffFileInformation::parse(infile.c_str(), *liblcvm_config);
 ```
 
 The output IsobmffFileInformation pointer can be used directly through its

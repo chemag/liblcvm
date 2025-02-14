@@ -34,7 +34,7 @@ void IsobmffFileInformation::get_liblcvm_version(std::string &version) {
 }
 
 std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
-    const char *infile, bool sort_by_pts, int debug) {
+    const char *infile, const LiblcvmConfig &liblcvm_config) {
   // 0. create a new object
   std::shared_ptr<IsobmffFileInformation> ptr = nullptr;
   try {
@@ -56,7 +56,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
   }
   std::shared_ptr<ISOBMFF::File> file = parser.GetFile();
   if (file == nullptr) {
-    if (debug > 0) {
+    if (liblcvm_config.get_debug() > 0) {
       fprintf(stderr, "error: no file in %s\n", ptr->filename.c_str());
     }
     return nullptr;
@@ -66,7 +66,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
   std::shared_ptr<ISOBMFF::ContainerBox> moov =
       file->GetTypedBox<ISOBMFF::ContainerBox>("moov");
   if (moov == nullptr) {
-    if (debug > 0) {
+    if (liblcvm_config.get_debug() > 0) {
       fprintf(stderr, "error: no /moov in %s\n", ptr->filename.c_str());
     }
     return nullptr;
@@ -86,7 +86,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     std::shared_ptr<ISOBMFF::ContainerBox> mdia =
         trak->GetTypedBox<ISOBMFF::ContainerBox>("mdia");
     if (mdia == nullptr) {
-      if (debug > 0) {
+      if (liblcvm_config.get_debug() > 0) {
         fprintf(stderr, "error: no /moov/trak/mdia in %s\n",
                 ptr->filename.c_str());
       }
@@ -97,7 +97,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     std::shared_ptr<ISOBMFF::HDLR> hdlr =
         mdia->GetTypedBox<ISOBMFF::HDLR>("hdlr");
     if (hdlr == nullptr) {
-      if (debug > 0) {
+      if (liblcvm_config.get_debug() > 0) {
         fprintf(stderr, "error: no /moov/trak/mdia/hdlr in %s\n",
                 ptr->filename.c_str());
       }
@@ -109,7 +109,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     std::shared_ptr<ISOBMFF::MDHD> mdhd =
         mdia->GetTypedBox<ISOBMFF::MDHD>("mdhd");
     if (mdhd == nullptr) {
-      if (debug > 0) {
+      if (liblcvm_config.get_debug() > 0) {
         fprintf(stderr, "error: no /moov/trak/mdia/mdhd in %s\n",
                 ptr->filename.c_str());
       }
@@ -118,7 +118,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     uint32_t timescale_hz = mdhd->GetTimescale();
     uint64_t duration = mdhd->GetDuration();
     float duration_sec = ((float)duration) / timescale_hz;
-    if (debug > 1) {
+    if (liblcvm_config.get_debug() > 1) {
       fprintf(stdout, "-> handler_type: %s ", handler_type.c_str());
       fprintf(stdout, "timescale: %u ", timescale_hz);
       fprintf(stdout, "duration: %lu ", duration);
@@ -141,7 +141,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     std::shared_ptr<ISOBMFF::ContainerBox> minf =
         mdia->GetTypedBox<ISOBMFF::ContainerBox>("minf");
     if (minf == nullptr) {
-      if (debug > 0) {
+      if (liblcvm_config.get_debug() > 0) {
         fprintf(stderr, "error: no /moov/trak/mdia/minf in %s\n",
                 ptr->filename.c_str());
       }
@@ -152,7 +152,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     std::shared_ptr<ISOBMFF::ContainerBox> stbl =
         minf->GetTypedBox<ISOBMFF::ContainerBox>("stbl");
     if (stbl == nullptr) {
-      if (debug > 0) {
+      if (liblcvm_config.get_debug() > 0) {
         fprintf(stderr, "error: no /moov/trak/mdia/minf/stbl in %s\n",
                 ptr->filename.c_str());
       }
@@ -161,8 +161,8 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
 
     // 8.1 Audio processing
     if (handler_type.compare("soun") == 0) {
-      if (ptr->audio.parse_mp4a(stbl, ptr, debug) < 0) {
-        if (debug > 0) {
+      if (ptr->audio.parse_mp4a(stbl, ptr, liblcvm_config.get_debug()) < 0) {
+        if (liblcvm_config.get_debug() > 0) {
           fprintf(stderr, "error: in getting audio information in %s\n",
                   ptr->filename.c_str());
         }
@@ -175,7 +175,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     std::shared_ptr<ISOBMFF::TKHD> tkhd =
         trak->GetTypedBox<ISOBMFF::TKHD>("tkhd");
     if (tkhd == nullptr) {
-      if (debug > 0) {
+      if (liblcvm_config.get_debug() > 0) {
         fprintf(stderr, "error: no /moov/trak/tkhd in %s\n",
                 ptr->filename.c_str());
       }
@@ -196,9 +196,9 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     ptr->timing.dts_sec_list.push_back(0.0);
     ptr->timing.pts_unit_list.push_back(0);
     ptr->timing.pts_sec_list.push_back(0.0);
-    if (ptr->timing.parse_timing_information(stbl, timescale_hz, ptr, debug) <
-        0) {
-      if (debug > 0) {
+    if (ptr->timing.parse_timing_information(stbl, timescale_hz, ptr,
+                                             liblcvm_config.get_debug()) < 0) {
+      if (liblcvm_config.get_debug() > 0) {
         fprintf(stderr, "error: no timing information in %s\n",
                 ptr->filename.c_str());
       }
@@ -206,8 +206,9 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     }
 
     // 11. get video keyframe information
-    if (ptr->timing.parse_keyframe_information(stbl, ptr, debug) < 0) {
-      if (debug > 0) {
+    if (ptr->timing.parse_keyframe_information(
+            stbl, ptr, liblcvm_config.get_debug()) < 0) {
+      if (liblcvm_config.get_debug() > 0) {
         fprintf(stderr, "error: no keyframe information in %s\n",
                 ptr->filename.c_str());
       }
@@ -215,8 +216,9 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     }
 
     // 12. get video frame information
-    if (ptr->frame.parse_frame_information(stbl, ptr, debug) < 0) {
-      if (debug > 0) {
+    if (ptr->frame.parse_frame_information(stbl, ptr,
+                                           liblcvm_config.get_debug()) < 0) {
+      if (liblcvm_config.get_debug() > 0) {
         fprintf(stderr, "error: no frame information in %s\n",
                 ptr->filename.c_str());
       }
@@ -225,8 +227,9 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
   }
 
   // 13. derive timing info
-  if (ptr->timing.derive_timing_info(ptr, sort_by_pts, debug) < 0) {
-    if (debug > 0) {
+  if (ptr->timing.derive_timing_info(ptr, liblcvm_config.get_sort_by_pts(),
+                                     liblcvm_config.get_debug()) < 0) {
+    if (liblcvm_config.get_debug() > 0) {
       fprintf(stderr, "error: cannot derive timing information in %s\n",
               ptr->filename.c_str());
     }
@@ -234,8 +237,9 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
   }
 
   // 14. derive frame info
-  if (ptr->frame.derive_frame_info(ptr, sort_by_pts, debug) < 0) {
-    if (debug > 0) {
+  if (ptr->frame.derive_frame_info(ptr, liblcvm_config.get_sort_by_pts(),
+                                   liblcvm_config.get_debug()) < 0) {
+    if (liblcvm_config.get_debug() > 0) {
       fprintf(stderr, "error: cannot derive frame information in %s\n",
               ptr->filename.c_str());
     }

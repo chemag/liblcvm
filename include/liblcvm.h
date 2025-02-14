@@ -19,6 +19,9 @@
 #define DECL_GETTER(name, type) \
   type get_##name() const { return this->name; }
 
+#define DECL_SETTER(name, type) \
+  void set_##name(type val) { this->name = val; }
+
 class IsobmffFileInformation;
 
 // Declaration of IsobmffFileInforrmation structure.
@@ -236,6 +239,25 @@ class FrameInformation {
   friend class IsobmffFileInformation;
 };
 
+class LiblcvmConfig {
+ private:
+  // sort_by_pts: Whether to sort the frames by PTS values.
+  bool sort_by_pts;
+  // debug: Debug level.
+  int debug;
+
+ public:
+  LiblcvmConfig() {
+    sort_by_pts = true;
+    debug = 0;
+  };
+
+  DECL_GETTER(sort_by_pts, bool)
+  DECL_SETTER(sort_by_pts, bool)
+  DECL_GETTER(debug, int)
+  DECL_SETTER(debug, int)
+};
+
 // Main class
 class IsobmffFileInformation {
  private:
@@ -258,12 +280,10 @@ class IsobmffFileInformation {
   // @brief Parse an ISOBMFF file.
   //
   // @param[in] infile: Name of the file to be parsed.
-  // @param[in] sort_by_pts: Whether to sort the frames by PTS values.
-  // @param[in] debug: Debug level.
+  // @param[in] liblcvm_config: Parsing configuration.
   // @return ptr: Full ISOBMFF information.
-  static std::shared_ptr<IsobmffFileInformation> parse(const char *infile,
-                                                       bool sort_by_pts,
-                                                       int debug);
+  static std::shared_ptr<IsobmffFileInformation> parse(
+      const char *infile, const LiblcvmConfig &liblcvm_config);
 
   // Private constructor to prevent direct instantiation
   IsobmffFileInformation() = default;

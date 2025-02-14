@@ -86,8 +86,11 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
   std::map<std::string, std::vector<float>> pts_duration_sec_list_dict;
   for (const auto &infile : infile_list) {
     // 2.1. analyze file
-    std::shared_ptr<IsobmffFileInformation> ptr = IsobmffFileInformation::parse(
-        infile.c_str(), outfile_timestamps_sort_pts, debug);
+    auto *liblcvm_config = new LiblcvmConfig();
+    liblcvm_config->set_sort_by_pts(outfile_timestamps_sort_pts);
+    liblcvm_config->set_debug(debug);
+    std::shared_ptr<IsobmffFileInformation> ptr =
+        IsobmffFileInformation::parse(infile.c_str(), *liblcvm_config);
     if (ptr == nullptr) {
       fprintf(stderr, "error: IsobmffFileInformation::parse() in %s\n",
               infile.c_str());
