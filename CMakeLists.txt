@@ -104,3 +104,35 @@ add_custom_target(lint
   COMMAND clang-format -i -style=google ${CMAKE_CURRENT_SOURCE_DIR}/src/*cc
   COMMAND clang-format -i -style=google ${CMAKE_CURRENT_SOURCE_DIR}/tools/*cc
 )
+
+
+# 5. build liblcvm pybindings library
+
+execute_process(COMMAND python3 -m pybind11 --includes
+  OUTPUT_VARIABLE PYBIND11_INCLUDE OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+string(REGEX REPLACE "-I" "" PYBIND11_INCLUDE "${PYBIND11_INCLUDE}")
+separate_arguments(PYBIND11_INCLUDE)
+
+# Get Python include paths and libraries
+execute_process(COMMAND python3-config --includes
+  OUTPUT_VARIABLE PYTHON_INCLUDE OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND python3-config --ldflags
+  OUTPUT_VARIABLE PYTHON_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+  OUTPUT_VARIABLE PYTHON_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+string(REPLACE "-framework CoreFoundation" "" PYTHON_LDFLAGS "${PYTHON_LDFLAGS}")
+string(REGEX REPLACE "-I" "" PYTHON_INCLUDE "${PYTHON_INCLUDE}")
+separate_arguments(PYTHON_INCLUDE)
+separate_arguments(PYTHON_LDFLAGS)
+
+# Combine linker flags, ensuring no duplicates
+list(APPEND ALL_LINKER_FLAGS ${PYTHON_LDFLAGS} "-lpython${PYTHON_VERSION}")
+list(REMOVE_DUPLICATES ALL_LINKER_FLAGS)
+
+add_library(liblcvm_pybind SHARED src/python_binding.cc tools/lcvm.cc)
+target_include_directories(liblcvm_pybind PUBLIC ${PYBIND11_INCLUDE} ${PYTHON_INCLUDE})
+target_link_libraries(liblcvm_pybind PRIVATE liblcvm "-framework CoreFoundation" ${ALL_LINKER_FLAGS})
+
+set_target_properties(liblcvm_pybind PROPERTIES OUTPUT_NAME "lcvm_pybind" SUFFIX ".so")
