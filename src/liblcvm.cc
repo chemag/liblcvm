@@ -699,20 +699,18 @@ void FrameInformation::parse_avcc(std::shared_ptr<ISOBMFF::AVCC> avcc,
       // cannot parse the NalUnit
       continue;
     }
-    // look for valid SPS NAL units
-    if ((nal_unit->nal_unit_payload->sps->sps_data
-             ->vui_parameters_present_flag == 1) &&
-        (nal_unit->nal_unit_payload->sps->sps_data->vui_parameters
-             ->colour_description_present_flag == 1)) {
-      this->colour_primaries = nal_unit->nal_unit_payload->sps->sps_data
-                                   ->vui_parameters->colour_primaries;
-      this->transfer_characteristics =
-          nal_unit->nal_unit_payload->sps->sps_data->vui_parameters
-              ->transfer_characteristics;
-      this->matrix_coeffs = nal_unit->nal_unit_payload->sps->sps_data
-                                ->vui_parameters->matrix_coefficients;
-      this->video_full_range_flag = nal_unit->nal_unit_payload->sps->sps_data
-                                        ->vui_parameters->video_full_range_flag;
+
+    // Look for valid SPS NAL units
+    if ((nal_unit->nal_unit_payload != nullptr) &&
+        (nal_unit->nal_unit_payload->sps != nullptr) &&
+        (nal_unit->nal_unit_payload->sps->sps_data != nullptr) &&
+        (nal_unit->nal_unit_payload->sps->sps_data->vui_parameters != nullptr) &&
+        (nal_unit->nal_unit_payload->sps->sps_data->vui_parameters->colour_description_present_flag == 1) &&
+        (nal_unit->nal_unit_payload->sps->sps_data->vui_parameters_present_flag == 1)) {
+      this->colour_primaries = nal_unit->nal_unit_payload->sps->sps_data->vui_parameters->colour_primaries;
+      this->transfer_characteristics = nal_unit->nal_unit_payload->sps->sps_data->vui_parameters->transfer_characteristics;
+      this->matrix_coeffs = nal_unit->nal_unit_payload->sps->sps_data->vui_parameters->matrix_coefficients;
+      this->video_full_range_flag = nal_unit->nal_unit_payload->sps->sps_data->vui_parameters->video_full_range_flag;
     }
   }
 }
@@ -748,21 +746,18 @@ void FrameInformation::parse_hvcc(std::shared_ptr<ISOBMFF::HVCC> hvcc,
         // cannot parse the NalUnit
         continue;
       }
-      // look for SPS NAL units
+
+      // Look for SPS NAL units
       if ((nal_unit_type == h265nal::NalUnitType::SPS_NUT) &&
+          (nal_unit->nal_unit_payload != nullptr) &&
+          (nal_unit->nal_unit_payload->sps != nullptr) &&
+          (nal_unit->nal_unit_payload->sps->vui_parameters != nullptr) &&
           (nal_unit->nal_unit_payload->sps->vui_parameters_present_flag == 1) &&
-          (nal_unit->nal_unit_payload->sps->vui_parameters
-               ->colour_description_present_flag == 1)) {
-        this->colour_primaries =
-            nal_unit->nal_unit_payload->sps->vui_parameters->colour_primaries;
-        this->transfer_characteristics =
-            nal_unit->nal_unit_payload->sps->vui_parameters
-                ->transfer_characteristics;
-        this->matrix_coeffs =
-            nal_unit->nal_unit_payload->sps->vui_parameters->matrix_coeffs;
-        this->video_full_range_flag =
-            nal_unit->nal_unit_payload->sps->vui_parameters
-                ->video_full_range_flag;
+          (nal_unit->nal_unit_payload->sps->vui_parameters->colour_description_present_flag == 1)) {
+        this->colour_primaries = nal_unit->nal_unit_payload->sps->vui_parameters->colour_primaries;
+        this->transfer_characteristics = nal_unit->nal_unit_payload->sps->vui_parameters->transfer_characteristics;
+        this->matrix_coeffs = nal_unit->nal_unit_payload->sps->vui_parameters->matrix_coeffs;
+        this->video_full_range_flag = nal_unit->nal_unit_payload->sps->vui_parameters->video_full_range_flag;
       }
     }
   }
