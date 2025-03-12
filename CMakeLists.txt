@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.12)
 
-project(lcvm VERSION 0.12)
+project(lcvm VERSION 0.13)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
