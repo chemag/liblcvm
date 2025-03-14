@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "liblcvm.h"
+#include "lcvm.h"
 
 extern int optind;
 
