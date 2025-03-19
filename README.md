@@ -30,6 +30,19 @@ $ CC=gcc CXX=g++ cmake -DBUILD_CLANG_FUZZER=OFF ..
 $ make
 ```
 
+Notes:
+* Replace the cmake line with the following one to build with clang and add
+debug/gdb symbols:
+```
+$ CC=clang CXX=clang++ cmake -DCMAKE_BUILD_TYPE=DEBUG -DCMAKE_C_FLAGS_DEBUG="-g -O0" -DCMAKE_CXX_FLAGS_DEBUG="-g -O0" ..
+```
+
+* Replace the cmake line with the following one to build with clang, add
+debug/gdb symbols, and add python (pybind11) bindings:
+```
+$ CC=clang CXX=clang++ cmake -DCMAKE_BUILD_TYPE=DEBUG -DCMAKE_C_FLAGS_DEBUG="-g -O0" -DCMAKE_CXX_FLAGS_DEBUG="-g -O0" -DBUILD_PYBINDINGS=ON ..
+```
+
 3. test the binary tool
 ```
 ./lcvm /tmp/test/*mp4 -o full.csv
@@ -93,8 +106,6 @@ include:
 * `get_video_structure_info()`
 * `get_video_generic_info()`
 * `get_frame_interframe_info()`
-
-
 
 
 # Appendix 1: Build Manually
