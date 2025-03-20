@@ -49,10 +49,14 @@ set(BUILD_CLANG_FUZZER OFF)  # Set the variable here
 
 # 1.2. add h265nal submodule
 add_subdirectory(${CMAKE_SOURCE_DIR}/lib/h265nal)
+# Ensure h265nal is built with -fPIC
+set_target_properties(h265nal PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # 1.3. add h264nal submodule
 add_subdirectory(${CMAKE_SOURCE_DIR}/lib/h264nal)
 
+# Ensure h264nal is built with -fPIC
+set_target_properties(h264nal PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # 2. build liblcvm library
 
@@ -74,41 +78,36 @@ if(BUILD_PYBINDINGS)
   # Add Python bindings if requested
   message(STATUS "Configuring Liblcvm library with PyBind11 interface")
 
-  if(APPLE) # For Mac
-    execute_process(COMMAND python3 -m pybind11 --includes
+
+  execute_process(COMMAND python3 -m pybind11 --includes
       OUTPUT_VARIABLE PYBIND11_INCLUDE OUTPUT_STRIP_TRAILING_WHITESPACE)
-    string(REGEX REPLACE "-I" "" PYBIND11_INCLUDE "${PYBIND11_INCLUDE}")
-    separate_arguments(PYBIND11_INCLUDE)
+  string(REGEX REPLACE "-I" "" PYBIND11_INCLUDE "${PYBIND11_INCLUDE}")
+  separate_arguments(PYBIND11_INCLUDE)
 
-    # Get Python include paths and libraries
-    execute_process(COMMAND python3-config --includes
+  # Get Python include paths and libraries
+  execute_process(COMMAND python3-config --includes
       OUTPUT_VARIABLE PYTHON_INCLUDE OUTPUT_STRIP_TRAILING_WHITESPACE)
-    execute_process(COMMAND python3-config --ldflags
+  execute_process(COMMAND python3-config --ldflags
       OUTPUT_VARIABLE PYTHON_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-    execute_process(COMMAND python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+  execute_process(COMMAND python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
       OUTPUT_VARIABLE PYTHON_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
-    string(REPLACE "-framework CoreFoundation" "" PYTHON_LDFLAGS "${PYTHON_LDFLAGS}")
-    string(REGEX REPLACE "-I" "" PYTHON_INCLUDE "${PYTHON_INCLUDE}")
-    separate_arguments(PYTHON_INCLUDE)
-    separate_arguments(PYTHON_LDFLAGS)
+  string(REPLACE "-framework CoreFoundation" "" PYTHON_LDFLAGS "${PYTHON_LDFLAGS}")
+  string(REGEX REPLACE "-I" "" PYTHON_INCLUDE "${PYTHON_INCLUDE}")
+  separate_arguments(PYTHON_INCLUDE)
+  separate_arguments(PYTHON_LDFLAGS)
 
-    # Combine linker flags, ensuring no duplicates
-    list(APPEND ALL_LINKER_FLAGS ${PYTHON_LDFLAGS} "-lpython${PYTHON_VERSION}")
-    list(REMOVE_DUPLICATES ALL_LINKER_FLAGS)
+  # Combine linker flags, ensuring no duplicates
+  list(APPEND ALL_LINKER_FLAGS ${PYTHON_LDFLAGS} "-lpython${PYTHON_VERSION}")
+  list(REMOVE_DUPLICATES ALL_LINKER_FLAGS)
 
-    list(APPEND LIBLCVM_SOURCES src/python_bindings.cc)
-    list(APPEND LIBLCVM_INCLUDE_DIRS ${PYBIND11_INCLUDE} ${PYTHON_INCLUDE})
+  list(APPEND LIBLCVM_SOURCES src/python_bindings.cc)
+  list(APPEND LIBLCVM_INCLUDE_DIRS ${PYBIND11_INCLUDE} ${PYTHON_INCLUDE})
+
+  if(APPLE) # For Mac
     list(APPEND LIBLCVM_LINK_LIBRARIES "-framework CoreFoundation" ${ALL_LINKER_FLAGS})
-
   elseif(UNIX AND NOT APPLE) # For Linux
-    find_package(Python 3.6 REQUIRED)
-    find_package(pybind11 2.2 REQUIRED)
-
-    list(APPEND LIBLCVM_SOURCES src/python_binding.cc)
-    list(APPEND LIBLCVM_INCLUDE_DIRS ${Python_INCLUDE_DIRS} ${pybind11_INCLUDE_DIRS})
-    list(APPEND LIBLCVM_LINK_LIBRARIES ${Python_LIBRARIES})
+    list(APPEND LIBLCVM_LINK_LIBRARIES ${ALL_LINKER_FLAGS})
   endif()
-
   add_library(liblcvm SHARED ${LIBLCVM_SOURCES})
   # set the output name to ensure the library is named liblcvm.so
   set_target_properties(liblcvm PROPERTIES OUTPUT_NAME "lcvm" SUFFIX ".so")
