@@ -191,9 +191,9 @@ def dump_output(infile, outfp, file_info, debug):
     # Write to the output file
     outfp.write(f"{infile}")
     outfp.write(f",{filesize}")
-    outfp.write(f",{bitrate_bps}")  # Format the float with 6 decimal places
-    outfp.write(f",{width}")
-    outfp.write(f",{height}")
+    outfp.write(f",{bitrate_bps:.6f}")  # Format the float with 6 decimal places
+    outfp.write(f",{width:.6f}")
+    outfp.write(f",{height:.6f}")
     outfp.write(f",{type}")
     outfp.write(f",{horizresolution}")
     outfp.write(f",{vertresolution}")
@@ -222,10 +222,10 @@ def dump_output(infile, outfp, file_info, debug):
     outfp.write(f",{pts_duration_sec_stddev:.6f}")
     outfp.write(f",{pts_duration_sec_mad:.6f}")
     outfp.write(f",{frame_drop_count}")
-    outfp.write(f",{frame_drop_ratio}")
-    outfp.write(f",{normalized_frame_drop_average_length}")
-    outfp.write(f",{frame_drop_length_percentile_list[0]}")
-    outfp.write(f",{frame_drop_length_percentile_list[1]}")
+    outfp.write(f",{frame_drop_ratio:.6f}")
+    outfp.write(f",{normalized_frame_drop_average_length:.6f}")
+    outfp.write(f",{frame_drop_length_percentile_list[0]:.6f}")
+    outfp.write(f",{frame_drop_length_percentile_list[1]:.6f}")
     outfp.write(f",{frame_drop_length_consecutive[0]}")
     outfp.write(f",{frame_drop_length_consecutive[1]}")
     outfp.write(f",{num_video_keyframes}")
