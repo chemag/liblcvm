@@ -99,48 +99,48 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     }
 
     // 2.2 get information
-    int filesize = ptr->get_frame().get_filesize();
-    float bitrate_bps = ptr->get_frame().get_bitrate_bps();
-    int width = ptr->get_frame().get_width();
-    int height = ptr->get_frame().get_height();
-    std::string type = ptr->get_frame().get_type();
+    auto filesize = ptr->get_frame().get_filesize();
+    auto bitrate_bps = ptr->get_frame().get_bitrate_bps();
+    auto width = ptr->get_frame().get_width();
+    auto height = ptr->get_frame().get_height();
+    auto type = ptr->get_frame().get_type();
     // int width2 = ptr->get_frame().get_width2();
     // int height2 = ptr->get_frame().get_height2();
-    int horizresolution = ptr->get_frame().get_horizresolution();
-    int vertresolution = ptr->get_frame().get_vertresolution();
-    int depth = ptr->get_frame().get_depth();
-    int chroma_format = ptr->get_frame().get_chroma_format();
-    int bit_depth_luma = ptr->get_frame().get_bit_depth_luma();
-    int bit_depth_chroma = ptr->get_frame().get_bit_depth_chroma();
-    int video_full_range_flag = ptr->get_frame().get_video_full_range_flag();
-    int colour_primaries = ptr->get_frame().get_colour_primaries();
-    int transfer_characteristics =
+    auto horizresolution = ptr->get_frame().get_horizresolution();
+    auto vertresolution = ptr->get_frame().get_vertresolution();
+    auto depth = ptr->get_frame().get_depth();
+    auto chroma_format = ptr->get_frame().get_chroma_format();
+    auto bit_depth_luma = ptr->get_frame().get_bit_depth_luma();
+    auto bit_depth_chroma = ptr->get_frame().get_bit_depth_chroma();
+    auto video_full_range_flag = ptr->get_frame().get_video_full_range_flag();
+    auto colour_primaries = ptr->get_frame().get_colour_primaries();
+    auto transfer_characteristics =
         ptr->get_frame().get_transfer_characteristics();
-    int matrix_coeffs = ptr->get_frame().get_matrix_coeffs();
+    auto matrix_coeffs = ptr->get_frame().get_matrix_coeffs();
 
-    bool video_freeze = ptr->get_timing().get_video_freeze();
-    float audio_video_ratio = ptr->get_timing().get_audio_video_ratio();
-    float duration_video_sec = ptr->get_timing().get_duration_video_sec();
-    float duration_audio_sec = ptr->get_timing().get_duration_audio_sec();
-    uint32_t timescale_video_hz = ptr->get_timing().get_timescale_video_hz();
-    uint32_t timescale_audio_hz = ptr->get_timing().get_timescale_audio_hz();
-    float pts_duration_sec_average =
+    auto video_freeze = ptr->get_timing().get_video_freeze();
+    auto audio_video_ratio = ptr->get_timing().get_audio_video_ratio();
+    auto duration_video_sec = ptr->get_timing().get_duration_video_sec();
+    auto duration_audio_sec = ptr->get_timing().get_duration_audio_sec();
+    auto timescale_video_hz = ptr->get_timing().get_timescale_video_hz();
+    auto timescale_audio_hz = ptr->get_timing().get_timescale_audio_hz();
+    auto pts_duration_sec_average =
         ptr->get_timing().get_pts_duration_sec_average();
-    float pts_duration_sec_median =
+    auto pts_duration_sec_median =
         ptr->get_timing().get_pts_duration_sec_median();
-    float pts_duration_sec_stddev =
+    auto pts_duration_sec_stddev =
         ptr->get_timing().get_pts_duration_sec_stddev();
-    float pts_duration_sec_mad = ptr->get_timing().get_pts_duration_sec_mad();
-    int num_video_frames = ptr->get_timing().get_num_video_frames();
-    float frame_rate_fps_median = ptr->get_timing().get_frame_rate_fps_median();
-    float frame_rate_fps_average =
+    auto pts_duration_sec_mad = ptr->get_timing().get_pts_duration_sec_mad();
+    auto num_video_frames = ptr->get_timing().get_num_video_frames();
+    auto frame_rate_fps_median = ptr->get_timing().get_frame_rate_fps_median();
+    auto frame_rate_fps_average =
         ptr->get_timing().get_frame_rate_fps_average();
-    float frame_rate_fps_reverse_average =
+    auto frame_rate_fps_reverse_average =
         ptr->get_timing().get_frame_rate_fps_reverse_average();
-    float frame_rate_fps_stddev = ptr->get_timing().get_frame_rate_fps_stddev();
-    int frame_drop_count = ptr->get_timing().get_frame_drop_count();
-    float frame_drop_ratio = ptr->get_timing().get_frame_drop_ratio();
-    float normalized_frame_drop_average_length =
+    auto frame_rate_fps_stddev = ptr->get_timing().get_frame_rate_fps_stddev();
+    auto frame_drop_count = ptr->get_timing().get_frame_drop_count();
+    auto frame_drop_ratio = ptr->get_timing().get_frame_drop_ratio();
+    auto normalized_frame_drop_average_length =
         ptr->get_timing().get_normalized_frame_drop_average_length();
 
     std::vector<float> percentile_list = {50, 90};
@@ -154,30 +154,30 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
         consecutive_list, frame_drop_length_consecutive, debug);
 
     // 2.3. get video structure info
-    int num_video_keyframes = ptr->get_timing().get_num_video_keyframes();
-    float key_frame_ratio = ptr->get_timing().get_key_frame_ratio();
+    auto num_video_keyframes = ptr->get_timing().get_num_video_keyframes();
+    auto key_frame_ratio = ptr->get_timing().get_key_frame_ratio();
 
     // 2.3.1 get audio structure info
-    std::string audio_type = ptr->get_audio().get_audio_type();
-    int channel_count = ptr->get_audio().get_channel_count();
-    int sample_rate = ptr->get_audio().get_sample_rate();
-    int sample_size = ptr->get_audio().get_sample_size();
+    auto audio_type = ptr->get_audio().get_audio_type();
+    auto channel_count = ptr->get_audio().get_channel_count();
+    auto sample_rate = ptr->get_audio().get_sample_rate();
+    auto sample_size = ptr->get_audio().get_sample_size();
 
     // 2.4. dump all output
     fprintf(outfp, "%s", infile.c_str());
     fprintf(outfp, ",%i", filesize);
     fprintf(outfp, ",%f", bitrate_bps);
-    fprintf(outfp, ",%i", width);
-    fprintf(outfp, ",%i", height);
+    fprintf(outfp, ",%f", width);
+    fprintf(outfp, ",%f", height);
     fprintf(outfp, ",%s", type.c_str());
     // fprintf(outfp, ",%i", width2);
     // fprintf(outfp, ",%i", height2);
     fprintf(outfp, ",%u", horizresolution);
     fprintf(outfp, ",%u", vertresolution);
     fprintf(outfp, ",%u", depth);
-    fprintf(outfp, ",%u", chroma_format);
-    fprintf(outfp, ",%u", bit_depth_luma);
-    fprintf(outfp, ",%u", bit_depth_chroma);
+    fprintf(outfp, ",%i", chroma_format);
+    fprintf(outfp, ",%i", bit_depth_luma);
+    fprintf(outfp, ",%i", bit_depth_chroma);
     fprintf(outfp, ",%i", video_full_range_flag);
     fprintf(outfp, ",%i", colour_primaries);
     fprintf(outfp, ",%i", transfer_characteristics);
