@@ -352,7 +352,7 @@ def parse_files(infile_list, outfile, outfile_timestamps, outfile_timestamps_sor
         outfp = sys.stdout
     else:
         try:
-            outfp = open(outfile, "w", newline="")  # Open in text mode
+            outfp = open(outfile, "w")
         except IOError:
             # Did not work
             sys.stderr.write(f'Could not open output file: "{outfile}"\n')
