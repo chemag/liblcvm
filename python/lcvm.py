@@ -9,9 +9,10 @@ Accelerated by the liblcvm C++ shared library (liblcvm.so).
 import argparse
 import csv
 import importlib
+import os
 import sys
 
-sys.path.append("../build")
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "build"))
 import liblcvm
 
 
