@@ -518,6 +518,8 @@ int TimingInformation::derive_timing_info(
                                     : 0.0;
 
   // 5. audio/video ratio and video freeze info
+  // use a default invalid value for audio video ratio
+  ptr->timing.audio_video_ratio = -1.0;
   if ((ptr->timing.duration_video_sec != -1.0) &&
       (ptr->timing.duration_audio_sec != -1.0) &&
       (ptr->timing.duration_video_sec >= 2.0)) {
