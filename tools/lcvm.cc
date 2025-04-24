@@ -253,26 +253,44 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     }
     // 3.3. dump the file names
     fprintf(outtsfp, "frame_num");
-    fprintf(outtsfp, ",frame_num_orig");
+    long unsigned infile_list_size = infile_list.size();
     for (const auto &entry : stts_unit_list_dict) {
-      long unsigned infile_list_size = infile_list.size();
+      const std::string &infile = entry.first;
+      fprintf(outtsfp, ",frame_num_orig");
+      if (infile_list_size > 1) {
+        fprintf(outtsfp, "_%s", infile.c_str());
+      }
+    }
+    for (const auto &entry : stts_unit_list_dict) {
       const std::string &infile = entry.first;
       fprintf(outtsfp, ",stts");
       if (infile_list_size > 1) {
         fprintf(outtsfp, "_%s", infile.c_str());
       }
+    }
+    for (const auto &entry : stts_unit_list_dict) {
+      const std::string &infile = entry.first;
       fprintf(outtsfp, ",ctts");
       if (infile_list_size > 1) {
         fprintf(outtsfp, "_%s", infile.c_str());
       }
+    }
+    for (const auto &entry : stts_unit_list_dict) {
+      const std::string &infile = entry.first;
       fprintf(outtsfp, ",dts");
       if (infile_list_size > 1) {
         fprintf(outtsfp, "_%s", infile.c_str());
       }
+    }
+    for (const auto &entry : stts_unit_list_dict) {
+      const std::string &infile = entry.first;
       fprintf(outtsfp, ",pts");
       if (infile_list_size > 1) {
         fprintf(outtsfp, "_%s", infile.c_str());
       }
+    }
+    for (const auto &entry : stts_unit_list_dict) {
+      const std::string &infile = entry.first;
       fprintf(outtsfp, ",pts_duration");
       if (infile_list_size > 1) {
         fprintf(outtsfp, "_%s", infile.c_str());
