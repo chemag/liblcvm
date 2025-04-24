@@ -255,12 +255,28 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     fprintf(outtsfp, "frame_num");
     fprintf(outtsfp, ",frame_num_orig");
     for (const auto &entry : stts_unit_list_dict) {
+      long unsigned infile_list_size = infile_list.size();
       const std::string &infile = entry.first;
-      fprintf(outtsfp, ",stts_%s", infile.c_str());
-      fprintf(outtsfp, ",ctts_%s", infile.c_str());
-      fprintf(outtsfp, ",dts_%s", infile.c_str());
-      fprintf(outtsfp, ",pts_%s", infile.c_str());
-      fprintf(outtsfp, ",pts_duration_%s", infile.c_str());
+      fprintf(outtsfp, ",stts");
+      if (infile_list_size > 1) {
+        fprintf(outtsfp, "_%s", infile.c_str());
+      }
+      fprintf(outtsfp, ",ctts");
+      if (infile_list_size > 1) {
+        fprintf(outtsfp, "_%s", infile.c_str());
+      }
+      fprintf(outtsfp, ",dts");
+      if (infile_list_size > 1) {
+        fprintf(outtsfp, "_%s", infile.c_str());
+      }
+      fprintf(outtsfp, ",pts");
+      if (infile_list_size > 1) {
+        fprintf(outtsfp, "_%s", infile.c_str());
+      }
+      fprintf(outtsfp, ",pts_duration");
+      if (infile_list_size > 1) {
+        fprintf(outtsfp, "_%s", infile.c_str());
+      }
     }
     fprintf(outtsfp, "\n");
     // 3.4. dump the columns of inter-frame timestamps
