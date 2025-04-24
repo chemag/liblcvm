@@ -84,6 +84,7 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
   std::map<std::string, std::vector<float>> dts_sec_list_dict;
   std::map<std::string, std::vector<float>> pts_sec_list_dict;
   std::map<std::string, std::vector<float>> pts_duration_sec_list_dict;
+  std::map<std::string, std::vector<float>> pts_duration_delta_sec_list_dict;
 
   auto liblcvm_config = std::make_unique<LiblcvmConfig>();
   liblcvm_config->set_sort_by_pts(outfile_timestamps_sort_pts);
@@ -224,6 +225,8 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
       std::vector<float> pts_sec_list = ptr->get_timing().get_pts_sec_list();
       std::vector<float> pts_duration_sec_list =
           ptr->get_timing().get_pts_duration_sec_list();
+      std::vector<float> pts_duration_delta_sec_list =
+          ptr->get_timing().get_pts_duration_delta_sec_list();
       // store the values
       frame_num_orig_list_dict[infile] = frame_num_orig_list;
       stts_unit_list_dict[infile] = stts_unit_list;
@@ -231,6 +234,7 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
       dts_sec_list_dict[infile] = dts_sec_list;
       pts_sec_list_dict[infile] = pts_sec_list;
       pts_duration_sec_list_dict[infile] = pts_duration_sec_list;
+      pts_duration_delta_sec_list_dict[infile] = pts_duration_delta_sec_list;
     }
   }
 
@@ -296,6 +300,13 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
         fprintf(outtsfp, "_%s", infile.c_str());
       }
     }
+    for (const auto &entry : stts_unit_list_dict) {
+      const std::string &infile = entry.first;
+      fprintf(outtsfp, ",pts_duration_delta");
+      if (infile_list_size > 1) {
+        fprintf(outtsfp, "_%s", infile.c_str());
+      }
+    }
     fprintf(outtsfp, "\n");
     // 3.4. dump the columns of inter-frame timestamps
     for (size_t frame_num = 0; frame_num < max_number_of_frames; ++frame_num) {
@@ -355,6 +366,16 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
         const std::vector<float> &pts_duration_sec_list = entry.second;
         if (frame_num < pts_duration_sec_list.size()) {
           float pts_duration = pts_duration_sec_list[frame_num];
+          fprintf(outtsfp, ",%f", pts_duration);
+        } else {
+          fprintf(outtsfp, ",");
+        }
+      }
+      // dump pts_duration_delta_sec_list[frame_num]
+      for (const auto &entry : pts_duration_delta_sec_list_dict) {
+        const std::vector<float> &pts_duration_delta_sec_list = entry.second;
+        if (frame_num < pts_duration_delta_sec_list.size()) {
+          float pts_duration = pts_duration_delta_sec_list[frame_num];
           fprintf(outtsfp, ",%f", pts_duration);
         } else {
           fprintf(outtsfp, ",");

@@ -247,6 +247,7 @@ def capture_timestamps(
     dts_sec_list_dict,
     pts_sec_list_dict,
     pts_duration_sec_list_dict,
+    pts_duration_delta_sec_list_dict,
 ):
     # Access the timing information
     timing_info = file_info.get_timing()
@@ -257,6 +258,7 @@ def capture_timestamps(
     dts_sec_list = timing_info.get_dts_sec_list()
     pts_sec_list = timing_info.get_pts_sec_list()
     pts_duration_sec_list = timing_info.get_pts_duration_sec_list()
+    pts_duration_delta_sec_list = timing_info.get_pts_duration_sec_list()
 
     # Store the values in dictionaries
     frame_num_orig_list_dict[infile] = frame_num_orig_list
@@ -265,6 +267,7 @@ def capture_timestamps(
     dts_sec_list_dict[infile] = dts_sec_list
     pts_sec_list_dict[infile] = pts_sec_list
     pts_duration_sec_list_dict[infile] = pts_duration_sec_list
+    pts_duration_delta_sec_list_dict[infile] = pts_duration_sec_list
 
 
 def write_timestamps_to_file(
@@ -275,6 +278,7 @@ def write_timestamps_to_file(
     dts_sec_list_dict,
     pts_sec_list_dict,
     pts_duration_sec_list_dict,
+    pts_duration_delta_sec_list_dict,
 ):
     # Write the inter-frame timestamps to the output file.
 
@@ -338,6 +342,13 @@ def write_timestamps_to_file(
                     else:
                         outtsfp.write(",")
 
+                # Dump pts_duration_delta_sec_list[frame_num]
+                for pts_duration_delta_sec_list in pts_duration_delta_sec_list_dict.values():
+                    if frame_num < len(pts_duration_delta_sec_list):
+                        outtsfp.write(f",{pts_duration_delta_sec_list[frame_num]:.6f}")
+                    else:
+                        outtsfp.write(",")
+
                 outtsfp.write("\n")
 
     except IOError:
@@ -368,6 +379,7 @@ def parse_files(infile_list, outfile, outfile_timestamps, outfile_timestamps_sor
     dts_sec_list_dict = {}
     pts_sec_list_dict = {}
     pts_duration_sec_list_dict = {}
+    pts_duration_delta_sec_list_dict = {}
 
     # 2.1. analyze file
     config = liblcvm.LiblcvmConfig()
@@ -393,6 +405,7 @@ def parse_files(infile_list, outfile, outfile_timestamps, outfile_timestamps_sor
                     dts_sec_list_dict,
                     pts_sec_list_dict,
                     pts_duration_sec_list_dict,
+                    pts_duration_delta_sec_list_dict,
                 )
 
         except Exception as e:
@@ -408,6 +421,7 @@ def parse_files(infile_list, outfile, outfile_timestamps, outfile_timestamps_sor
             dts_sec_list_dict,
             pts_sec_list_dict,
             pts_duration_sec_list_dict,
+            pts_duration_delta_sec_list_dict,
         )
 
     if outfp is not sys.stdout:

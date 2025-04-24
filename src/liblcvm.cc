@@ -508,6 +508,14 @@ int TimingInformation::derive_timing_info(
       calculate_standard_deviation(ptr->timing.pts_duration_sec_list);
   ptr->timing.pts_duration_sec_mad =
       calculate_median_absolute_deviation(ptr->timing.pts_duration_sec_list);
+  // 3.4. derive the pts_duration_delta_sec_list
+  ptr->timing.pts_duration_delta_sec_list.resize(
+      ptr->timing.pts_duration_sec_list.size());
+  for (uint32_t i = 0; i < ptr->timing.pts_duration_sec_list.size(); ++i) {
+    ptr->timing.pts_duration_delta_sec_list[i] =
+        ptr->timing.pts_duration_sec_list[i] -
+        ptr->timing.pts_duration_sec_average;
+  }
 
   // 4. derive keyframe-related values
   ptr->timing.num_video_keyframes =

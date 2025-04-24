@@ -81,7 +81,9 @@ namespace py = pybind11;
       .def("get_dts_sec_list", &class_name::get_dts_sec_list)                 \
       .def("get_pts_sec_list", &class_name::get_pts_sec_list)                 \
       .def("get_pts_duration_sec_list",                                       \
-           &class_name::get_pts_duration_sec_list)
+           &class_name::get_pts_duration_sec_list)                            \
+      .def("get_pts_duration_delta_sec_list",                                 \
+           &class_name::get_pts_duration_delta_sec_list)
 
 // Define the macro to bind audio getters
 #define AUDIO_GETTERS(class_name)                               \

@@ -51,6 +51,9 @@ class TimingInformation {
   // pts_duration_sec_list: PTS (presentation timestamp) duration list
   // (seconds).
   std::vector<float> pts_duration_sec_list;
+  // pts_duration_delta_sec_list: PTS (presentation timestamp) duration
+  // delta to the average list (seconds).
+  std::vector<float> pts_duration_delta_sec_list;
   // pts_duration_sec_average: pts duration average (sec).
   float pts_duration_sec_average;
   // pts_duration_sec_median: pts duration median (sec).
@@ -100,6 +103,7 @@ class TimingInformation {
   DECL_GETTER(pts_unit_list, std::vector<int32_t>)
   DECL_GETTER(pts_sec_list, std::vector<float>)
   DECL_GETTER(pts_duration_sec_list, std::vector<float>)
+  DECL_GETTER(pts_duration_delta_sec_list, std::vector<float>)
   DECL_GETTER(pts_duration_sec_average, float)
   DECL_GETTER(pts_duration_sec_median, float)
   DECL_GETTER(pts_duration_sec_stddev, float)
