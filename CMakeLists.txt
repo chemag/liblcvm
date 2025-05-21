@@ -20,11 +20,6 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff/ISOBMFF/include)
 # 1. build external libraries
 
 # 1.1. build ISOBMFF library
-# apply isobmff fix patch
-execute_process(
-  COMMAND git apply ${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff.patch
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff
-)
 
 # add the ISOBMFF submodule
 include(ExternalProject)
