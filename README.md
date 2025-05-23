@@ -15,34 +15,15 @@ it in devices with battery and thermal constrains.
 
 # 2. Operation
 
-1. Prerequisites
 
-Following dependencies are required to install liblcvm and its submodules:
-* cmake
-* gtest-devel
-* gmock-devel
-* llvm-toolset (or clang-tools-extra)
-
-Note: The requirement may vary depending on the OS, e.g., in Fedora clang-tidy came from clang-tools-extra
-
-For linux enviroments, the following commands can be used to install the dependencies:
-```
-sudo dnf install cmake
-sudo dnf install gtest-devel
-sudo dnf install gmock-devel
-sudo dnf install llvm-toolset
-# or
-sudo dnf install clang-tools-extra
-```
-
-2. Clone the repository.
+1. Clone the repository.
 
 ```
 $ git clone --recursive https://github.com/chemag/liblcvm
 $ cd liblcvm
 ```
 
-3. Build library and binary.
+2. Build library and binary.
 ```
 $ mkdir build
 $ cd build
@@ -50,22 +31,9 @@ $ CC=gcc CXX=g++ cmake -DBUILD_CLANG_FUZZER=OFF ..
 $ make
 ```
 
-Notes:
-* Replace the cmake line with the following one to build with clang and add
-debug/gdb symbols:
+3. test the binary tool
 ```
-$ CC=clang CXX=clang++ cmake -DCMAKE_BUILD_TYPE=DEBUG -DCMAKE_C_FLAGS_DEBUG="-g -O0" -DCMAKE_CXX_FLAGS_DEBUG="-g -O0" ..
-```
-
-* Replace the cmake line with the following one to build with clang, add
-debug/gdb symbols, and add python (pybind11) bindings:
-```
-$ CC=clang CXX=clang++ cmake -DCMAKE_BUILD_TYPE=DEBUG -DCMAKE_C_FLAGS_DEBUG="-g -O0" -DCMAKE_CXX_FLAGS_DEBUG="-g -O0" -DBUILD_PYBINDINGS=ON ..
-```
-
-4. test the binary tool
-```
-./lcvm /tmp/test/*mp4 -o full.csv
+$ ./lcvm /tmp/test/*mp4 -o full.csv
 
 $ csvlook -I full.csv
 | infile          | num_video_frames | frame_rate_fps | video_freeze | video_freeze_ratio | frame_drop_ratio | normalized_frame_drop_average_length |
@@ -73,6 +41,23 @@ $ csvlook -I full.csv
 | /tmp/test/a.mp4 | 1807             | 30.010002      | 0            | -0.003015          | 0.001108         | 3.003668                             |
 | /tmp/test/b.mp4 | 331              | 30.010002      | 0            | -0.008523          | 0.006015         | 3.003335                             |
 | /tmp/test/c.mp4 | 570              | 29.910269      | 0            | -0.011072          | 0.124218         | 2.035057                             |
+```
+
+Notes:
+* (a) Replace gcc with clang by re-running the cmake line as follows:
+```
+$ CC=clang CXX=clang++ cmake ..
+```
+
+* (b) Replace gcc with clang and add debug/gdb symbols:
+```
+$ CC=clang CXX=clang++ cmake -DCMAKE_BUILD_TYPE=DEBUG -DCMAKE_C_FLAGS_DEBUG="-g -O0" -DCMAKE_CXX_FLAGS_DEBUG="-g -O0" ..
+```
+
+* (c) Replace gcc with clang, add debug/gdb symbols, and add python (pybind11)
+bindings:
+```
+$ CC=clang CXX=clang++ cmake -DCMAKE_BUILD_TYPE=DEBUG -DCMAKE_C_FLAGS_DEBUG="-g -O0" -DCMAKE_CXX_FLAGS_DEBUG="-g -O0" -DBUILD_PYBINDINGS=ON ..
 ```
 
 
@@ -128,27 +113,42 @@ include:
 * `get_frame_interframe_info()`
 
 
-# Appendix 1: Build Manually
 
-1. Clone the repository
+# Appendix 1: Prerequisites
+
+## A1.1: Linux Prerequisites
+The following dependencies are required to install liblcvm and its submodules:
+* cmake
+* gtest-devel
+* gmock-devel
+* llvm-toolset (clang-tools-extra in some distros)
+
+Note: The requirement may vary depending on the OS, e.g., in Fedora clang-tidy came from clang-tools-extra.
+
+For linux enviroments, the following commands can be used to install the dependencies:
 ```
-$ git clone --recursive http://github.com/chemag/liblcvm
-$ cd liblcvm
+sudo dnf install cmake
+sudo dnf install gtest-devel
+sudo dnf install gmock-devel
+sudo dnf install llvm-toolset
+# or
+sudo dnf install clang-tidy  # ubuntu
+sudo dnf install clang-tools-extra  # fedora
 ```
 
-2. build the binary tool (tools/lcvm)
+
+## A1.2: MacOS Prerequisites
+The following packages can be installed using brew.
+
 ```
-$ make build
-...
-[ ISOBMFF ]> libISOBMFF.so [ Debug - x86_64 ]: Linking the x86_64 binary
-make[1]: Leaving directory '/tmp/liblcvm/lib/isobmff'
-LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:./lib/isobmff/Build/Debug/Products/x86_64/ g++ -c -o src/liblcvm.o -g -O0 src/liblcvm.cc -I./lib/isobmff/ISOBMFF/include/
-LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:./lib/isobmff/Build/Debug/Products/x86_64/ g++ -c -o tools/lcvm.o -g -O0 tools/lcvm.cc -I./lib/isobmff/ISOBMFF/include/ -I./include
-LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:./lib/isobmff/Build/Debug/Products/x86_64/ g++ -o tools/lcvm tools/lcvm.o src/liblcvm.o -g -O0 -L./lib/isobmff/Build/Debug/Products/x86_64/ -lISOBMFF
+$ brew install llvm cmake googletest git clang-format
 ```
 
+You also need to install Xcode.
 
-3. test the binary tool:
+
+# Appendix 2: Test the Binary Tool Manually
+
 ```
 $ TESTDIR=/tmp/test make test
 LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:./lib/isobmff/Build/Debug/Products/x86_64/ ./tools/lcvm /tmp/test/*mp4 -o /tmp/full.csv
@@ -162,11 +162,16 @@ $ csvlook -I /tmp/full.csv
 ```
 
 
-# Appendix 2: Build Troubleshoot
+# Appendix 3: Build Troubleshooting
 
-## A2.1. Mac Known Build Errors
+## A3.1. Mac Known Build Errors
 
 ```
 clang: error: no such sysroot directory: '/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS17.5.sdk' [-Werror,-Wmissing-sysroot]
 ```
-To resolve this issue, update the Xcode path in the Common.mk file: ```lib/isobmff/Submodules/makelib/Common.mk +75```
+
+To resolve this issue, update the Xcode path in the Common.mk file:
+
+```
+lib/isobmff/Submodules/makelib/Common.mk +75
+```
