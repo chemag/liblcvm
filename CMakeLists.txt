@@ -13,35 +13,18 @@ message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR} ")
 
 # add include directories
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff/ISOBMFF/include)
 
 
 # 1. build external libraries
 
-# 1.1. build ISOBMFF library
-
-# add the ISOBMFF submodule
-include(ExternalProject)
-ExternalProject_Add(
-  ISOBMFF
-  SOURCE_DIR ${CMAKE_SOURCE_DIR}/lib/isobmff
-  BUILD_IN_SOURCE 1
-  CONFIGURE_COMMAND ""
-  BUILD_COMMAND make
-  INSTALL_COMMAND ""
-)
-
-# build isobmff library
-execute_process(
-  COMMAND make
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff
-)
-
-
-# we do not care about fuzzing either h264nal nor h265nal
-set(BUILD_CLANG_FUZZER OFF)  # Set the variable here
+# 1.1. add isobmff submodule
+add_subdirectory(${CMAKE_SOURCE_DIR}/lib/isobmff)
 
 # 1.2. add h265nal submodule
+
+# we do not care about fuzzing either h264nal nor h265nal here
+set(BUILD_CLANG_FUZZER OFF)  # Set the variable here
+
 option(BUILD_PYBINDINGS "Build Python bindings for liblcvm" OFF)
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/lib/h265nal)
@@ -67,7 +50,7 @@ set(LIBLCVM_INCLUDE_DIRS
   ${CMAKE_CURRENT_SOURCE_DIR}/lib/h264nal/include
 )
 set(LIBLCVM_LINK_LIBRARIES
-  ${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff/Build/Debug/Products/x86_64/libISOBMFF.a
+  ISOBMFF
   h265nal
   h264nal)
 
