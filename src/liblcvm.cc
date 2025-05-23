@@ -12,6 +12,8 @@
 #include <h265_bitstream_parser.h>
 #include <h265_common.h>
 #include <h265_nal_unit_parser.h>
+
+#include <inttypes.h>
 #include <stdint.h>  // for uint32_t, uint64_t
 #include <sys/stat.h>
 
@@ -121,7 +123,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     if (liblcvm_config.get_debug() > 1) {
       fprintf(stdout, "-> handler_type: %s ", handler_type.c_str());
       fprintf(stdout, "timescale: %u ", timescale_hz);
-      fprintf(stdout, "duration: %lu ", duration);
+      fprintf(stdout, "duration: %" PRIu64 " ", duration);
       fprintf(stdout, "duration_sec: %f\n", duration_sec);
     }
     if (handler_type.compare("soun") == 0) {
