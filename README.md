@@ -15,14 +15,34 @@ it in devices with battery and thermal constrains.
 
 # 2. Operation
 
-1. Clone the repository.
+1. Prerequisites
+
+Following dependencies are required to install liblcvm and its submodules:
+* cmake
+* gtest-devel
+* gmock-devel
+* llvm-toolset (or clang-tools-extra)
+
+Note: The requirement may vary depending on the OS, e.g., in Fedora clang-tidy came from clang-tools-extra
+
+For linux enviroments, the following commands can be used to install the dependencies:
+```
+sudo dnf install cmake
+sudo dnf install gtest-devel
+sudo dnf install gmock-devel
+sudo dnf install llvm-toolset
+# or
+sudo dnf install clang-tools-extra
+```
+
+2. Clone the repository.
 
 ```
 $ git clone --recursive https://github.com/chemag/liblcvm
 $ cd liblcvm
 ```
 
-2. Build library and binary.
+3. Build library and binary.
 ```
 $ mkdir build
 $ cd build
@@ -43,7 +63,7 @@ debug/gdb symbols, and add python (pybind11) bindings:
 $ CC=clang CXX=clang++ cmake -DCMAKE_BUILD_TYPE=DEBUG -DCMAKE_C_FLAGS_DEBUG="-g -O0" -DCMAKE_CXX_FLAGS_DEBUG="-g -O0" -DBUILD_PYBINDINGS=ON ..
 ```
 
-3. test the binary tool
+4. test the binary tool
 ```
 ./lcvm /tmp/test/*mp4 -o full.csv
 
@@ -116,42 +136,7 @@ $ git clone --recursive http://github.com/chemag/liblcvm
 $ cd liblcvm
 ```
 
-2. fix the ISOBMFF Makefile (needed for Fedora)
-```
-$ git diff
-diff --git a/Makefile b/Makefile
-index 63d90c7..ace112e 100644
---- a/Makefile
-+++ b/Makefile
-@@ -45,14 +45,14 @@ EXT_CPP             := .cpp
- EXT_M               := .m
- EXT_MM              := .mm
- EXT_H               := .hpp
--CC                  := clang
-+CC                  := g++
- FLAGS_OPTIM         := Os
- FLAGS_WARN          := -Werror -Wall
- FLAGS_STD_C         := c99
- FLAGS_STD_CPP       := c++14
- FLAGS_OTHER         := -fno-strict-aliasing
- FLAGS_C             :=
--FLAGS_CPP           := -x c++ -stdlib=libc++
-+FLAGS_CPP           :=
- FLAGS_M             := -fobjc-arc
- FLAGS_MM            := -fobjc-arc
- XCODE_PROJECT       := ISOBMFF.xcodeproj
-@@ -70,7 +70,7 @@ FILES_M_EXCLUDE     :=
- FILES_MM            :=
- FILES_MM_EXCLUDE    :=
-
--LIBS                := -lc++
-+LIBS                :=
-
- FILES               := $(filter-out $(FILES_C_EXCLUDE),$(FILES_C))      \
-                        $(filter-out $(FILES_CPP_EXCLUDE),$(FILES_CPP))  \
-```
-
-3. build the binary tool (tools/lcvm)
+2. build the binary tool (tools/lcvm)
 ```
 $ make build
 ...
@@ -163,7 +148,7 @@ LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:./lib/isobmff/Build/Debug/Products/x86_64/ g+
 ```
 
 
-4. test the binary tool:
+3. test the binary tool:
 ```
 $ TESTDIR=/tmp/test make test
 LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:./lib/isobmff/Build/Debug/Products/x86_64/ ./tools/lcvm /tmp/test/*mp4 -o /tmp/full.csv
