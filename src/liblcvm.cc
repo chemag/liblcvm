@@ -18,7 +18,7 @@
 #include <sys/stat.h>
 
 #include <ISOBMFF.hpp>         // for various
-#include <ISOBMFF/Parser.hpp>  // for Parser
+#include <Parser.hpp>  // for Parser
 #include <algorithm>           // for sort
 #include <cmath>               // for sqrt
 #include <cstdio>              // for fprintf, stderr, stdout
