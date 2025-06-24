@@ -45,12 +45,12 @@ endif()
 # Common settings for liblcvm
 set(LIBLCVM_SOURCES src/liblcvm.cc)
 set(LIBLCVM_INCLUDE_DIRS
-  ${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff/ISOBMFF/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff/include
   ${CMAKE_CURRENT_SOURCE_DIR}/lib/h265nal/include
   ${CMAKE_CURRENT_SOURCE_DIR}/lib/h264nal/include
 )
 set(LIBLCVM_LINK_LIBRARIES
-  ISOBMFF
+  isobmff
   h265nal
   h264nal)
 

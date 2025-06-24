@@ -7,7 +7,7 @@
 #include <stdlib.h>
 
 #include <ISOBMFF.hpp>
-#include <ISOBMFF/Parser.hpp>
+#include <Parser.hpp>
 #include <climits>
 #include <cstdio>
 #include <cstdlib>
