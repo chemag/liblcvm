@@ -124,7 +124,7 @@ target_include_directories(liblcvm PRIVATE ${CMAKE_BINARY_DIR})
 
 # 4.1. add test target
 add_custom_target(test
-  COMMAND ${CMAKE_BINARY_DIR}/lcvm ${CMAKE_BINARY_DIR}/*MOV -o /tmp/full.csv
+  COMMAND ${CMAKE_BINARY_DIR}/lcvm ${CMAKE_SOURCE_DIR}/lib/isobmff/media/*MOV -o /tmp/full.csv
 )
 
 # 4.2. add lint target
