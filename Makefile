@@ -21,11 +21,11 @@ build:
 
 
 ifeq ($(TESTDIR),)
-TESTDIR := /tmp/
+TESTDIR := /tmp
 endif
 
 test:
-	LD_LIBRARY_PATH=$${LD_LIBRARY_PATH}:./lib/isobmff/Build/Debug/Products/x86_64/ ./tools/lcvm ${TESTDIR}/*mp4 -o /tmp/full.csv
+	LD_LIBRARY_PATH=$${LD_LIBRARY_PATH}:./build/lib/isobmff/src/ ./build/lcvm ./lib/isobmff/media/*MOV -o /tmp/full.csv
 
 
 build-cmake:
