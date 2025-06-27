@@ -133,3 +133,26 @@ add_custom_target(lint
   COMMAND clang-format -i -style=google ${CMAKE_CURRENT_SOURCE_DIR}/src/*cc
   COMMAND clang-format -i -style=google ${CMAKE_CURRENT_SOURCE_DIR}/tools/*cc
 )
+
+# 4.3. Add fuzzing target
+set(CORPUS_DIR ${CMAKE_SOURCE_DIR}/lib/isobmff/fuzz/corpus)
+set(RUNS 100 CACHE STRING "Number of runs for fuzzers")  # Default number of runs, can be overridden
+
+# Create the fuzz target
+add_custom_target(fuzz
+  COMMAND ${CMAKE_COMMAND} -E echo "Running all fuzzers with ${RUNS} runs..."
+)
+# Get a list of all executables with _fuzzer in the specified directory
+file(GLOB FUZZER_EXECUTABLES "${CMAKE_SOURCE_DIR}/build/lib/isobmff/fuzz/*_fuzzer")
+
+# Iterate over each fuzzer executable and add a command to the fuzz target
+foreach(FUZZER_EXECUTABLE IN LISTS FUZZER_EXECUTABLES)
+  get_filename_component(FUZZER_NAME ${FUZZER_EXECUTABLE} NAME_WE)
+  add_custom_command(
+    TARGET fuzz
+    COMMAND ${FUZZER_EXECUTABLE}
+            -artifact_prefix=${CORPUS_DIR}/${FUZZER_NAME}/
+            ${CORPUS_DIR}/${FUZZER_NAME}/
+            -runs=$$RUNS
+  )
+endforeach()
