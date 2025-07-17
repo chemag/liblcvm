@@ -1,0 +1,2 @@
+warn "warn 1" (age == 30 and name != "Bob") or not (score in range(1, 2))
+error "error 1" (age < 30 and name != "Bob") or not (score in range(10, 20))
