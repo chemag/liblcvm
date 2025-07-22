@@ -7,9 +7,9 @@ all: $(TARGET)
 
 # Compiler and flags
 CXX := g++
-CXXFLAGS := -std=c++17 -Wall -Wextra -O0 -g -I/usr/include/antlr4-runtime -Igen/
+CXXFLAGS := -std=c++17 -Wall -Wextra -O0 -g -I/usr/include/antlr4-runtime -Igen/ -I/opt/homebrew/include $(shell pkg-config --cflags protobuf) -I/usr/local/include/antlr4-runtime
 CXXFLAGS += -Wno-overloaded-virtual
-LDFLAGS := -lantlr4-runtime -lprotobuf
+LDFLAGS := $(shell pkg-config --libs protobuf) -lantlr4-runtime
 
 
 # Protobuf compiler
@@ -21,6 +21,9 @@ PROTO_GEN_SRCS := gen/rules.pb.cc gen/rules.pb.h
 $(PROTO_GEN_SRCS): $(PROTO_SRC)
 	$(PROTOC) --cpp_out=gen/ $(PROTO_SRC)
 
+gen/rules.pb.o: gen/rules.pb.cc gen/rules.pb.h
+
+antlr.main.o: gen/rules.pb.h
 
 # Source files
 SRCS := antlr.main.cpp \
@@ -34,7 +37,9 @@ SRCS := antlr.main.cpp \
         gen/rulesVisitor.cpp
 
 
-OBJS := $(SRCS:.cpp=.o)
+OBJS := $(patsubst %.cpp,%.o,$(filter %.cpp,$(SRCS))) \
+        $(patsubst %.cc,%.o,$(filter %.cc,$(SRCS)))
+
 
 gen/rulesLexer.interp: rules.g4
 	java -Xmx500M -cp antlr-4.13.1-complete.jar org.antlr.v4.Tool -Dlanguage=Cpp -visitor -o gen $<
@@ -53,6 +58,7 @@ gen/%.o: gen/%.cpp
 
 clean:
 	rm -f $(TARGET) $(OBJS)
+	rm -f $(PROTO_GEN_SRCS)
 
 realclean: clean
 	rm -f gen/*

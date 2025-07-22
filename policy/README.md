@@ -123,3 +123,30 @@ number
 * integrate into liblcvm
 * add unittest
 * add fuzzing
+
+
+# Installation Instructions (MacOS)
+
+Install required packages.
+```
+$ brew install protobuf antlr abseil pkgconf
+```
+
+
+MacOS needs to install antlr4 from source.
+```
+$ git clone https://github.com/antlr/antlr4.git
+$ cd antlr4
+$ cd runtime/Cpp
+$ mkdir build && cd build
+$ cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local -DANTLR4_INSTALL=ON
+$ make -j
+$ sudo make install
+```
+
+MacOS needs to run specifying the dylib directory:
+```
+$ DYLD_LIBRARY_PATH=/usr/local/lib ./antlr.main
+warn 1: true
+error 1: false
+```
