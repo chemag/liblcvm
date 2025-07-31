@@ -175,3 +175,8 @@ To resolve this issue, update the Xcode path in the Common.mk file:
 ```
 lib/isobmff/Submodules/makelib/Common.mk +75
 ```
+
+
+# Appendix 4: autogen notes
+
+* The antlr files were generated using antlr-4.13.1-complete.jar.

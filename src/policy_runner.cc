@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <list>
 #include <memory>
 #include <variant>
 
@@ -22,7 +23,7 @@ struct ParserContext {
   rulesParser::ProgramContext* tree = nullptr;
 };
 
-ParserContext createParserContext(const std::string& infile) {
+ParserContext create_parser_content(const std::string& infile) {
   ParserContext ctx;
 
   // Hold the stream open so it stays valid while ANTLRInputStream reads from it
@@ -75,7 +76,7 @@ void printContent(ParserContext& ctx, const std::string& outfile) {
   printTree(ctx.tree, ctx.parser.get(), outfile_stream);
 }
 
-dsl::RuleSet convertToProto(ParserContext& ctx) {
+dsl::RuleSet convert_parser_context_to_proto(ParserContext& ctx) {
   RulesToProtoVisitor visitor;
   dsl::RuleSet ruleSet;
 
@@ -105,7 +106,6 @@ void writeProtoToFile(dsl::RuleSet ruleSet, std::string outfile) {
 
 
 // variant operation
-using Value = std::variant<int, double, std::string>;
 
 template<typename T>
 double to_number(const T& value) {
@@ -114,35 +114,35 @@ double to_number(const T& value) {
     throw std::runtime_error("Unsupported numeric type");
 }
 
-double to_double(const Value& value) {
+double to_double(const LiblcvmValue& value) {
    if (std::holds_alternative<int>(value)) {
         return static_cast<double>(std::get<int>(value));
     } else if (std::holds_alternative<double>(value)) {
         return std::get<double>(value);
     } else {
-        throw std::runtime_error("Value is not numeric");
+        throw std::runtime_error("LiblcvmValue is not numeric");
     }
 }
 
-std::string to_string_value(const Value& value) {
+std::string to_string_value(const LiblcvmValue& value) {
     if (std::holds_alternative<std::string>(value)) {
         return std::get<std::string>(value);
     } else {
-        throw std::runtime_error("Value is not a string");
+        throw std::runtime_error("LiblcvmValue is not a string");
     }
 }
 
 
 // recursive evaluator
-bool evaluate_rule(const dsl::RuleSet& rules, const std::map<std::string, Value>& dict);
+bool evaluate_rule(const dsl::RuleSet& rules, const std::map<std::string, LiblcvmValue>& dict);
 
-bool eval_expr(const dsl::Expr& expr, const std::map<std::string, Value>& dict);
+bool eval_expr(const dsl::Expr& expr, const std::map<std::string, LiblcvmValue>& dict);
 
-bool eval_comparison(const dsl::Comparison& cmp, const std::map<std::string, Value>& dict) {
+bool eval_comparison(const dsl::Comparison& cmp, const std::map<std::string, LiblcvmValue>& dict) {
     auto it = dict.find(cmp.column());
     if (it == dict.end()) return false;
 
-    const Value& val = it->second;
+    const LiblcvmValue& val = it->second;
 
     if (cmp.op() == dsl::ComparisonOpType::EQ || cmp.op() == dsl::ComparisonOpType::NE) {
         if (std::holds_alternative<std::string>(val)) {
@@ -172,7 +172,7 @@ bool eval_comparison(const dsl::Comparison& cmp, const std::map<std::string, Val
     }
 }
 
-bool eval_range(const dsl::RangeCheck& range, const std::map<std::string, Value>& dict) {
+bool eval_range(const dsl::RangeCheck& range, const std::map<std::string, LiblcvmValue>& dict) {
     auto it = dict.find(range.column());
     if (it == dict.end()) return false;
 
@@ -183,11 +183,11 @@ bool eval_range(const dsl::RangeCheck& range, const std::map<std::string, Value>
     return val >= low && val <= high;
 }
 
-bool eval_not(const dsl::NotExpr& not_expr, const std::map<std::string, Value>& dict) {
+bool eval_not(const dsl::NotExpr& not_expr, const std::map<std::string, LiblcvmValue>& dict) {
     return !eval_expr(not_expr.expr(), dict);
 }
 
-bool eval_logical(const dsl::Logical& logic, const std::map<std::string, Value>& dict) {
+bool eval_logical(const dsl::Logical& logic, const std::map<std::string, LiblcvmValue>& dict) {
     switch (logic.op()) {
         case dsl::LogicOpType::AND:
             for (const auto& e : logic.operands())
@@ -202,7 +202,7 @@ bool eval_logical(const dsl::Logical& logic, const std::map<std::string, Value>&
     }
 }
 
-bool eval_expr(const dsl::Expr& expr, const std::map<std::string, Value>& dict) {
+bool eval_expr(const dsl::Expr& expr, const std::map<std::string, LiblcvmValue>& dict) {
     switch (expr.expr_kind_case()) {
         case dsl::Expr::kComparison: return eval_comparison(expr.comparison(), dict);
         case dsl::Expr::kRange:   return eval_range(expr.range(), dict);
@@ -213,40 +213,36 @@ bool eval_expr(const dsl::Expr& expr, const std::map<std::string, Value>& dict) 
 }
 
 
-void evaluate_rules(const dsl::RuleSet& rules, const std::map<std::string, Value>& dict) {
+void evaluate_rules(const dsl::RuleSet& rules, const std::map<std::string, LiblcvmValue>& dict, std::list<std::string>* warn_list, std::list<std::string>* error_list) {
     for (const auto& rule : rules.rules()) {
         bool result = eval_expr(rule.condition(), dict);
         std::cout << rule.label() << ": " << (result ? "true" : "false") << std::endl;
     }
+    // TODO(marko): the output right now is on stdout. Instead, we need to
+    // popular the warn and error lists with the rule names that match..
+    // 
 }
 
-// main file
-int main() {
-  auto infile = "input.txt";
-  auto outfile_text = "output.txt";
-  auto outfile = "output.pbtxt";
+
+int policy_runner(std::string policy_str, std::shared_ptr<std::map<std::string, LiblcvmValue>> pmap) {
 
   try {
-    // parse the file
-    auto ctx = createParserContext(infile);
-    try {
-      // print as text complains
-      printContent(ctx, outfile_text);
-    } catch (const std::exception& ex) {
-      // ignore it
-    }
-    // convert to protobuf
-    dsl::RuleSet ruleSet = convertToProto(ctx);
-    // print protobuf to text file
-    writeProtoToFile(ruleSet, outfile);
+    // 1. parse the file contents
+    // TODO(marko): This needs the file after having been read, not the file name)
+    ParserContext ctx = create_parser_content(infile);
+    //try {
+    //  // print as text complains
+    //  printContent(ctx, outfile_text);
+    //} catch (const std::exception& ex) {
+    //  // ignore it
+    //}
+    // 2. convert to parser content to protobuf
+    dsl::RuleSet ruleSet = convert_parser_context_to_proto(ctx);
+    //// print protobuf to text file
+    //writeProtoToFile(ruleSet, outfile);
 
-    // evaluate a dictionary against the config
-    std::map<std::string, Value> dict = {
-        {"age", 30},
-        {"name", std::string("Bob")},
-        {"score", 15.5}
-    };
-    evaluate_rules(ruleSet, dict);
+    // 3. evaluate the input dictionary against the config
+    evaluate_rules(ruleSet, pmap);
 
   } catch (const std::exception& ex) {
     std::cerr << "Fatal error: " << ex.what() << std::endl;

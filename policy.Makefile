@@ -1,4 +1,5 @@
 
+# TODO(marko): This Makefile should be integrated into the root (and autogen?) CMakeLists.txt file, after fixing all paths
 
 # Target
 TARGET := antlr.main
