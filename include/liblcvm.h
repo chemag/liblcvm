@@ -13,7 +13,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <map>
 #include <numeric>
+#include <variant>
 #include <vector>
 
 #define DECL_GETTER(name, type) \
@@ -243,6 +245,8 @@ class FrameInformation {
   friend class IsobmffFileInformation;
 };
 
+using LiblcvmValue = std::variant<int, double, std::string>;
+
 class LiblcvmConfig {
  private:
   // sort_by_pts: Whether to sort the frames by PTS values.
@@ -287,6 +291,14 @@ class IsobmffFileInformation {
   // @param[in] liblcvm_config: Parsing configuration.
   // @return ptr: Full ISOBMFF information.
   static std::shared_ptr<IsobmffFileInformation> parse(
+      const char *infile, const LiblcvmConfig &liblcvm_config);
+
+  // @brief Parse an ISOBMFF file into a map (dictionary).
+  //
+  // @param[in] infile: Name of the file to be parsed.
+  // @param[in] liblcvm_config: Parsing configuration.
+  // @return ptr: Full ISOBMFF information, as a map.
+  static std::shared_ptr<std::map<std::string, LiblcvmValue>> parse_to_map(
       const char *infile, const LiblcvmConfig &liblcvm_config);
 
   // Private constructor to prevent direct instantiation

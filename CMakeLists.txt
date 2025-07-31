@@ -2,8 +2,12 @@ cmake_minimum_required(VERSION 3.10)
 
 project(lcvm VERSION 0.17)
 
-set(CMAKE_CXX_STANDARD 14)
+# use C++17
+set(CMAKE_CXX_STANDARD 17)
+# enforce the standard (don't allow fallback)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# use -std=c++17, not -std=gnu++17
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 
 # Set compiler flags

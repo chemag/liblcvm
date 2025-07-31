@@ -55,6 +55,8 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     }
   }
 
+  // TODO(marko): reimplement this using the new API function
+
   // 1. write CSV header
   fprintf(outfp,
           "infile,filesize,bitrate_bps,width,height,type,"

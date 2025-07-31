@@ -22,6 +22,7 @@
 #include <cmath>        // for sqrt
 #include <cstdio>       // for fprintf, stderr, stdout
 #include <memory>       // for shared_ptr, operator==, __shared...
+#include <map>          // for map
 #include <numeric>      // for accumulate
 #include <string>       // for basic_string, string
 #include <vector>       // for vector
@@ -32,6 +33,29 @@
 
 void IsobmffFileInformation::get_liblcvm_version(std::string &version) {
   version = PROJECT_VER;
+}
+
+std::shared_ptr<std::map<std::string, LiblcvmValue>>
+IsobmffFileInformation::parse_to_map(const char *infile,
+                                     const LiblcvmConfig &liblcvm_config) {
+  // parse the infile
+  std::shared_ptr<IsobmffFileInformation> pobj =
+      IsobmffFileInformation::parse(infile, liblcvm_config);
+  // convert to a generic map
+  std::shared_ptr<std::map<std::string, LiblcvmValue>> pmap;
+  // convert the object into a generic string->Value dictionary
+  // Value is a variant
+  // TODO(marko): implement this
+  // use code in parse_files() from tools/lcvm.cc
+  // * keep the exact same key names from the "write CSV header" section
+  // * keep the exact same code to obtain the different objects that are dumped
+  // in Section 2.4 ("dump all output")
+  // * emplace every elements as follows:
+  // pmap.emplace("infile", infile);
+  // pmap.emplace("filesize", filesize);
+  // ...
+
+  return pmap;
 }
 
 std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
