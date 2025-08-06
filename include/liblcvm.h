@@ -299,7 +299,7 @@ class IsobmffFileInformation {
   // @param[in] liblcvm_config: Parsing configuration.
   // @return ptr: Full ISOBMFF information, as a map.
   static std::shared_ptr<std::map<std::string, LiblcvmValue>> parse_to_map(
-      const char *infile, const LiblcvmConfig &liblcvm_config);
+      const char *infile, const LiblcvmConfig &liblcvm_config, const std::string& policy_str);
 
   // Private constructor to prevent direct instantiation
   IsobmffFileInformation() = default;
