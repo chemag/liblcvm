@@ -6,11 +6,13 @@
 #include <memory>
 #include <variant>
 
-#include "antlr.protovisitor.h"
+#include "liblcvm.h"
+
+#include "policy_protovisitor.h"
 #include "antlr4-runtime.h"
-#include "gen/rules.pb.h"
-#include "gen/rulesLexer.h"
-#include "gen/rulesParser.h"
+#include "rules.pb.h"
+#include "rulesLexer.h"
+#include "rulesParser.h"
 #include "tree/Trees.h"
 
 struct ParserContext {
@@ -216,34 +218,37 @@ bool eval_expr(const dsl::Expr& expr, const std::map<std::string, LiblcvmValue>&
 void evaluate_rules(const dsl::RuleSet& rules, const std::map<std::string, LiblcvmValue>& dict, std::list<std::string>* warn_list, std::list<std::string>* error_list) {
     for (const auto& rule : rules.rules()) {
         bool result = eval_expr(rule.condition(), dict);
-        std::cout << rule.label() << ": " << (result ? "true" : "false") << std::endl;
+        if (result) {
+            if (rule.severity() == dsl::SeverityType::WARN && warn_list) {
+                warn_list->push_back(rule.label());
+            } else if (rule.severity() == dsl::SeverityType::ERROR && error_list) {
+                error_list->push_back(rule.label());
+            }
+        }
     }
-    // TODO(marko): the output right now is on stdout. Instead, we need to
-    // popular the warn and error lists with the rule names that match..
-    // 
 }
 
+ParserContext create_parser_content_from_string(const std::string& policy_str) {
+    ParserContext ctx;
+    ctx.input = std::make_unique<antlr4::ANTLRInputStream>(policy_str);
+    ctx.lexer = std::make_unique<rulesLexer>(ctx.input.get());
+    ctx.tokens = std::make_unique<antlr4::CommonTokenStream>(ctx.lexer.get());
+    ctx.parser = std::make_unique<rulesParser>(ctx.tokens.get());
+    ctx.tree = ctx.parser->program();
+    if (!ctx.tree || ctx.tree->children.empty()) {
+        throw std::runtime_error("Parse error: Empty or invalid input");
+    }
+    return ctx;
+}
 
-int policy_runner(std::string policy_str, std::shared_ptr<std::map<std::string, LiblcvmValue>> pmap) {
-
+int policy_runner(const std::string& policy_str,
+                  std::shared_ptr<std::map<std::string, LiblcvmValue>> pmap,
+                  std::list<std::string>* warn_list,
+                  std::list<std::string>* error_list) {
   try {
-    // 1. parse the file contents
-    // TODO(marko): This needs the file after having been read, not the file name)
-    ParserContext ctx = create_parser_content(infile);
-    //try {
-    //  // print as text complains
-    //  printContent(ctx, outfile_text);
-    //} catch (const std::exception& ex) {
-    //  // ignore it
-    //}
-    // 2. convert to parser content to protobuf
+    ParserContext ctx = create_parser_content_from_string(policy_str);
     dsl::RuleSet ruleSet = convert_parser_context_to_proto(ctx);
-    //// print protobuf to text file
-    //writeProtoToFile(ruleSet, outfile);
-
-    // 3. evaluate the input dictionary against the config
-    evaluate_rules(ruleSet, pmap);
-
+    evaluate_rules(ruleSet, *pmap, warn_list, error_list);
   } catch (const std::exception& ex) {
     std::cerr << "Fatal error: " << ex.what() << std::endl;
     return 1;
