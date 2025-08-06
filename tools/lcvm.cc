@@ -379,354 +379,204 @@ int parse_files_with_policy(
 
 int parse_files(std::vector<std::string> &infile_list, char *outfile,
                 char *outfile_timestamps, bool outfile_timestamps_sort_pts,
-                int debug) {
-  // 0. open outfile
-  FILE *outfp;
-  if (outfile == nullptr || (strlen(outfile) == 1 && outfile[0] == '-')) {
-    // use stdout
-    outfp = stdout;
-  } else {
-    outfp = fopen(outfile, "wb");
-    if (outfp == nullptr) {
-      // did not work
-      fprintf(stderr, "Could not open output file: \"%s\"\n", outfile);
-      return -1;
-    }
-  }
-
-  // TODO(marko): reimplement this using the new API function
-
-  // 1. write CSV header
-  fprintf(outfp,
-          "infile,filesize,bitrate_bps,width,height,type,"
-          "horizresolution,vertresolution,"
-          "depth,chroma_format,bit_depth_luma,bit_depth_chroma,"
-          "video_full_range_flag,"
-          "colour_primaries,"
-          "transfer_characteristics,"
-          "matrix_coeffs,"
-          "num_video_frames,frame_rate_fps_median,frame_rate_fps_average,"
-          "frame_rate_fps_reverse_average,frame_rate_fps_stddev,video_freeze,"
-          "audio_video_ratio,duration_video_sec,duration_audio_sec,"
-          "timescale_video_hz,timescale_audio_hz,"
-          "pts_duration_sec_average,pts_duration_sec_median,"
-          "pts_duration_sec_stddev,pts_duration_sec_mad,"
-          "frame_drop_count,frame_drop_ratio,"
-          "normalized_frame_drop_average_length,"
-          "frame_drop_length_percentile_50,frame_drop_length_percentile_90,"
-          "frame_drop_length_consecutive_2,frame_drop_length_consecutive_5,"
-          "num_video_keyframes,key_frame_ratio,"
-          "audio_type,channel_count,sample_rate,sample_size\n");
-
-  // 2. write CSV rows
-  std::map<std::string, std::vector<uint32_t>> frame_num_orig_list_dict;
-  std::map<std::string, std::vector<uint32_t>> stts_unit_list_dict;
-  std::map<std::string, std::vector<int32_t>> ctts_unit_list_dict;
-  std::map<std::string, std::vector<float>> dts_sec_list_dict;
-  std::map<std::string, std::vector<float>> pts_sec_list_dict;
-  std::map<std::string, std::vector<float>> pts_duration_sec_list_dict;
-  std::map<std::string, std::vector<float>> pts_duration_delta_sec_list_dict;
-
-  auto liblcvm_config = std::make_unique<LiblcvmConfig>();
-  liblcvm_config->set_sort_by_pts(outfile_timestamps_sort_pts);
-  liblcvm_config->set_debug(debug);
-  for (const auto &infile : infile_list) {
-    // 2.1. analyze file
-    std::shared_ptr<IsobmffFileInformation> ptr =
-        IsobmffFileInformation::parse(infile.c_str(), *liblcvm_config);
-    if (ptr == nullptr) {
-      fprintf(stderr, "error: IsobmffFileInformation::parse() in %s\n",
-              infile.c_str());
-      continue;
+                int debug, const std::string& policy_str) {
+    // 0. open outfile
+    FILE *outfp;
+    if (outfile == nullptr || (strlen(outfile) == 1 && outfile[0] == '-')) {
+        outfp = stdout;
+    } else {
+        outfp = fopen(outfile, "wb");
+        if (outfp == nullptr) {
+            fprintf(stderr, "Could not open output file: \"%s\"\n", outfile);
+            return -1;
+        }
     }
 
-    // 2.2 get information
-    auto filesize = ptr->get_frame().get_filesize();
-    auto bitrate_bps = ptr->get_frame().get_bitrate_bps();
-    auto width = ptr->get_frame().get_width();
-    auto height = ptr->get_frame().get_height();
-    auto type = ptr->get_frame().get_type();
-    // int width2 = ptr->get_frame().get_width2();
-    // int height2 = ptr->get_frame().get_height2();
-    auto horizresolution = ptr->get_frame().get_horizresolution();
-    auto vertresolution = ptr->get_frame().get_vertresolution();
-    auto depth = ptr->get_frame().get_depth();
-    auto chroma_format = ptr->get_frame().get_chroma_format();
-    auto bit_depth_luma = ptr->get_frame().get_bit_depth_luma();
-    auto bit_depth_chroma = ptr->get_frame().get_bit_depth_chroma();
-    auto video_full_range_flag = ptr->get_frame().get_video_full_range_flag();
-    auto colour_primaries = ptr->get_frame().get_colour_primaries();
-    auto transfer_characteristics =
-        ptr->get_frame().get_transfer_characteristics();
-    auto matrix_coeffs = ptr->get_frame().get_matrix_coeffs();
+    // 1. write CSV header
+    const std::vector<std::string> csv_keys = {
+        "infile", "filesize", "bitrate_bps", "width", "height", "type",
+        "horizresolution", "vertresolution", "depth", "chroma_format",
+        "bit_depth_luma", "bit_depth_chroma", "video_full_range_flag",
+        "colour_primaries", "transfer_characteristics", "matrix_coeffs",
+        "num_video_frames", "frame_rate_fps_median", "frame_rate_fps_average",
+        "frame_rate_fps_reverse_average", "frame_rate_fps_stddev", "video_freeze",
+        "audio_video_ratio", "duration_video_sec", "duration_audio_sec",
+        "timescale_video_hz", "timescale_audio_hz", "pts_duration_sec_average",
+        "pts_duration_sec_median", "pts_duration_sec_stddev", "pts_duration_sec_mad",
+        "frame_drop_count", "frame_drop_ratio", "normalized_frame_drop_average_length",
+        "frame_drop_length_percentile_50", "frame_drop_length_percentile_90",
+        "frame_drop_length_consecutive_2", "frame_drop_length_consecutive_5",
+        "num_video_keyframes", "key_frame_ratio", "audio_type", "channel_count",
+        "sample_rate", "sample_size", "warn_list", "error_list"
+    };
 
-    auto video_freeze = ptr->get_timing().get_video_freeze();
-    auto audio_video_ratio = ptr->get_timing().get_audio_video_ratio();
-    auto duration_video_sec = ptr->get_timing().get_duration_video_sec();
-    auto duration_audio_sec = ptr->get_timing().get_duration_audio_sec();
-    auto timescale_video_hz = ptr->get_timing().get_timescale_video_hz();
-    auto timescale_audio_hz = ptr->get_timing().get_timescale_audio_hz();
-    auto pts_duration_sec_average =
-        ptr->get_timing().get_pts_duration_sec_average();
-    auto pts_duration_sec_median =
-        ptr->get_timing().get_pts_duration_sec_median();
-    auto pts_duration_sec_stddev =
-        ptr->get_timing().get_pts_duration_sec_stddev();
-    auto pts_duration_sec_mad = ptr->get_timing().get_pts_duration_sec_mad();
-    auto num_video_frames = ptr->get_timing().get_num_video_frames();
-    auto frame_rate_fps_median = ptr->get_timing().get_frame_rate_fps_median();
-    auto frame_rate_fps_average =
-        ptr->get_timing().get_frame_rate_fps_average();
-    auto frame_rate_fps_reverse_average =
-        ptr->get_timing().get_frame_rate_fps_reverse_average();
-    auto frame_rate_fps_stddev = ptr->get_timing().get_frame_rate_fps_stddev();
-    auto frame_drop_count = ptr->get_timing().get_frame_drop_count();
-    auto frame_drop_ratio = ptr->get_timing().get_frame_drop_ratio();
-    auto normalized_frame_drop_average_length =
-        ptr->get_timing().get_normalized_frame_drop_average_length();
+    for (size_t i = 0; i < csv_keys.size(); ++i) {
+        fprintf(outfp, "%s%s", csv_keys[i].c_str(), (i + 1 < csv_keys.size()) ? "," : "\n");
+    }
 
-    std::vector<float> percentile_list = {50, 90};
-    std::vector<float> frame_drop_length_percentile_list;
-    ptr->get_timing().calculate_percentile_list(
-        percentile_list, frame_drop_length_percentile_list, debug);
+    // 2. write CSV rows
+    std::map<std::string, std::vector<uint32_t>> frame_num_orig_list_dict;
+    std::map<std::string, std::vector<uint32_t>> stts_unit_list_dict;
+    std::map<std::string, std::vector<int32_t>> ctts_unit_list_dict;
+    std::map<std::string, std::vector<float>> dts_sec_list_dict;
+    std::map<std::string, std::vector<float>> pts_sec_list_dict;
+    std::map<std::string, std::vector<float>> pts_duration_sec_list_dict;
+    std::map<std::string, std::vector<float>> pts_duration_delta_sec_list_dict;
 
-    std::vector<int> consecutive_list = {2, 5};
-    std::vector<long int> frame_drop_length_consecutive;
-    ptr->get_timing().calculate_consecutive_list(
-        consecutive_list, frame_drop_length_consecutive, debug);
+    auto liblcvm_config = std::make_unique<LiblcvmConfig>();
+    liblcvm_config->set_sort_by_pts(outfile_timestamps_sort_pts);
+    liblcvm_config->set_debug(debug);
 
-    // 2.3. get video structure info
-    auto num_video_keyframes = ptr->get_timing().get_num_video_keyframes();
-    auto key_frame_ratio = ptr->get_timing().get_key_frame_ratio();
+    for (const auto &infile : infile_list) {
+        std::shared_ptr<std::map<std::string, LiblcvmValue>> pmap =
+        IsobmffFileInformation::parse_to_map(infile.c_str(), *liblcvm_config, policy_str);
+        if (!pmap) {
+            fprintf(stderr, "error: IsobmffFileInformation::parse_to_map() in %s\n", infile.c_str());
+            continue;
+        }
+        // Write CSV row in the correct order
+        for (size_t i = 0; i < csv_keys.size(); ++i) {
+            const std::string &key = csv_keys[i];
+            auto it = pmap->find(key);
+            if (it == pmap->end()) {
+                fprintf(outfp, "%s", (i + 1 < csv_keys.size()) ? "," : "\n");
+                continue;
+            }
+            std::string value = to_csv_string(it->second);
+            fprintf(outfp, "%s%s", csv_escape(value).c_str(), (i + 1 < csv_keys.size()) ? "," : "\n");
+        }
 
-    // 2.3.1 get audio structure info
-    auto audio_type = ptr->get_audio().get_audio_type();
-    auto channel_count = ptr->get_audio().get_channel_count();
-    auto sample_rate = ptr->get_audio().get_sample_rate();
-    auto sample_size = ptr->get_audio().get_sample_size();
+        // 2.4. capture outfile timestamps
+        if (outfile_timestamps != nullptr) {
+            std::shared_ptr<IsobmffFileInformation> ptr =
+                IsobmffFileInformation::parse(infile.c_str(), *liblcvm_config);
+            if (ptr != nullptr) {
+                frame_num_orig_list_dict[infile] = ptr->get_timing().get_frame_num_orig_list();
+                stts_unit_list_dict[infile] = ptr->get_timing().get_stts_unit_list();
+                ctts_unit_list_dict[infile] = ptr->get_timing().get_ctts_unit_list();
+                dts_sec_list_dict[infile] = ptr->get_timing().get_dts_sec_list();
+                pts_sec_list_dict[infile] = ptr->get_timing().get_pts_sec_list();
+                pts_duration_sec_list_dict[infile] = ptr->get_timing().get_pts_duration_sec_list();
+                pts_duration_delta_sec_list_dict[infile] = ptr->get_timing().get_pts_duration_delta_sec_list();
+            }
+        }
+    }
 
-    // 2.4. dump all output
-    fprintf(outfp, "%s", infile.c_str());
-    fprintf(outfp, ",%i", filesize);
-    fprintf(outfp, ",%f", bitrate_bps);
-    fprintf(outfp, ",%f", width);
-    fprintf(outfp, ",%f", height);
-    fprintf(outfp, ",%s", type.c_str());
-    // fprintf(outfp, ",%i", width2);
-    // fprintf(outfp, ",%i", height2);
-    fprintf(outfp, ",%u", horizresolution);
-    fprintf(outfp, ",%u", vertresolution);
-    fprintf(outfp, ",%u", depth);
-    fprintf(outfp, ",%i", chroma_format);
-    fprintf(outfp, ",%i", bit_depth_luma);
-    fprintf(outfp, ",%i", bit_depth_chroma);
-    fprintf(outfp, ",%i", video_full_range_flag);
-    fprintf(outfp, ",%i", colour_primaries);
-    fprintf(outfp, ",%i", transfer_characteristics);
-    fprintf(outfp, ",%i", matrix_coeffs);
-    fprintf(outfp, ",%i", num_video_frames);
-    fprintf(outfp, ",%f", frame_rate_fps_median);
-    fprintf(outfp, ",%f", frame_rate_fps_average);
-    fprintf(outfp, ",%f", frame_rate_fps_reverse_average);
-    fprintf(outfp, ",%f", frame_rate_fps_stddev);
-    fprintf(outfp, ",%i", video_freeze ? 1 : 0);
-    fprintf(outfp, ",%f", audio_video_ratio);
-    fprintf(outfp, ",%f", duration_video_sec);
-    fprintf(outfp, ",%f", duration_audio_sec);
-    fprintf(outfp, ",%u", timescale_video_hz);
-    fprintf(outfp, ",%u", timescale_audio_hz);
-    fprintf(outfp, ",%f", pts_duration_sec_average);
-    fprintf(outfp, ",%f", pts_duration_sec_median);
-    fprintf(outfp, ",%f", pts_duration_sec_stddev);
-    fprintf(outfp, ",%f", pts_duration_sec_mad);
-    fprintf(outfp, ",%i", frame_drop_count);
-    fprintf(outfp, ",%f", frame_drop_ratio);
-    fprintf(outfp, ",%f", normalized_frame_drop_average_length);
-    fprintf(outfp, ",%f", frame_drop_length_percentile_list[0]);
-    fprintf(outfp, ",%f", frame_drop_length_percentile_list[1]);
-    fprintf(outfp, ",%ld", frame_drop_length_consecutive[0]);
-    fprintf(outfp, ",%ld", frame_drop_length_consecutive[1]);
-    fprintf(outfp, ",%i", num_video_keyframes);
-    fprintf(outfp, ",%f", key_frame_ratio);
-    fprintf(outfp, ",%s", audio_type.c_str());
-    fprintf(outfp, ",%i", channel_count);
-    fprintf(outfp, ",%i", sample_rate);
-    fprintf(outfp, ",%i", sample_size);
-    fprintf(outfp, "\n");
-
-    // 2.4. capture outfile timestamps
+    // 3. dump outfile timestamps
     if (outfile_timestamps != nullptr) {
-      std::vector<uint32_t> frame_num_orig_list =
-          ptr->get_timing().get_frame_num_orig_list();
-      std::vector<uint32_t> stts_unit_list =
-          ptr->get_timing().get_stts_unit_list();
-      std::vector<int32_t> ctts_unit_list =
-          ptr->get_timing().get_ctts_unit_list();
-      std::vector<float> dts_sec_list = ptr->get_timing().get_dts_sec_list();
-      std::vector<float> pts_sec_list = ptr->get_timing().get_pts_sec_list();
-      std::vector<float> pts_duration_sec_list =
-          ptr->get_timing().get_pts_duration_sec_list();
-      std::vector<float> pts_duration_delta_sec_list =
-          ptr->get_timing().get_pts_duration_delta_sec_list();
-      // store the values
-      frame_num_orig_list_dict[infile] = frame_num_orig_list;
-      stts_unit_list_dict[infile] = stts_unit_list;
-      ctts_unit_list_dict[infile] = ctts_unit_list;
-      dts_sec_list_dict[infile] = dts_sec_list;
-      pts_sec_list_dict[infile] = pts_sec_list;
-      pts_duration_sec_list_dict[infile] = pts_duration_sec_list;
-      pts_duration_delta_sec_list_dict[infile] = pts_duration_delta_sec_list;
-    }
-  }
-
-  // 3. dump outfile timestamps
-  if (outfile_timestamps != nullptr) {
-    // 3.1. get the number of frames of the longest file
-    size_t max_number_of_frames = 0;
-    for (const auto &entry : frame_num_orig_list_dict) {
-      const std::vector<uint32_t> &frame_num_orig_list = entry.second;
-      max_number_of_frames =
-          std::max(max_number_of_frames, frame_num_orig_list.size());
-    }
-    // 3.2. open outfile_timestamps
-    FILE *outtsfp = fopen(outfile_timestamps, "wb");
-    if (outtsfp == nullptr) {
-      // did not work
-      fprintf(stderr, "Could not open output file: \"%s\"\n",
-              outfile_timestamps);
-      return -1;
-    }
-    // 3.3. dump the file names
-    fprintf(outtsfp, "frame_num");
-    long unsigned infile_list_size = infile_list.size();
-    for (const auto &entry : stts_unit_list_dict) {
-      const std::string &infile = entry.first;
-      fprintf(outtsfp, ",frame_num_orig");
-      if (infile_list_size > 1) {
-        fprintf(outtsfp, "_%s", infile.c_str());
-      }
-    }
-    for (const auto &entry : stts_unit_list_dict) {
-      const std::string &infile = entry.first;
-      fprintf(outtsfp, ",stts");
-      if (infile_list_size > 1) {
-        fprintf(outtsfp, "_%s", infile.c_str());
-      }
-    }
-    for (const auto &entry : stts_unit_list_dict) {
-      const std::string &infile = entry.first;
-      fprintf(outtsfp, ",ctts");
-      if (infile_list_size > 1) {
-        fprintf(outtsfp, "_%s", infile.c_str());
-      }
-    }
-    for (const auto &entry : stts_unit_list_dict) {
-      const std::string &infile = entry.first;
-      fprintf(outtsfp, ",dts");
-      if (infile_list_size > 1) {
-        fprintf(outtsfp, "_%s", infile.c_str());
-      }
-    }
-    for (const auto &entry : stts_unit_list_dict) {
-      const std::string &infile = entry.first;
-      fprintf(outtsfp, ",pts");
-      if (infile_list_size > 1) {
-        fprintf(outtsfp, "_%s", infile.c_str());
-      }
-    }
-    for (const auto &entry : stts_unit_list_dict) {
-      const std::string &infile = entry.first;
-      fprintf(outtsfp, ",pts_duration");
-      if (infile_list_size > 1) {
-        fprintf(outtsfp, "_%s", infile.c_str());
-      }
-    }
-    for (const auto &entry : stts_unit_list_dict) {
-      const std::string &infile = entry.first;
-      fprintf(outtsfp, ",pts_duration_delta");
-      if (infile_list_size > 1) {
-        fprintf(outtsfp, "_%s", infile.c_str());
-      }
-    }
-    fprintf(outtsfp, "\n");
-    // 3.4. dump the columns of inter-frame timestamps
-    for (size_t frame_num = 0; frame_num < max_number_of_frames; ++frame_num) {
-      fprintf(outtsfp, "%li", frame_num);
-      // get frame_num_orig_list[frame_num]
-      for (const auto &entry : frame_num_orig_list_dict) {
-        const std::vector<uint32_t> &frame_num_orig_list = entry.second;
-        if (frame_num < frame_num_orig_list.size()) {
-          uint32_t frame_num_orig = frame_num_orig_list[frame_num];
-          fprintf(outtsfp, ",%u", frame_num_orig);
-        } else {
-          fprintf(outtsfp, ",");
+        size_t max_number_of_frames = 0;
+        for (const auto &entry : frame_num_orig_list_dict) {
+            const std::vector<uint32_t> &frame_num_orig_list = entry.second;
+            max_number_of_frames = std::max(max_number_of_frames, frame_num_orig_list.size());
         }
-      }
-      // dump stts_unit_list[frame_num]
-      for (const auto &entry : stts_unit_list_dict) {
-        const std::vector<uint32_t> &stts_unit_list = entry.second;
-        if (frame_num < stts_unit_list.size()) {
-          uint32_t stts_unit = stts_unit_list[frame_num];
-          fprintf(outtsfp, ",%u", stts_unit);
-        } else {
-          fprintf(outtsfp, ",");
+        FILE *outtsfp = fopen(outfile_timestamps, "wb");
+        if (outtsfp == nullptr) {
+            fprintf(stderr, "Could not open output file: \"%s\"\n", outfile_timestamps);
+            if (outfp != stdout) fclose(outfp);
+            return -1;
         }
-      }
-      // dump ctts_sec_list[frame_num]
-      for (const auto &entry : ctts_unit_list_dict) {
-        const std::vector<int32_t> &ctts_unit_list = entry.second;
-        if (frame_num < ctts_unit_list.size()) {
-          int32_t ctts_unit = ctts_unit_list[frame_num];
-          fprintf(outtsfp, ",%i", ctts_unit);
-        } else {
-          fprintf(outtsfp, ",");
+        fprintf(outtsfp, "frame_num");
+        long unsigned infile_list_size = infile_list.size();
+        for (const auto &entry : stts_unit_list_dict) {
+            const std::string &infile = entry.first;
+            fprintf(outtsfp, ",frame_num_orig");
+            if (infile_list_size > 1) fprintf(outtsfp, "_%s", infile.c_str());
         }
-      }
-      // dump dts_sec_list[frame_num]
-      for (const auto &entry : dts_sec_list_dict) {
-        const std::vector<float> &dts_sec_list = entry.second;
-        if (frame_num < dts_sec_list.size()) {
-          float dts = dts_sec_list[frame_num];
-          fprintf(outtsfp, ",%f", dts);
-        } else {
-          fprintf(outtsfp, ",");
+        for (const auto &entry : stts_unit_list_dict) {
+            const std::string &infile = entry.first;
+            fprintf(outtsfp, ",stts");
+            if (infile_list_size > 1) fprintf(outtsfp, "_%s", infile.c_str());
         }
-      }
-      // dump pts_sec_list[frame_num]
-      for (const auto &entry : pts_sec_list_dict) {
-        const std::vector<float> &pts_sec_list = entry.second;
-        if (frame_num < pts_sec_list.size()) {
-          float pts = pts_sec_list[frame_num];
-          fprintf(outtsfp, ",%f", pts);
-        } else {
-          fprintf(outtsfp, ",");
+        for (const auto &entry : stts_unit_list_dict) {
+            const std::string &infile = entry.first;
+            fprintf(outtsfp, ",ctts");
+            if (infile_list_size > 1) fprintf(outtsfp, "_%s", infile.c_str());
         }
-      }
-      // dump pts_duration_sec_list[frame_num]
-      for (const auto &entry : pts_duration_sec_list_dict) {
-        const std::vector<float> &pts_duration_sec_list = entry.second;
-        if (frame_num < pts_duration_sec_list.size()) {
-          float pts_duration = pts_duration_sec_list[frame_num];
-          fprintf(outtsfp, ",%f", pts_duration);
-        } else {
-          fprintf(outtsfp, ",");
+        for (const auto &entry : stts_unit_list_dict) {
+            const std::string &infile = entry.first;
+            fprintf(outtsfp, ",dts");
+            if (infile_list_size > 1) fprintf(outtsfp, "_%s", infile.c_str());
         }
-      }
-      // dump pts_duration_delta_sec_list[frame_num]
-      for (const auto &entry : pts_duration_delta_sec_list_dict) {
-        const std::vector<float> &pts_duration_delta_sec_list = entry.second;
-        if (frame_num < pts_duration_delta_sec_list.size()) {
-          float pts_duration = pts_duration_delta_sec_list[frame_num];
-          fprintf(outtsfp, ",%f", pts_duration);
-        } else {
-          fprintf(outtsfp, ",");
+        for (const auto &entry : stts_unit_list_dict) {
+            const std::string &infile = entry.first;
+            fprintf(outtsfp, ",pts");
+            if (infile_list_size > 1) fprintf(outtsfp, "_%s", infile.c_str());
         }
-      }
-      fprintf(outtsfp, "\n");
+        for (const auto &entry : stts_unit_list_dict) {
+            const std::string &infile = entry.first;
+            fprintf(outtsfp, ",pts_duration");
+            if (infile_list_size > 1) fprintf(outtsfp, "_%s", infile.c_str());
+        }
+        for (const auto &entry : stts_unit_list_dict) {
+            const std::string &infile = entry.first;
+            fprintf(outtsfp, ",pts_duration_delta");
+            if (infile_list_size > 1) fprintf(outtsfp, "_%s", infile.c_str());
+        }
+        fprintf(outtsfp, "\n");
+        for (size_t frame_num = 0; frame_num < max_number_of_frames; ++frame_num) {
+            fprintf(outtsfp, "%zu", frame_num);
+            for (const auto &entry : frame_num_orig_list_dict) {
+                const std::vector<uint32_t> &frame_num_orig_list = entry.second;
+                if (frame_num < frame_num_orig_list.size()) {
+                    fprintf(outtsfp, ",%u", frame_num_orig_list[frame_num]);
+                } else {
+                    fprintf(outtsfp, ",");
+                }
+            }
+            for (const auto &entry : stts_unit_list_dict) {
+                const std::vector<uint32_t> &stts_unit_list = entry.second;
+                if (frame_num < stts_unit_list.size()) {
+                    fprintf(outtsfp, ",%u", stts_unit_list[frame_num]);
+                } else {
+                    fprintf(outtsfp, ",");
+                }
+            }
+            for (const auto &entry : ctts_unit_list_dict) {
+                const std::vector<int32_t> &ctts_unit_list = entry.second;
+                if (frame_num < ctts_unit_list.size()) {
+                    fprintf(outtsfp, ",%i", ctts_unit_list[frame_num]);
+                } else {
+                    fprintf(outtsfp, ",");
+                }
+            }
+            for (const auto &entry : dts_sec_list_dict) {
+                const std::vector<float> &dts_sec_list = entry.second;
+                if (frame_num < dts_sec_list.size()) {
+                    fprintf(outtsfp, ",%f", dts_sec_list[frame_num]);
+                } else {
+                    fprintf(outtsfp, ",");
+                }
+            }
+            for (const auto &entry : pts_sec_list_dict) {
+                const std::vector<float> &pts_sec_list = entry.second;
+                if (frame_num < pts_sec_list.size()) {
+                    fprintf(outtsfp, ",%f", pts_sec_list[frame_num]);
+                } else {
+                    fprintf(outtsfp, ",");
+                }
+            }
+            for (const auto &entry : pts_duration_sec_list_dict) {
+                const std::vector<float> &pts_duration_sec_list = entry.second;
+                if (frame_num < pts_duration_sec_list.size()) {
+                    fprintf(outtsfp, ",%f", pts_duration_sec_list[frame_num]);
+                } else {
+                    fprintf(outtsfp, ",");
+                }
+            }
+            for (const auto &entry : pts_duration_delta_sec_list_dict) {
+                const std::vector<float> &pts_duration_delta_sec_list = entry.second;
+                if (frame_num < pts_duration_delta_sec_list.size()) {
+                    fprintf(outtsfp, ",%f", pts_duration_delta_sec_list[frame_num]);
+                } else {
+                    fprintf(outtsfp, ",");
+                }
+            }
+            fprintf(outtsfp, "\n");
+        }
+        fclose(outtsfp);
     }
-  }
-
-  return 0;
+    if (outfp != stdout) fclose(outfp);
+    return 0;
 }
 
 void usage(char *name) {
