@@ -6,10 +6,9 @@
 #include <memory>
 #include <variant>
 
-#include "liblcvm.h"
-
-#include "policy_protovisitor.h"
 #include "antlr4-runtime.h"
+#include "liblcvm.h"
+#include "policy_protovisitor.h"
 #include "rules.pb.h"
 #include "rulesLexer.h"
 #include "rulesParser.h"
@@ -106,139 +105,156 @@ void writeProtoToFile(dsl::RuleSet ruleSet, std::string outfile) {
   outfile_stream.close();
 }
 
-
 // variant operation
 
-template<typename T>
+template <typename T>
 double to_number(const T& value) {
-    if constexpr (std::is_same_v<T, int>) return static_cast<double>(value);
-    if constexpr (std::is_same_v<T, double>) return value;
-    throw std::runtime_error("Unsupported numeric type");
+  if constexpr (std::is_same_v<T, int>) return static_cast<double>(value);
+  if constexpr (std::is_same_v<T, double>) return value;
+  throw std::runtime_error("Unsupported numeric type");
 }
 
 double to_double(const LiblcvmValue& value) {
-   if (std::holds_alternative<int>(value)) {
-        return static_cast<double>(std::get<int>(value));
-    } else if (std::holds_alternative<double>(value)) {
-        return std::get<double>(value);
-    } else {
-        throw std::runtime_error("LiblcvmValue is not numeric");
-    }
+  if (std::holds_alternative<int>(value)) {
+    return static_cast<double>(std::get<int>(value));
+  } else if (std::holds_alternative<double>(value)) {
+    return std::get<double>(value);
+  } else {
+    throw std::runtime_error("LiblcvmValue is not numeric");
+  }
 }
 
 std::string to_string_value(const LiblcvmValue& value) {
-    if (std::holds_alternative<std::string>(value)) {
-        return std::get<std::string>(value);
-    } else {
-        throw std::runtime_error("LiblcvmValue is not a string");
-    }
+  if (std::holds_alternative<std::string>(value)) {
+    return std::get<std::string>(value);
+  } else {
+    throw std::runtime_error("LiblcvmValue is not a string");
+  }
 }
-
 
 // recursive evaluator
-bool evaluate_rule(const dsl::RuleSet& rules, const std::map<std::string, LiblcvmValue>& dict);
+bool evaluate_rule(const dsl::RuleSet& rules,
+                   const std::map<std::string, LiblcvmValue>& dict);
 
-bool eval_expr(const dsl::Expr& expr, const std::map<std::string, LiblcvmValue>& dict);
+bool eval_expr(const dsl::Expr& expr,
+               const std::map<std::string, LiblcvmValue>& dict);
 
-bool eval_comparison(const dsl::Comparison& cmp, const std::map<std::string, LiblcvmValue>& dict) {
-    auto it = dict.find(cmp.column());
-    if (it == dict.end()) return false;
+bool eval_comparison(const dsl::Comparison& cmp,
+                     const std::map<std::string, LiblcvmValue>& dict) {
+  auto it = dict.find(cmp.column());
+  if (it == dict.end()) return false;
 
-    const LiblcvmValue& val = it->second;
+  const LiblcvmValue& val = it->second;
 
-    if (cmp.op() == dsl::ComparisonOpType::EQ || cmp.op() == dsl::ComparisonOpType::NE) {
-        if (std::holds_alternative<std::string>(val)) {
-            std::string rhs = cmp.value();
-            std::string lhs = to_string_value(val);
-            if (cmp.op() == dsl::ComparisonOpType::EQ) return lhs == rhs;
-            if (cmp.op() == dsl::ComparisonOpType::NE) return lhs != rhs;
-        } else {
-            double lhs = to_double(val);
-            double rhs = std::stod(cmp.value());
-            if (cmp.op() == dsl::ComparisonOpType::EQ) return lhs == rhs;
-            if (cmp.op() == dsl::ComparisonOpType::NE) return lhs != rhs;
-        }
+  if (cmp.op() == dsl::ComparisonOpType::EQ ||
+      cmp.op() == dsl::ComparisonOpType::NE) {
+    if (std::holds_alternative<std::string>(val)) {
+      std::string rhs = cmp.value();
+      std::string lhs = to_string_value(val);
+      if (cmp.op() == dsl::ComparisonOpType::EQ) return lhs == rhs;
+      if (cmp.op() == dsl::ComparisonOpType::NE) return lhs != rhs;
+    } else {
+      double lhs = to_double(val);
+      double rhs = std::stod(cmp.value());
+      if (cmp.op() == dsl::ComparisonOpType::EQ) return lhs == rhs;
+      if (cmp.op() == dsl::ComparisonOpType::NE) return lhs != rhs;
     }
+  }
 
-    // Numeric comparisons
-    double lhs = to_double(val);
-    double rhs = std::stod(cmp.value());
+  // Numeric comparisons
+  double lhs = to_double(val);
+  double rhs = std::stod(cmp.value());
 
-    switch (cmp.op()) {
-        case dsl::ComparisonOpType::LT:  return lhs < rhs;
-        case dsl::ComparisonOpType::LE:  return lhs <= rhs;
-        case dsl::ComparisonOpType::GT:  return lhs > rhs;
-        case dsl::ComparisonOpType::GE:  return lhs >= rhs;
-        default:
-            throw std::runtime_error("Unsupported comparison op");
-    }
+  switch (cmp.op()) {
+    case dsl::ComparisonOpType::LT:
+      return lhs < rhs;
+    case dsl::ComparisonOpType::LE:
+      return lhs <= rhs;
+    case dsl::ComparisonOpType::GT:
+      return lhs > rhs;
+    case dsl::ComparisonOpType::GE:
+      return lhs >= rhs;
+    default:
+      throw std::runtime_error("Unsupported comparison op");
+  }
 }
 
-bool eval_range(const dsl::RangeCheck& range, const std::map<std::string, LiblcvmValue>& dict) {
-    auto it = dict.find(range.column());
-    if (it == dict.end()) return false;
+bool eval_range(const dsl::RangeCheck& range,
+                const std::map<std::string, LiblcvmValue>& dict) {
+  auto it = dict.find(range.column());
+  if (it == dict.end()) return false;
 
-    double val = to_double(it->second);
-    double low = range.low();
-    double high = range.high();
+  double val = to_double(it->second);
+  double low = range.low();
+  double high = range.high();
 
-    return val >= low && val <= high;
+  return val >= low && val <= high;
 }
 
-bool eval_not(const dsl::NotExpr& not_expr, const std::map<std::string, LiblcvmValue>& dict) {
-    return !eval_expr(not_expr.expr(), dict);
+bool eval_not(const dsl::NotExpr& not_expr,
+              const std::map<std::string, LiblcvmValue>& dict) {
+  return !eval_expr(not_expr.expr(), dict);
 }
 
-bool eval_logical(const dsl::Logical& logic, const std::map<std::string, LiblcvmValue>& dict) {
-    switch (logic.op()) {
-        case dsl::LogicOpType::AND:
-            for (const auto& e : logic.operands())
-                if (!eval_expr(e, dict)) return false;
-            return true;
-        case dsl::LogicOpType::OR:
-            for (const auto& e : logic.operands())
-                if (eval_expr(e, dict)) return true;
-            return false;
-        default:
-            return false;
+bool eval_logical(const dsl::Logical& logic,
+                  const std::map<std::string, LiblcvmValue>& dict) {
+  switch (logic.op()) {
+    case dsl::LogicOpType::AND:
+      for (const auto& e : logic.operands())
+        if (!eval_expr(e, dict)) return false;
+      return true;
+    case dsl::LogicOpType::OR:
+      for (const auto& e : logic.operands())
+        if (eval_expr(e, dict)) return true;
+      return false;
+    default:
+      return false;
+  }
+}
+
+bool eval_expr(const dsl::Expr& expr,
+               const std::map<std::string, LiblcvmValue>& dict) {
+  switch (expr.expr_kind_case()) {
+    case dsl::Expr::kComparison:
+      return eval_comparison(expr.comparison(), dict);
+    case dsl::Expr::kRange:
+      return eval_range(expr.range(), dict);
+    case dsl::Expr::kNotExpr:
+      return eval_not(expr.not_expr(), dict);
+    case dsl::Expr::kLogical:
+      return eval_logical(expr.logical(), dict);
+    default:
+      return false;
+  }
+}
+
+void evaluate_rules(const dsl::RuleSet& rules,
+                    const std::map<std::string, LiblcvmValue>& dict,
+                    std::list<std::string>* warn_list,
+                    std::list<std::string>* error_list) {
+  for (const auto& rule : rules.rules()) {
+    bool result = eval_expr(rule.condition(), dict);
+    if (result) {
+      if (rule.severity() == dsl::SeverityType::WARN && warn_list) {
+        warn_list->push_back(rule.label());
+      } else if (rule.severity() == dsl::SeverityType::ERROR && error_list) {
+        error_list->push_back(rule.label());
+      }
     }
-}
-
-bool eval_expr(const dsl::Expr& expr, const std::map<std::string, LiblcvmValue>& dict) {
-    switch (expr.expr_kind_case()) {
-        case dsl::Expr::kComparison: return eval_comparison(expr.comparison(), dict);
-        case dsl::Expr::kRange:   return eval_range(expr.range(), dict);
-        case dsl::Expr::kNotExpr:     return eval_not(expr.not_expr(), dict);
-        case dsl::Expr::kLogical: return eval_logical(expr.logical(), dict);
-        default: return false;
-    }
-}
-
-
-void evaluate_rules(const dsl::RuleSet& rules, const std::map<std::string, LiblcvmValue>& dict, std::list<std::string>* warn_list, std::list<std::string>* error_list) {
-    for (const auto& rule : rules.rules()) {
-        bool result = eval_expr(rule.condition(), dict);
-        if (result) {
-            if (rule.severity() == dsl::SeverityType::WARN && warn_list) {
-                warn_list->push_back(rule.label());
-            } else if (rule.severity() == dsl::SeverityType::ERROR && error_list) {
-                error_list->push_back(rule.label());
-            }
-        }
-    }
+  }
 }
 
 ParserContext create_parser_content_from_string(const std::string& policy_str) {
-    ParserContext ctx;
-    ctx.input = std::make_unique<antlr4::ANTLRInputStream>(policy_str);
-    ctx.lexer = std::make_unique<rulesLexer>(ctx.input.get());
-    ctx.tokens = std::make_unique<antlr4::CommonTokenStream>(ctx.lexer.get());
-    ctx.parser = std::make_unique<rulesParser>(ctx.tokens.get());
-    ctx.tree = ctx.parser->program();
-    if (!ctx.tree || ctx.tree->children.empty()) {
-        throw std::runtime_error("Parse error: Empty or invalid input");
-    }
-    return ctx;
+  ParserContext ctx;
+  ctx.input = std::make_unique<antlr4::ANTLRInputStream>(policy_str);
+  ctx.lexer = std::make_unique<rulesLexer>(ctx.input.get());
+  ctx.tokens = std::make_unique<antlr4::CommonTokenStream>(ctx.lexer.get());
+  ctx.parser = std::make_unique<rulesParser>(ctx.tokens.get());
+  ctx.tree = ctx.parser->program();
+  if (!ctx.tree || ctx.tree->children.empty()) {
+    throw std::runtime_error("Parse error: Empty or invalid input");
+  }
+  return ctx;
 }
 
 int policy_runner(const std::string& policy_str,

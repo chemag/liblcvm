@@ -21,16 +21,15 @@
 #include <algorithm>    // for sort
 #include <cmath>        // for sqrt
 #include <cstdio>       // for fprintf, stderr, stdout
-#include <memory>       // for shared_ptr, operator==, __shared...
-#include <map>          // for map
-#include <numeric>      // for accumulate
-#include <string>       // for basic_string, string
-#include <vector>       // for vector
 #include <list>
-
-#include "policy_protovisitor.h"
+#include <map>      // for map
+#include <memory>   // for shared_ptr, operator==, __shared...
+#include <numeric>  // for accumulate
+#include <string>   // for basic_string, string
+#include <vector>   // for vector
 
 #include "config.h"
+#include "policy_protovisitor.h"
 
 #define MAX_AUDIO_VIDEO_RATIO 1.05
 
@@ -38,19 +37,20 @@ void IsobmffFileInformation::get_liblcvm_version(std::string &version) {
   version = PROJECT_VER;
 }
 
-int policy_runner(const std::string& policy_str,
+int policy_runner(const std::string &policy_str,
                   std::shared_ptr<std::map<std::string, LiblcvmValue>> pmap,
-                  std::list<std::string>* warn_list,
-                  std::list<std::string>* error_list);
+                  std::list<std::string> *warn_list,
+                  std::list<std::string> *error_list);
 
-std::string join_list(const std::list<std::string>& lst, const char* sep = ", ") {
+std::string join_list(const std::list<std::string> &lst,
+                      const char *sep = ", ") {
   std::ostringstream oss;
   bool first = true;
-    for (const auto& s : lst) {
-      if (!first) oss << sep;
-      oss << s;
-      first = false;
-    }
+  for (const auto &s : lst) {
+    if (!first) oss << sep;
+    oss << s;
+    first = false;
+  }
 
   return oss.str();
 }
@@ -58,76 +58,118 @@ std::string join_list(const std::list<std::string>& lst, const char* sep = ", ")
 std::shared_ptr<std::map<std::string, LiblcvmValue>>
 IsobmffFileInformation::parse_to_map(const char *infile,
                                      const LiblcvmConfig &liblcvm_config,
-                                     const std::string& policy_str) {
+                                     const std::string &policy_str) {
   // Helper lambdas
   auto to_double = [](auto v) { return static_cast<double>(v); };
   auto to_int = [](auto v) { return static_cast<int>(v); };
 
-  std::shared_ptr<std::map<std::string, LiblcvmValue>> pmap = std::make_shared<std::map<std::string, LiblcvmValue>>();
+  std::shared_ptr<std::map<std::string, LiblcvmValue>> pmap =
+      std::make_shared<std::map<std::string, LiblcvmValue>>();
   // Default parsing logic
   std::shared_ptr<IsobmffFileInformation> pobj =
       IsobmffFileInformation::parse(infile, liblcvm_config);
   if (!pobj) {
-      fprintf(stderr, "Failed to parse file: %s\n", infile);
-      return nullptr;
+    fprintf(stderr, "Failed to parse file: %s\n", infile);
+    return nullptr;
   }
 
   pmap->emplace("infile", std::string(infile));
+  // TODO(marko): why to_int() here? filesize should already be an int.
+  // Same for all the other to_int() cases.
   pmap->emplace("filesize", to_int(pobj->get_frame().get_filesize()));
+  // TODO(marko): move all the floats to double to avoid the conversion
   pmap->emplace("bitrate_bps", to_double(pobj->get_frame().get_bitrate_bps()));
   pmap->emplace("width", to_double(pobj->get_frame().get_width()));
   pmap->emplace("height", to_double(pobj->get_frame().get_height()));
   pmap->emplace("type", std::string(pobj->get_frame().get_type()));
-  pmap->emplace("horizresolution", to_int(pobj->get_frame().get_horizresolution()));
-  pmap->emplace("vertresolution", to_int(pobj->get_frame().get_vertresolution()));
+  pmap->emplace("horizresolution",
+                to_int(pobj->get_frame().get_horizresolution()));
+  pmap->emplace("vertresolution",
+                to_int(pobj->get_frame().get_vertresolution()));
   pmap->emplace("depth", to_int(pobj->get_frame().get_depth()));
   pmap->emplace("chroma_format", to_int(pobj->get_frame().get_chroma_format()));
-  pmap->emplace("bit_depth_luma", to_int(pobj->get_frame().get_bit_depth_luma()));
-  pmap->emplace("bit_depth_chroma", to_int(pobj->get_frame().get_bit_depth_chroma()));
-  pmap->emplace("video_full_range_flag", to_int(pobj->get_frame().get_video_full_range_flag()));
-  pmap->emplace("colour_primaries", to_int(pobj->get_frame().get_colour_primaries()));
-  pmap->emplace("transfer_characteristics", to_int(pobj->get_frame().get_transfer_characteristics()));
+  pmap->emplace("bit_depth_luma",
+                to_int(pobj->get_frame().get_bit_depth_luma()));
+  pmap->emplace("bit_depth_chroma",
+                to_int(pobj->get_frame().get_bit_depth_chroma()));
+  pmap->emplace("video_full_range_flag",
+                to_int(pobj->get_frame().get_video_full_range_flag()));
+  pmap->emplace("colour_primaries",
+                to_int(pobj->get_frame().get_colour_primaries()));
+  pmap->emplace("transfer_characteristics",
+                to_int(pobj->get_frame().get_transfer_characteristics()));
   pmap->emplace("matrix_coeffs", to_int(pobj->get_frame().get_matrix_coeffs()));
-  pmap->emplace("num_video_frames", to_int(pobj->get_timing().get_num_video_frames()));
-  pmap->emplace("frame_rate_fps_median", to_double(pobj->get_timing().get_frame_rate_fps_median()));
-  pmap->emplace("frame_rate_fps_average", to_double(pobj->get_timing().get_frame_rate_fps_average()));
-  pmap->emplace("frame_rate_fps_reverse_average", to_double(pobj->get_timing().get_frame_rate_fps_reverse_average()));
-  pmap->emplace("frame_rate_fps_stddev", to_double(pobj->get_timing().get_frame_rate_fps_stddev()));
+  pmap->emplace("num_video_frames",
+                to_int(pobj->get_timing().get_num_video_frames()));
+  pmap->emplace("frame_rate_fps_median",
+                to_double(pobj->get_timing().get_frame_rate_fps_median()));
+  pmap->emplace("frame_rate_fps_average",
+                to_double(pobj->get_timing().get_frame_rate_fps_average()));
+  pmap->emplace(
+      "frame_rate_fps_reverse_average",
+      to_double(pobj->get_timing().get_frame_rate_fps_reverse_average()));
+  pmap->emplace("frame_rate_fps_stddev",
+                to_double(pobj->get_timing().get_frame_rate_fps_stddev()));
   pmap->emplace("video_freeze", pobj->get_timing().get_video_freeze() ? 1 : 0);
-  pmap->emplace("audio_video_ratio", to_double(pobj->get_timing().get_audio_video_ratio()));
-  pmap->emplace("duration_video_sec", to_double(pobj->get_timing().get_duration_video_sec()));
-  pmap->emplace("duration_audio_sec", to_double(pobj->get_timing().get_duration_audio_sec()));
-  pmap->emplace("timescale_video_hz", to_int(pobj->get_timing().get_timescale_video_hz()));
-  pmap->emplace("timescale_audio_hz", to_int(pobj->get_timing().get_timescale_audio_hz()));
-  pmap->emplace("pts_duration_sec_average", to_double(pobj->get_timing().get_pts_duration_sec_average()));
-  pmap->emplace("pts_duration_sec_median", to_double(pobj->get_timing().get_pts_duration_sec_median()));
-  pmap->emplace("pts_duration_sec_stddev", to_double(pobj->get_timing().get_pts_duration_sec_stddev()));
-  pmap->emplace("pts_duration_sec_mad", to_double(pobj->get_timing().get_pts_duration_sec_mad()));
-  pmap->emplace("frame_drop_count", to_int(pobj->get_timing().get_frame_drop_count()));
-  pmap->emplace("frame_drop_ratio", to_double(pobj->get_timing().get_frame_drop_ratio()));
-  pmap->emplace("normalized_frame_drop_average_length", to_double(pobj->get_timing().get_normalized_frame_drop_average_length()));
+  pmap->emplace("audio_video_ratio",
+                to_double(pobj->get_timing().get_audio_video_ratio()));
+  pmap->emplace("duration_video_sec",
+                to_double(pobj->get_timing().get_duration_video_sec()));
+  pmap->emplace("duration_audio_sec",
+                to_double(pobj->get_timing().get_duration_audio_sec()));
+  pmap->emplace("timescale_video_hz",
+                to_int(pobj->get_timing().get_timescale_video_hz()));
+  pmap->emplace("timescale_audio_hz",
+                to_int(pobj->get_timing().get_timescale_audio_hz()));
+  pmap->emplace("pts_duration_sec_average",
+                to_double(pobj->get_timing().get_pts_duration_sec_average()));
+  pmap->emplace("pts_duration_sec_median",
+                to_double(pobj->get_timing().get_pts_duration_sec_median()));
+  pmap->emplace("pts_duration_sec_stddev",
+                to_double(pobj->get_timing().get_pts_duration_sec_stddev()));
+  pmap->emplace("pts_duration_sec_mad",
+                to_double(pobj->get_timing().get_pts_duration_sec_mad()));
+  pmap->emplace("frame_drop_count",
+                to_int(pobj->get_timing().get_frame_drop_count()));
+  pmap->emplace("frame_drop_ratio",
+                to_double(pobj->get_timing().get_frame_drop_ratio()));
+  pmap->emplace(
+      "normalized_frame_drop_average_length",
+      to_double(pobj->get_timing().get_normalized_frame_drop_average_length()));
 
   // Percentiles
   std::vector<float> percentile_list = {50, 90};
   std::vector<float> frame_drop_length_percentile_list;
   pobj->get_timing().calculate_percentile_list(
-      percentile_list, frame_drop_length_percentile_list, liblcvm_config.get_debug());
+      percentile_list, frame_drop_length_percentile_list,
+      liblcvm_config.get_debug());
   pmap->emplace("frame_drop_length_percentile_50",
-                frame_drop_length_percentile_list.size() > 0 ? to_double(frame_drop_length_percentile_list[0]) : 0.0);
+                frame_drop_length_percentile_list.size() > 0
+                    ? to_double(frame_drop_length_percentile_list[0])
+                    : 0.0);
   pmap->emplace("frame_drop_length_percentile_90",
-                frame_drop_length_percentile_list.size() > 1 ? to_double(frame_drop_length_percentile_list[1]) : 0.0);
+                frame_drop_length_percentile_list.size() > 1
+                    ? to_double(frame_drop_length_percentile_list[1])
+                    : 0.0);
 
-  // Consecutive
+  // Consecutive frame drop lists
   std::vector<int> consecutive_list = {2, 5};
   std::vector<long int> frame_drop_length_consecutive;
-  pobj->get_timing().calculate_consecutive_list(
-      consecutive_list, frame_drop_length_consecutive, liblcvm_config.get_debug());
+  pobj->get_timing().calculate_consecutive_list(consecutive_list,
+                                                frame_drop_length_consecutive,
+                                                liblcvm_config.get_debug());
   pmap->emplace("frame_drop_length_consecutive_2",
-                frame_drop_length_consecutive.size() > 0 ? to_int(frame_drop_length_consecutive[0]) : 0);
+                frame_drop_length_consecutive.size() > 0
+                    ? to_int(frame_drop_length_consecutive[0])
+                    : 0);
   pmap->emplace("frame_drop_length_consecutive_5",
-                frame_drop_length_consecutive.size() > 1 ? to_int(frame_drop_length_consecutive[1]) : 0);
-  pmap->emplace("num_video_keyframes", to_int(pobj->get_timing().get_num_video_keyframes()));
-  pmap->emplace("key_frame_ratio", to_double(pobj->get_timing().get_key_frame_ratio()));
+                frame_drop_length_consecutive.size() > 1
+                    ? to_int(frame_drop_length_consecutive[1])
+                    : 0);
+  pmap->emplace("num_video_keyframes",
+                to_int(pobj->get_timing().get_num_video_keyframes()));
+  pmap->emplace("key_frame_ratio",
+                to_double(pobj->get_timing().get_key_frame_ratio()));
   pmap->emplace("audio_type", std::string(pobj->get_audio().get_audio_type()));
   pmap->emplace("channel_count", to_int(pobj->get_audio().get_channel_count()));
   pmap->emplace("sample_rate", to_int(pobj->get_audio().get_sample_rate()));
@@ -141,16 +183,17 @@ IsobmffFileInformation::parse_to_map(const char *infile,
   std::list<std::string> warn_list, error_list;
   int policy_status = policy_runner(policy_str, pmap, &warn_list, &error_list);
   if (policy_status != 0 || !pmap || pmap->empty()) {
-      fprintf(stderr, "Policy evaluation failed for file: %s\n", infile);
-      if (policy_status != 0) {
-          fprintf(stderr, "policy_runner returned error status: %d\n", policy_status);
-      }
-      if (!pmap) {
-          fprintf(stderr, "pmap is null!\n");
-      } else if (pmap->empty()) {
-          fprintf(stderr, "pmap is empty!\n");
-      }
-      return nullptr;
+    fprintf(stderr, "Policy evaluation failed for file: %s\n", infile);
+    if (policy_status != 0) {
+      fprintf(stderr, "policy_runner returned error status: %d\n",
+              policy_status);
+    }
+    if (!pmap) {
+      fprintf(stderr, "pmap is null!\n");
+    } else if (pmap->empty()) {
+      fprintf(stderr, "pmap is empty!\n");
+    }
+    return nullptr;
   }
 
   pmap->emplace("warn_list", join_list(warn_list));
