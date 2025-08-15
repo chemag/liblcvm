@@ -37,6 +37,29 @@ void IsobmffFileInformation::get_liblcvm_version(std::string &version) {
   version = PROJECT_VER;
 }
 
+// variant operation
+double to_double(const LiblcvmValue &value) {
+  if (std::holds_alternative<int>(value)) {
+    return static_cast<double>(std::get<int>(value));
+  } else if (std::holds_alternative<double>(value)) {
+    return std::get<double>(value);
+  } else {
+    throw std::runtime_error("LiblcvmValue is not numeric");
+  }
+}
+
+std::string to_string_value(const LiblcvmValue &value) {
+  if (std::holds_alternative<std::string>(value)) {
+    return std::get<std::string>(value);
+  } else if (std::holds_alternative<int>(value)) {
+    return std::to_string(std::get<int>(value));
+  } else if (std::holds_alternative<double>(value)) {
+    return std::to_string(std::get<double>(value));
+  } else {
+    throw std::runtime_error("LiblcvmValue type is unsupported");
+  }
+}
+
 int policy_runner(const std::string &policy_str,
                   std::shared_ptr<std::map<std::string, LiblcvmValue>> pmap,
                   std::list<std::string> *warn_list,

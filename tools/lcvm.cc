@@ -10,6 +10,7 @@
 #include <climits>
 #include <cstdio>
 #include <cstring>
+#include <list>
 #include <map>
 #include <string>  // for basic_string, string
 #include <vector>
@@ -41,8 +42,8 @@ arg_options DEFAULT_OPTIONS{
     .policy_file = nullptr,
 };
 
-std::string join_list(const std::list<std::string> &lst,
-                      const char *sep = ";") {
+std::string join_list_2(const std::list<std::string> &lst,
+                        const char *sep = ";") {
   std::ostringstream oss;
   bool first = true;
   for (const auto &s : lst) {
@@ -193,8 +194,8 @@ int parse_files_with_policy(std::vector<std::string> &infile_list,
 
     policy_runner(policy_str, pmap, &warn_list, &error_list);
 
-    std::string warn_str = join_list(warn_list);
-    std::string error_str = join_list(error_list);
+    std::string warn_str = join_list_2(warn_list);
+    std::string error_str = join_list_2(error_list);
 
     // --- Write CSV row ---
     fprintf(outfp,
@@ -392,6 +393,20 @@ int parse_files_with_policy(std::vector<std::string> &infile_list,
   return 0;
 }
 
+std::string csv_escape(const std::string &value) {
+  bool must_quote = value.find_first_of(",\"\n") != std::string::npos;
+  std::string escaped = value;
+  size_t pos = 0;
+  while ((pos = escaped.find('"', pos)) != std::string::npos) {
+    escaped.insert(pos, "\"");
+    pos += 2;
+  }
+  if (must_quote) {
+    escaped = "\"" + escaped + "\"";
+  }
+  return escaped;
+}
+
 int parse_files(std::vector<std::string> &infile_list, char *outfile,
                 char *outfile_timestamps, bool outfile_timestamps_sort_pts,
                 int debug, const std::string &policy_str) {
@@ -491,7 +506,7 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
         fprintf(outfp, "%s", (i + 1 < csv_keys.size()) ? "," : "\n");
         continue;
       }
-      std::string value = to_csv_string(it->second);
+      std::string value = to_string_value(it->second);
       fprintf(outfp, "%s%s", csv_escape(value).c_str(),
               (i + 1 < csv_keys.size()) ? "," : "\n");
     }
@@ -807,9 +822,9 @@ int main(int argc, char **argv) {
           options->infile_list, options->outfile, options->outfile_timestamps,
           options->outfile_timestamps_sort_pts, options->debug, policy_str);
     } else {
-      parse_files(options->infile_list, options->outfile,
-                  options->outfile_timestamps,
-                  options->outfile_timestamps_sort_pts, options->debug);
+      parse_files(
+          options->infile_list, options->outfile, options->outfile_timestamps,
+          options->outfile_timestamps_sort_pts, options->debug, policy_str);
     }
   }
   return 0;

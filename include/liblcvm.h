@@ -246,6 +246,8 @@ class FrameInformation {
 };
 
 using LiblcvmValue = std::variant<int, double, std::string>;
+double to_double(const LiblcvmValue &value);
+std::string to_string_value(const LiblcvmValue &value);
 
 class LiblcvmConfig {
  private:

@@ -105,33 +105,6 @@ void writeProtoToFile(dsl::RuleSet ruleSet, std::string outfile) {
   outfile_stream.close();
 }
 
-// variant operation
-
-template <typename T>
-double to_number(const T& value) {
-  if constexpr (std::is_same_v<T, int>) return static_cast<double>(value);
-  if constexpr (std::is_same_v<T, double>) return value;
-  throw std::runtime_error("Unsupported numeric type");
-}
-
-double to_double(const LiblcvmValue& value) {
-  if (std::holds_alternative<int>(value)) {
-    return static_cast<double>(std::get<int>(value));
-  } else if (std::holds_alternative<double>(value)) {
-    return std::get<double>(value);
-  } else {
-    throw std::runtime_error("LiblcvmValue is not numeric");
-  }
-}
-
-std::string to_string_value(const LiblcvmValue& value) {
-  if (std::holds_alternative<std::string>(value)) {
-    return std::get<std::string>(value);
-  } else {
-    throw std::runtime_error("LiblcvmValue is not a string");
-  }
-}
-
 // recursive evaluator
 bool evaluate_rule(const dsl::RuleSet& rules,
                    const std::map<std::string, LiblcvmValue>& dict);
