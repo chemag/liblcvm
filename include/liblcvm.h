@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <list>
 #include <map>
 #include <numeric>
 #include <variant>
@@ -299,10 +300,12 @@ class IsobmffFileInformation {
   //
   // @param[in] infile: Name of the file to be parsed.
   // @param[in] liblcvm_config: Parsing configuration.
+  // @param[in] policy_string: String containing a policy.
+  // @param[out] pkeys: List of keys (in-order).
   // @return ptr: Full ISOBMFF information, as a map.
   static std::shared_ptr<std::map<std::string, LiblcvmValue>> parse_to_map(
       const char *infile, const LiblcvmConfig &liblcvm_config,
-      const std::string &policy_str);
+      const std::string &policy_str, std::vector<std::string> *pkeys);
 
   // Private constructor to prevent direct instantiation
   IsobmffFileInformation() = default;
