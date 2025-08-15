@@ -193,6 +193,8 @@ target_include_directories(liblcvm PRIVATE ${CMAKE_BINARY_DIR})
 add_custom_target(test
   COMMAND ${CMAKE_COMMAND} -E echo "Running: ${CMAKE_BINARY_DIR}/lcvm ${CMAKE_SOURCE_DIR}/lib/isobmff/media/*MOV -o /tmp/full.csv"
   COMMAND ${CMAKE_BINARY_DIR}/lcvm ${CMAKE_SOURCE_DIR}/lib/isobmff/media/*MOV -o /tmp/full.csv
+  COMMAND ${CMAKE_COMMAND} -E echo "Running: ${CMAKE_BINARY_DIR}/lcvm ${CMAKE_SOURCE_DIR}/lib/isobmff/media/*MOV -p ${CMAKE_SOURCE_DIR}/policy/example.txt -o /tmp/full.policy.csv"
+  COMMAND ${CMAKE_BINARY_DIR}/lcvm ${CMAKE_SOURCE_DIR}/lib/isobmff/media/*MOV -p ${CMAKE_SOURCE_DIR}/policy/example.txt -o /tmp/full.policy.csv
 )
 
 add_custom_target(lint
