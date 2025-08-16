@@ -119,26 +119,29 @@ bool eval_comparison(const dsl::Comparison& cmp,
 
   const LiblcvmValue& val = it->second;
 
-  if (cmp.op() == dsl::ComparisonOpType::EQ ||
-      cmp.op() == dsl::ComparisonOpType::NE) {
-    if (std::holds_alternative<std::string>(val)) {
-      std::string rhs = cmp.value();
-      std::string lhs = liblcvmvalue_to_string(val);
-      if (cmp.op() == dsl::ComparisonOpType::EQ) return lhs == rhs;
-      if (cmp.op() == dsl::ComparisonOpType::NE) return lhs != rhs;
-    } else {
-      double lhs = liblcvmvalue_to_double(val);
-      double rhs = std::stod(cmp.value());
-      if (cmp.op() == dsl::ComparisonOpType::EQ) return lhs == rhs;
-      if (cmp.op() == dsl::ComparisonOpType::NE) return lhs != rhs;
+  if (std::holds_alternative<std::string>(val)) {
+    // string comparisons
+    std::string rhs = cmp.value();
+    std::string lhs = liblcvmvalue_to_string(val);
+    switch (cmp.op()) {
+      case dsl::ComparisonOpType::EQ:
+        return lhs == rhs;
+      case dsl::ComparisonOpType::NE:
+        return lhs != rhs;
+      default:
+        throw std::runtime_error("Unsupported comparison op for strings: " +
+                                 std::to_string(static_cast<int>(cmp.op())));
     }
   }
 
-  // Numeric comparisons
+  // numeric comparisons
   double lhs = liblcvmvalue_to_double(val);
   double rhs = std::stod(cmp.value());
-
   switch (cmp.op()) {
+    case dsl::ComparisonOpType::EQ:
+      return lhs == rhs;
+    case dsl::ComparisonOpType::NE:
+      return lhs != rhs;
     case dsl::ComparisonOpType::LT:
       return lhs < rhs;
     case dsl::ComparisonOpType::LE:
@@ -148,7 +151,8 @@ bool eval_comparison(const dsl::Comparison& cmp,
     case dsl::ComparisonOpType::GE:
       return lhs >= rhs;
     default:
-      throw std::runtime_error("Unsupported comparison op");
+      throw std::runtime_error("Unsupported comparison op for numeric: " +
+                               std::to_string(static_cast<int>(cmp.op())));
   }
 }
 
@@ -242,6 +246,11 @@ int policy_runner(const std::string& policy_str, LiblcvmKeyList* pkeys,
     dict[*itK] = *itV;
   }
 
+  // reset warn_list/error_list
+  warn_list->clear();
+  error_list->clear();
+
+  // run the policy
   try {
     ParserContext ctx = create_parser_content_from_string(policy_str);
     dsl::RuleSet ruleSet = convert_parser_context_to_proto(ctx);

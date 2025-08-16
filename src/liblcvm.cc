@@ -63,10 +63,6 @@ std::string liblcvmvalue_to_string(const LiblcvmValue &value) {
   }
 }
 
-int policy_runner(const std::string &policy_str, LiblcvmKeyList *pkeys,
-                  LiblcvmValList *pvals, std::list<std::string> *warn_list,
-                  std::list<std::string> *error_list);
-
 std::string join_list(const std::list<std::string> &lst,
                       const char *sep = ";") {
   std::ostringstream oss;
