@@ -123,11 +123,11 @@ bool eval_comparison(const dsl::Comparison& cmp,
       cmp.op() == dsl::ComparisonOpType::NE) {
     if (std::holds_alternative<std::string>(val)) {
       std::string rhs = cmp.value();
-      std::string lhs = to_string_value(val);
+      std::string lhs = liblcvmvalue_to_string(val);
       if (cmp.op() == dsl::ComparisonOpType::EQ) return lhs == rhs;
       if (cmp.op() == dsl::ComparisonOpType::NE) return lhs != rhs;
     } else {
-      double lhs = to_double(val);
+      double lhs = liblcvmvalue_to_double(val);
       double rhs = std::stod(cmp.value());
       if (cmp.op() == dsl::ComparisonOpType::EQ) return lhs == rhs;
       if (cmp.op() == dsl::ComparisonOpType::NE) return lhs != rhs;
@@ -135,7 +135,7 @@ bool eval_comparison(const dsl::Comparison& cmp,
   }
 
   // Numeric comparisons
-  double lhs = to_double(val);
+  double lhs = liblcvmvalue_to_double(val);
   double rhs = std::stod(cmp.value());
 
   switch (cmp.op()) {
@@ -157,7 +157,7 @@ bool eval_range(const dsl::RangeCheck& range,
   auto it = dict.find(range.column());
   if (it == dict.end()) return false;
 
-  double val = to_double(it->second);
+  double val = liblcvmvalue_to_double(it->second);
   double low = range.low();
   double high = range.high();
 
@@ -230,14 +230,22 @@ ParserContext create_parser_content_from_string(const std::string& policy_str) {
   return ctx;
 }
 
-int policy_runner(const std::string& policy_str,
-                  std::shared_ptr<std::map<std::string, LiblcvmValue>> pmap,
-                  std::list<std::string>* warn_list,
+int policy_runner(const std::string& policy_str, LiblcvmKeyList* pkeys,
+                  LiblcvmValList* pvals, std::list<std::string>* warn_list,
                   std::list<std::string>* error_list) {
+  // convert the keys/vals into a dictionary
+  std::map<std::string, LiblcvmValue> dict;
+  auto itK = pkeys->begin();
+  auto itV = pvals->begin();
+  for (; itK != pkeys->end() && itV != pvals->end(); ++itK, ++itV) {
+    // overwrites if the same key appears twice
+    dict[*itK] = *itV;
+  }
+
   try {
     ParserContext ctx = create_parser_content_from_string(policy_str);
     dsl::RuleSet ruleSet = convert_parser_context_to_proto(ctx);
-    evaluate_rules(ruleSet, *pmap, warn_list, error_list);
+    evaluate_rules(ruleSet, dict, warn_list, error_list);
   } catch (const std::exception& ex) {
     std::cerr << "Fatal error: " << ex.what() << std::endl;
     return 1;

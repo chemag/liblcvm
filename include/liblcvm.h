@@ -16,6 +16,7 @@
 #include <list>
 #include <map>
 #include <numeric>
+#include <tuple>
 #include <variant>
 #include <vector>
 
@@ -247,43 +248,59 @@ class FrameInformation {
 };
 
 using LiblcvmValue = std::variant<int, double, std::string>;
-double to_double(const LiblcvmValue &value);
-std::string to_string_value(const LiblcvmValue &value);
+using LiblcvmValList = std::vector<LiblcvmValue>;
+using LiblcvmKeyList = std::vector<std::string>;
+
+// frame_num, stts, ctts, dts, pts, pts_duration, pts_duration_delta
+using LiblcvmTiming =
+    std::tuple<uint32_t, uint32_t, int32_t, float, float, float, float>;
+using LiblcvmTimingList = std::vector<LiblcvmTiming>;
+
+double liblcvmvalue_to_double(const LiblcvmValue &value);
+std::string liblcvmvalue_to_string(const LiblcvmValue &value);
 
 class LiblcvmConfig {
  private:
   // sort_by_pts: Whether to sort the frames by PTS values.
   bool sort_by_pts;
+  // policy: Warn/Error policy.
+  std::string policy;
   // debug: Debug level.
   int debug;
 
  public:
   LiblcvmConfig() {
     sort_by_pts = true;
+    policy = "";
     debug = 0;
   };
 
   DECL_GETTER(sort_by_pts, bool)
   DECL_SETTER(sort_by_pts, bool)
+  DECL_GETTER(policy, std::string)
+  DECL_SETTER(policy, std::string)
   DECL_GETTER(debug, int)
   DECL_SETTER(debug, int)
 };
 
 // Main class
+
 class IsobmffFileInformation {
  private:
   std::string filename;
+  std::string policy;
   TimingInformation timing;
   FrameInformation frame;
   AudioInformation audio;
 
  public:
   DECL_GETTER(filename, std::string)
+  DECL_GETTER(policy, std::string)
   DECL_GETTER(timing, TimingInformation)
   DECL_GETTER(frame, FrameInformation)
   DECL_GETTER(audio, AudioInformation)
 
-  // @brief Gets the library version.
+  // @brief Get the library version.
   //
   // @param[out] version: Version string.
   static void get_liblcvm_version(std::string &version);
@@ -296,16 +313,37 @@ class IsobmffFileInformation {
   static std::shared_ptr<IsobmffFileInformation> parse(
       const char *infile, const LiblcvmConfig &liblcvm_config);
 
-  // @brief Parse an ISOBMFF file into a map (dictionary).
+  // @brief Converts IsobmffFileInformation to 2 generic lists.
+  //
+  // @param[in] pobj: IsobmffFileInformation object.
+  // @param[out] pkeys: List of keys (in-order).
+  // @param[out] pvals: List of values (in-order)
+  // @param[in] calculate_timestamps: Whether to calculate the timing lists.
+  // @param[out] pkeys_timing: List of timing keys (in-order).
+  // @param[out] pvals_timing: List of timing values (in-order).
+  // @param[in] debug: Debug level.
+  // @return int: Error code (0 if ok, !=0 otherwise).
+  static int LiblcvmConfig_to_lists(
+      std::shared_ptr<IsobmffFileInformation> pobj, LiblcvmKeyList *pkeys,
+      LiblcvmValList *pvals, bool calculate_timestamps,
+      LiblcvmKeyList *pkeys_timing, LiblcvmTimingList *pvals_timing, int debug);
+
+  // @brief Parse an ISOBMFF file into 2 lists.
   //
   // @param[in] infile: Name of the file to be parsed.
   // @param[in] liblcvm_config: Parsing configuration.
-  // @param[in] policy_string: String containing a policy.
   // @param[out] pkeys: List of keys (in-order).
-  // @return ptr: Full ISOBMFF information, as a map.
-  static std::shared_ptr<std::map<std::string, LiblcvmValue>> parse_to_map(
-      const char *infile, const LiblcvmConfig &liblcvm_config,
-      const std::string &policy_str, std::vector<std::string> *pkeys);
+  // @param[out] pvals: List of values (in-order)
+  // @param[in] calculate_timestamps: Whether to calculate the timing lists.
+  // @param[out] pkeys_timing: List of timing keys (in-order).
+  // @param[out] pvals_timing: List of timing values (in-order).
+  // @return int: Error code (0 if ok, !=0 otherwise).
+  static int parse_to_lists(const char *infile,
+                            const LiblcvmConfig &liblcvm_config,
+                            std::vector<std::string> *pkeys,
+                            LiblcvmValList *pvals, bool calculate_timestamps,
+                            LiblcvmKeyList *pkeys_timing,
+                            LiblcvmTimingList *pvals_timing);
 
   // Private constructor to prevent direct instantiation
   IsobmffFileInformation() = default;

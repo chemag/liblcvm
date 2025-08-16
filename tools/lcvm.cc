@@ -70,26 +70,25 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     }
   }
 
-  // 2. write CSV rows
-  std::map<std::string, std::vector<uint32_t>> frame_num_orig_list_dict;
-  std::map<std::string, std::vector<uint32_t>> stts_unit_list_dict;
-  std::map<std::string, std::vector<int32_t>> ctts_unit_list_dict;
-  std::map<std::string, std::vector<float>> dts_sec_list_dict;
-  std::map<std::string, std::vector<float>> pts_sec_list_dict;
-  std::map<std::string, std::vector<float>> pts_duration_sec_list_dict;
-  std::map<std::string, std::vector<float>> pts_duration_delta_sec_list_dict;
-
+  // 2. set parsing parameters
   auto liblcvm_config = std::make_unique<LiblcvmConfig>();
   liblcvm_config->set_sort_by_pts(outfile_timestamps_sort_pts);
+  liblcvm_config->set_policy(policy_str);
   liblcvm_config->set_debug(debug);
 
+  // 3. parse the input files
   bool printed_csv_header = false;
+  LiblcvmKeyList keys_timing;
+  std::map<std::string, LiblcvmTimingList> vals_timing_map;
+  bool calculate_timestamps = outfile_timestamps != nullptr;
   for (const auto &infile : infile_list) {
-    std::vector<std::string> keys;
-    std::shared_ptr<std::map<std::string, LiblcvmValue>> pmap =
-        IsobmffFileInformation::parse_to_map(infile.c_str(), *liblcvm_config,
-                                             policy_str, &keys);
-    if (!pmap) {
+    LiblcvmKeyList keys;
+    LiblcvmValList vals;
+    LiblcvmKeyList pkeys_timing;
+    LiblcvmTimingList vals_timing;
+    if (IsobmffFileInformation::parse_to_lists(
+            infile.c_str(), *liblcvm_config, &keys, &vals, calculate_timestamps,
+            &keys_timing, &vals_timing)) {
       fprintf(stderr, "error: IsobmffFileInformation::parse_to_map() in %s\n",
               infile.c_str());
       continue;
@@ -103,48 +102,22 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
       printed_csv_header = true;
     }
 
-    // write CSV row
-    for (size_t i = 0; i < keys.size(); ++i) {
-      const std::string &key = keys[i];
-      auto it = pmap->find(key);
-      if (it == pmap->end()) {
-        fprintf(outfp, "%s", (i + 1 < keys.size()) ? "," : "\n");
-        continue;
-      }
-      std::string value = to_string_value(it->second);
+    // write CSV rows
+    for (size_t i = 0; i < vals.size(); ++i) {
+      std::string value = liblcvmvalue_to_string(vals[i]);
       fprintf(outfp, "%s%s", csv_escape(value).c_str(),
-              (i + 1 < keys.size()) ? "," : "\n");
+              (i + 1 < vals.size()) ? "," : "\n");
     }
 
     // capture outfile timestamps
-    if (outfile_timestamps != nullptr) {
-      std::shared_ptr<IsobmffFileInformation> ptr =
-          IsobmffFileInformation::parse(infile.c_str(), *liblcvm_config);
-      if (ptr != nullptr) {
-        frame_num_orig_list_dict[infile] =
-            ptr->get_timing().get_frame_num_orig_list();
-        stts_unit_list_dict[infile] = ptr->get_timing().get_stts_unit_list();
-        ctts_unit_list_dict[infile] = ptr->get_timing().get_ctts_unit_list();
-        dts_sec_list_dict[infile] = ptr->get_timing().get_dts_sec_list();
-        pts_sec_list_dict[infile] = ptr->get_timing().get_pts_sec_list();
-        pts_duration_sec_list_dict[infile] =
-            ptr->get_timing().get_pts_duration_sec_list();
-        pts_duration_delta_sec_list_dict[infile] =
-            ptr->get_timing().get_pts_duration_delta_sec_list();
-      }
+    if (calculate_timestamps) {
+      vals_timing_map.emplace(infile, vals_timing);
     }
   }
 
-  // 3. dump outfile timestamps
-  if (outfile_timestamps != nullptr) {
-    // 3.1. get the number of frames of the longest file
-    size_t max_number_of_frames = 0;
-    for (const auto &entry : frame_num_orig_list_dict) {
-      const std::vector<uint32_t> &frame_num_orig_list = entry.second;
-      max_number_of_frames =
-          std::max(max_number_of_frames, frame_num_orig_list.size());
-    }
-    // 3.2. open outfile_timestamps
+  // 4. dump outfile timestamps
+  if (calculate_timestamps) {
+    // 3.1. open outfile_timestamps
     FILE *outtsfp = fopen(outfile_timestamps, "wb");
     if (outtsfp == nullptr) {
       // did not work
@@ -155,133 +128,39 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
       }
       return -1;
     }
-    // 3.3. dump the file names
-    fprintf(outtsfp, "frame_num");
-    long unsigned infile_list_size = infile_list.size();
-    for (const auto &entry : stts_unit_list_dict) {
-      const std::string &infile = entry.first;
-      fprintf(outtsfp, ",frame_num_orig");
-      if (infile_list_size > 1) {
-        fprintf(outtsfp, "_%s", infile.c_str());
-      }
+
+    // 3.2. write CSV header
+    fprintf(outtsfp, "%s,", "filename");
+    fprintf(outtsfp, "%s,", "frame_num");
+    for (size_t i = 0; i < keys_timing.size(); ++i) {
+      fprintf(outtsfp, "%s%s", keys_timing[i].c_str(),
+              (i + 1 < keys_timing.size()) ? "," : "\n");
     }
-    for (const auto &entry : stts_unit_list_dict) {
-      const std::string &infile = entry.first;
-      fprintf(outtsfp, ",stts");
-      if (infile_list_size > 1) {
-        fprintf(outtsfp, "_%s", infile.c_str());
+
+    // 3.3. write CSV rows
+    for (const auto &entry : vals_timing_map) {
+      const auto &filename = entry.first;
+      const auto &vals_timing = entry.second;
+      for (size_t frame_num = 0; frame_num < vals_timing.size(); ++frame_num) {
+        fprintf(outtsfp, "%s", filename.c_str());
+        fprintf(outtsfp, ",%zu", frame_num);
+        const LiblcvmTiming &timing = vals_timing[frame_num];
+        std::string value0 = std::to_string(std::get<0>(timing));
+        fprintf(outtsfp, ",%s", csv_escape(value0).c_str());
+        std::string value1 = std::to_string(std::get<1>(timing));
+        fprintf(outtsfp, ",%s", csv_escape(value1).c_str());
+        std::string value2 = std::to_string(std::get<2>(timing));
+        fprintf(outtsfp, ",%s", csv_escape(value2).c_str());
+        std::string value3 = std::to_string(std::get<3>(timing));
+        fprintf(outtsfp, ",%s", csv_escape(value3).c_str());
+        std::string value4 = std::to_string(std::get<4>(timing));
+        fprintf(outtsfp, ",%s", csv_escape(value4).c_str());
+        std::string value5 = std::to_string(std::get<5>(timing));
+        fprintf(outtsfp, ",%s", csv_escape(value5).c_str());
+        std::string value6 = std::to_string(std::get<6>(timing));
+        fprintf(outtsfp, ",%s", csv_escape(value6).c_str());
+        fprintf(outtsfp, "\n");
       }
-    }
-    for (const auto &entry : stts_unit_list_dict) {
-      const std::string &infile = entry.first;
-      fprintf(outtsfp, ",ctts");
-      if (infile_list_size > 1) {
-        fprintf(outtsfp, "_%s", infile.c_str());
-      }
-    }
-    for (const auto &entry : stts_unit_list_dict) {
-      const std::string &infile = entry.first;
-      fprintf(outtsfp, ",dts");
-      if (infile_list_size > 1) {
-        fprintf(outtsfp, "_%s", infile.c_str());
-      }
-    }
-    for (const auto &entry : stts_unit_list_dict) {
-      const std::string &infile = entry.first;
-      fprintf(outtsfp, ",pts");
-      if (infile_list_size > 1) {
-        fprintf(outtsfp, "_%s", infile.c_str());
-      }
-    }
-    for (const auto &entry : stts_unit_list_dict) {
-      const std::string &infile = entry.first;
-      fprintf(outtsfp, ",pts_duration");
-      if (infile_list_size > 1) {
-        fprintf(outtsfp, "_%s", infile.c_str());
-      }
-    }
-    for (const auto &entry : stts_unit_list_dict) {
-      const std::string &infile = entry.first;
-      fprintf(outtsfp, ",pts_duration_delta");
-      if (infile_list_size > 1) {
-        fprintf(outtsfp, "_%s", infile.c_str());
-      }
-    }
-    fprintf(outtsfp, "\n");
-    // 3.4. dump the columns of inter-frame timestamps
-    for (size_t frame_num = 0; frame_num < max_number_of_frames; ++frame_num) {
-      fprintf(outtsfp, "%zu", frame_num);
-      // get frame_num_orig_list[frame_num]
-      for (const auto &entry : frame_num_orig_list_dict) {
-        const std::vector<uint32_t> &frame_num_orig_list = entry.second;
-        if (frame_num < frame_num_orig_list.size()) {
-          uint32_t frame_num_orig = frame_num_orig_list[frame_num];
-          fprintf(outtsfp, ",%u", frame_num_orig);
-        } else {
-          fprintf(outtsfp, ",");
-        }
-      }
-      // dump stts_unit_list[frame_num]
-      for (const auto &entry : stts_unit_list_dict) {
-        const std::vector<uint32_t> &stts_unit_list = entry.second;
-        if (frame_num < stts_unit_list.size()) {
-          uint32_t stts_unit = stts_unit_list[frame_num];
-          fprintf(outtsfp, ",%u", stts_unit);
-        } else {
-          fprintf(outtsfp, ",");
-        }
-      }
-      // dump ctts_sec_list[frame_num]
-      for (const auto &entry : ctts_unit_list_dict) {
-        const std::vector<int32_t> &ctts_unit_list = entry.second;
-        if (frame_num < ctts_unit_list.size()) {
-          int32_t ctts_unit = ctts_unit_list[frame_num];
-          fprintf(outtsfp, ",%i", ctts_unit);
-        } else {
-          fprintf(outtsfp, ",");
-        }
-      }
-      // dump dts_sec_list[frame_num]
-      for (const auto &entry : dts_sec_list_dict) {
-        const std::vector<float> &dts_sec_list = entry.second;
-        if (frame_num < dts_sec_list.size()) {
-          float dts = dts_sec_list[frame_num];
-          fprintf(outtsfp, ",%f", dts);
-        } else {
-          fprintf(outtsfp, ",");
-        }
-      }
-      // dump pts_sec_list[frame_num]
-      for (const auto &entry : pts_sec_list_dict) {
-        const std::vector<float> &pts_sec_list = entry.second;
-        if (frame_num < pts_sec_list.size()) {
-          float pts = pts_sec_list[frame_num];
-          fprintf(outtsfp, ",%f", pts);
-        } else {
-          fprintf(outtsfp, ",");
-        }
-      }
-      // dump pts_duration_sec_list[frame_num]
-      for (const auto &entry : pts_duration_sec_list_dict) {
-        const std::vector<float> &pts_duration_sec_list = entry.second;
-        if (frame_num < pts_duration_sec_list.size()) {
-          float pts_duration = pts_duration_sec_list[frame_num];
-          fprintf(outtsfp, ",%f", pts_duration);
-        } else {
-          fprintf(outtsfp, ",");
-        }
-      }
-      // dump pts_duration_delta_sec_list[frame_num]
-      for (const auto &entry : pts_duration_delta_sec_list_dict) {
-        const std::vector<float> &pts_duration_delta_sec_list = entry.second;
-        if (frame_num < pts_duration_delta_sec_list.size()) {
-          float pts_duration_delta = pts_duration_delta_sec_list[frame_num];
-          fprintf(outtsfp, ",%f", pts_duration_delta);
-        } else {
-          fprintf(outtsfp, ",");
-        }
-      }
-      fprintf(outtsfp, "\n");
     }
     fclose(outtsfp);
   }
