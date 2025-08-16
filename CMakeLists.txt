@@ -82,7 +82,6 @@ include_directories(
 )
 
 # 1. build external libraries
-
 add_subdirectory(${CMAKE_SOURCE_DIR}/lib/isobmff)
 
 set(BUILD_CLANG_FUZZER OFF)
@@ -190,7 +189,14 @@ target_include_directories(liblcvm PRIVATE ${CMAKE_BINARY_DIR})
 
 # 4. others
 
-add_custom_target(test
+option(BUILD_TESTS "Build liblcvm tests" ON)
+if(BUILD_TESTS)
+  enable_testing()
+  add_subdirectory(test)
+endif()
+
+
+add_custom_target(test2
   COMMAND ${CMAKE_COMMAND} -E echo "Running: ${CMAKE_BINARY_DIR}/lcvm ${CMAKE_SOURCE_DIR}/lib/isobmff/media/*MOV -o /tmp/full.csv"
   COMMAND ${CMAKE_BINARY_DIR}/lcvm ${CMAKE_SOURCE_DIR}/lib/isobmff/media/*MOV -o /tmp/full.csv
   COMMAND ${CMAKE_COMMAND} -E echo "Running: ${CMAKE_BINARY_DIR}/lcvm ${CMAKE_SOURCE_DIR}/lib/isobmff/media/*MOV -p ${CMAKE_SOURCE_DIR}/policy/example.txt -o /tmp/full.policy.csv"

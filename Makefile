@@ -8,6 +8,7 @@ lint:
 	clang-format -i -style=google ./include/*h
 	clang-format -i -style=google ./src/*cc
 	clang-format -i -style=google ./tools/*cc
+	clang-format -i -style=google ./test/*cc
 
 
 .PHONY: build
