@@ -192,7 +192,7 @@ def dump_output(infile, outfp, file_info, debug):
     # Write to the output file
     outfp.write(f"{infile}")
     outfp.write(f",{filesize}")
-    outfp.write(f",{bitrate_bps:.6f}")  # Format the float with 6 decimal places
+    outfp.write(f",{bitrate_bps:.6f}")  # Format the double with 6 decimal places
     outfp.write(f",{width:.6f}")
     outfp.write(f",{height:.6f}")
     outfp.write(f",{type}")

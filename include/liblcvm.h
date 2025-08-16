@@ -33,9 +33,9 @@ class TimingInformation {
   // num_video_frames: Number of video frames in the file.
   int num_video_frames;
   // duration_video_sec: Video length (seconds).
-  float duration_video_sec;
+  double duration_video_sec;
   // duration_audio_sec: Audio length (seconds).
-  float duration_audio_sec;
+  double duration_audio_sec;
   // timescale_video_hz: Video length (Hz).
   uint32_t timescale_video_hz;
   // timescale_audio_hz: Audio length (Hz).
@@ -47,85 +47,85 @@ class TimingInformation {
   // ctts_unit_list: CTTS values (units).
   std::vector<int32_t> ctts_unit_list;
   // dts_sec_list: DTS (decoding timestamp) list (seconds).
-  std::vector<float> dts_sec_list;
+  std::vector<double> dts_sec_list;
   // pts_sec_list: PTS (presentation timestamp) list (units).
   std::vector<int32_t> pts_unit_list;
   // pts_sec_list: PTS (presentation timestamp) list (seconds).
-  std::vector<float> pts_sec_list;
+  std::vector<double> pts_sec_list;
   // pts_duration_sec_list: PTS (presentation timestamp) duration list
   // (seconds).
-  std::vector<float> pts_duration_sec_list;
+  std::vector<double> pts_duration_sec_list;
   // pts_duration_delta_sec_list: PTS (presentation timestamp) duration
   // delta to the average list (seconds).
-  std::vector<float> pts_duration_delta_sec_list;
+  std::vector<double> pts_duration_delta_sec_list;
   // pts_duration_sec_average: pts duration average (sec).
-  float pts_duration_sec_average;
+  double pts_duration_sec_average;
   // pts_duration_sec_median: pts duration median (sec).
-  float pts_duration_sec_median;
+  double pts_duration_sec_median;
   // pts_duration_sec_stddev: pts duration standard deviation (sec).
-  float pts_duration_sec_stddev;
+  double pts_duration_sec_stddev;
   // pts_duration_sec_mad: pts duration MAD (median absolute deviation) (sec).
-  float pts_duration_sec_mad;
+  double pts_duration_sec_mad;
   std::vector<uint32_t> keyframe_sample_number_list;
   // num_video_keyframes: Number of video key frames in the file.
   int num_video_keyframes;
-  float key_frame_ratio;
+  double key_frame_ratio;
   // audio_video_ratio: Audio/video length ratio.
-  float audio_video_ratio;
+  double audio_video_ratio;
   // video_freeze: Whether there is a video freeze.
   bool video_freeze;
   // frame_rate_fps_list: Vector of per-frame frame rates (fps).
-  std::vector<float> frame_rate_fps_list;
+  std::vector<double> frame_rate_fps_list;
   // frame_rate_fps_median: Frame rate (median, fps).
-  float frame_rate_fps_median;
+  double frame_rate_fps_median;
   // frame_rate_fps_average: Frame rate (average, fps).
-  float frame_rate_fps_average;
+  double frame_rate_fps_average;
   // frame_rate_fps_reverse_average: Average frame rate calculated
   // as the reverse of average PTS duration (sec)
-  float frame_rate_fps_reverse_average;
+  double frame_rate_fps_reverse_average;
   // frame_rate_fps_stddev: Frame rate (stddev).
-  float frame_rate_fps_stddev;
+  double frame_rate_fps_stddev;
   // frame_drop_length_sec_list: Vector of lengths between frame drops.
-  std::vector<float> frame_drop_length_sec_list;
+  std::vector<double> frame_drop_length_sec_list;
   // frame_drop_count: Frame drop count.
   int frame_drop_count;
   // frame_drop_ratio: Frame drop ratio (unitless).
-  float frame_drop_ratio;
+  double frame_drop_ratio;
   // normalized_frame_drop_average_length: Normalized frame drop length.
-  float normalized_frame_drop_average_length;
+  double normalized_frame_drop_average_length;
 
  public:
   DECL_GETTER(num_video_frames, int)
-  DECL_GETTER(duration_video_sec, float)
-  DECL_GETTER(duration_audio_sec, float)
+  DECL_GETTER(duration_video_sec, double)
+  DECL_GETTER(duration_audio_sec, double)
   DECL_GETTER(timescale_video_hz, uint32_t)
   DECL_GETTER(timescale_audio_hz, uint32_t)
   DECL_GETTER(frame_num_orig_list, std::vector<uint32_t>)
   DECL_GETTER(stts_unit_list, std::vector<uint32_t>)
   DECL_GETTER(ctts_unit_list, std::vector<int32_t>)
-  DECL_GETTER(dts_sec_list, std::vector<float>)
+  DECL_GETTER(dts_sec_list, std::vector<double>)
   DECL_GETTER(pts_unit_list, std::vector<int32_t>)
-  DECL_GETTER(pts_sec_list, std::vector<float>)
-  DECL_GETTER(pts_duration_sec_list, std::vector<float>)
-  DECL_GETTER(pts_duration_delta_sec_list, std::vector<float>)
-  DECL_GETTER(pts_duration_sec_average, float)
-  DECL_GETTER(pts_duration_sec_median, float)
-  DECL_GETTER(pts_duration_sec_stddev, float)
-  DECL_GETTER(pts_duration_sec_mad, float)
+  DECL_GETTER(pts_sec_list, std::vector<double>)
+  DECL_GETTER(pts_duration_sec_list, std::vector<double>)
+  DECL_GETTER(pts_duration_delta_sec_list, std::vector<double>)
+  DECL_GETTER(pts_duration_sec_average, double)
+  DECL_GETTER(pts_duration_sec_median, double)
+  DECL_GETTER(pts_duration_sec_stddev, double)
+  DECL_GETTER(pts_duration_sec_mad, double)
   DECL_GETTER(keyframe_sample_number_list, std::vector<uint32_t>)
   DECL_GETTER(num_video_keyframes, int)
-  DECL_GETTER(key_frame_ratio, float)
-  DECL_GETTER(audio_video_ratio, float)
+  DECL_GETTER(key_frame_ratio, double)
+  DECL_GETTER(audio_video_ratio, double)
   DECL_GETTER(video_freeze, bool)
-  DECL_GETTER(frame_rate_fps_list, std::vector<float>)
-  DECL_GETTER(frame_rate_fps_median, float)
-  DECL_GETTER(frame_rate_fps_average, float)
-  DECL_GETTER(frame_rate_fps_reverse_average, float)
-  DECL_GETTER(frame_rate_fps_stddev, float)
-  DECL_GETTER(frame_drop_length_sec_list, std::vector<float>)
+  DECL_GETTER(frame_rate_fps_list, std::vector<double>)
+  DECL_GETTER(frame_rate_fps_median, double)
+  DECL_GETTER(frame_rate_fps_average, double)
+  DECL_GETTER(frame_rate_fps_reverse_average, double)
+  DECL_GETTER(frame_rate_fps_stddev, double)
+  DECL_GETTER(frame_drop_length_sec_list, std::vector<double>)
   DECL_GETTER(frame_drop_count, int)
-  DECL_GETTER(frame_drop_ratio, float)
-  DECL_GETTER(normalized_frame_drop_average_length, float)
+  DECL_GETTER(frame_drop_ratio, double)
+  DECL_GETTER(normalized_frame_drop_average_length, double)
 
   static int parse_timing_information(
       std::shared_ptr<ISOBMFF::ContainerBox> stbl, uint32_t timescale_hz,
@@ -142,8 +142,8 @@ class TimingInformation {
   // @param[out] frame_drop_length_percentile_list: Frame drop length percentile
   // list.
   void calculate_percentile_list(
-      const std::vector<float> percentile_list,
-      std::vector<float> &frame_drop_length_percentile_list, int debug);
+      const std::vector<double> percentile_list,
+      std::vector<double> &frame_drop_length_percentile_list, int debug);
 
   // @param[in] consecutive_list: Consecutive list.
   // @param[out] frame_drop_length_consecutive: Frame drop length consecutive.
@@ -181,11 +181,11 @@ class FrameInformation {
   // filesize: Video file size (bytes).
   int filesize;
   // bitrate_bps: Video bitrate (bps).
-  float bitrate_bps;
+  double bitrate_bps;
   // width: Video width.
-  float width;
+  double width;
   // height: Video height.
-  float height;
+  double height;
   // type: Video type ("hvc1" or "avc1").
   std::string type;
   // width2: Video width (from hvc1/avc1).
@@ -220,9 +220,9 @@ class FrameInformation {
 
  public:
   DECL_GETTER(filesize, int)
-  DECL_GETTER(bitrate_bps, float)
-  DECL_GETTER(width, float)
-  DECL_GETTER(height, float)
+  DECL_GETTER(bitrate_bps, double)
+  DECL_GETTER(width, double)
+  DECL_GETTER(height, double)
   DECL_GETTER(type, std::string)
   DECL_GETTER(width2, int)
   DECL_GETTER(height2, int)
@@ -254,7 +254,7 @@ using LiblcvmKeyList = std::vector<std::string>;
 
 // frame_num, stts, ctts, dts, pts, pts_duration, pts_duration_delta
 using LiblcvmTiming =
-    std::tuple<uint32_t, uint32_t, int32_t, float, float, float, float>;
+    std::tuple<uint32_t, uint32_t, int32_t, double, double, double, double>;
 using LiblcvmTimingList = std::vector<LiblcvmTiming>;
 
 double liblcvmvalue_to_double(const LiblcvmValue &value);

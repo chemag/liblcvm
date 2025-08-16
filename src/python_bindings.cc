@@ -55,9 +55,9 @@ namespace py = pybind11;
            &class_name::get_normalized_frame_drop_average_length)             \
       .def(                                                                   \
           "calculate_percentile_list",                                        \
-          [](class_name& self, const std::vector<float>& percentile_list,     \
+          [](class_name& self, const std::vector<double>& percentile_list,    \
              int debug) {                                                     \
-            std::vector<float> frame_drop_length_percentile_list;             \
+            std::vector<double> frame_drop_length_percentile_list;            \
             self.calculate_percentile_list(                                   \
                 percentile_list, frame_drop_length_percentile_list, debug);   \
             return frame_drop_length_percentile_list;                         \

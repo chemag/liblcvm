@@ -105,10 +105,6 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
     std::shared_ptr<IsobmffFileInformation> pobj, LiblcvmKeyList *pkeys,
     LiblcvmValList *pvals, bool calculate_timestamps,
     LiblcvmKeyList *pkeys_timing, LiblcvmTimingList *pvals_timing, int debug) {
-  // TODO(chema): remove these lambdas
-  // Helper lambdas
-  auto to_double = [](auto v) { return static_cast<double>(v); };
-
   // 0. reset all vectors
   pkeys->clear();
   pvals->clear();
@@ -118,17 +114,14 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
   // 1. fill up the main keys/vals
   pkeys->push_back("infile");
   pvals->push_back(pobj->get_filename());
-  // TODO(marko): why to_int() here? filesize should already be an int.
-  // Same for all the other to_int() cases.
   pkeys->push_back("filesize");
   pvals->push_back(pobj->get_frame().get_filesize());
-  // TODO(marko): move all the floats to double to avoid the conversion
   pkeys->push_back("bitrate_bps");
-  pvals->push_back(to_double(pobj->get_frame().get_bitrate_bps()));
+  pvals->push_back(pobj->get_frame().get_bitrate_bps());
   pkeys->push_back("width");
-  pvals->push_back(to_double(pobj->get_frame().get_width()));
+  pvals->push_back(pobj->get_frame().get_width());
   pkeys->push_back("height");
-  pvals->push_back(to_double(pobj->get_frame().get_height()));
+  pvals->push_back(pobj->get_frame().get_height());
   pkeys->push_back("type");
   pvals->push_back(std::string(pobj->get_frame().get_type()));
   pkeys->push_back("horizresolution");
@@ -154,55 +147,53 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
   pkeys->push_back("num_video_frames");
   pvals->push_back(pobj->get_timing().get_num_video_frames());
   pkeys->push_back("frame_rate_fps_median");
-  pvals->push_back(to_double(pobj->get_timing().get_frame_rate_fps_median()));
+  pvals->push_back(pobj->get_timing().get_frame_rate_fps_median());
   pkeys->push_back("frame_rate_fps_average");
-  pvals->push_back(to_double(pobj->get_timing().get_frame_rate_fps_average()));
+  pvals->push_back(pobj->get_timing().get_frame_rate_fps_average());
   pkeys->push_back("frame_rate_fps_reverse_average");
-  pvals->push_back(
-      to_double(pobj->get_timing().get_frame_rate_fps_reverse_average()));
+  pvals->push_back(pobj->get_timing().get_frame_rate_fps_reverse_average());
   pkeys->push_back("frame_rate_fps_stddev");
-  pvals->push_back(to_double(pobj->get_timing().get_frame_rate_fps_stddev()));
+  pvals->push_back(pobj->get_timing().get_frame_rate_fps_stddev());
   pkeys->push_back("video_freeze");
   pvals->push_back(pobj->get_timing().get_video_freeze() ? 1 : 0);
   pkeys->push_back("audio_video_ratio");
-  pvals->push_back(to_double(pobj->get_timing().get_audio_video_ratio()));
+  pvals->push_back(pobj->get_timing().get_audio_video_ratio());
   pkeys->push_back("duration_video_sec");
-  pvals->push_back(to_double(pobj->get_timing().get_duration_video_sec()));
+  pvals->push_back(pobj->get_timing().get_duration_video_sec());
   pkeys->push_back("duration_audio_sec");
-  pvals->push_back(to_double(pobj->get_timing().get_duration_audio_sec()));
+  pvals->push_back(pobj->get_timing().get_duration_audio_sec());
   pkeys->push_back("timescale_video_hz");
   pvals->push_back(pobj->get_timing().get_timescale_video_hz());
   pkeys->push_back("timescale_audio_hz");
   pvals->push_back(pobj->get_timing().get_timescale_audio_hz());
   pkeys->push_back("pts_duration_sec_average");
-  pvals->push_back(
-      to_double(pobj->get_timing().get_pts_duration_sec_average()));
+  pvals->push_back(pobj->get_timing().get_pts_duration_sec_average());
   pkeys->push_back("pts_duration_sec_median");
-  pvals->push_back(to_double(pobj->get_timing().get_pts_duration_sec_median()));
+  pvals->push_back(pobj->get_timing().get_pts_duration_sec_median());
   pkeys->push_back("pts_duration_sec_stddev");
-  pvals->push_back(to_double(pobj->get_timing().get_pts_duration_sec_stddev()));
+  pvals->push_back(pobj->get_timing().get_pts_duration_sec_stddev());
   pkeys->push_back("pts_duration_sec_mad");
-  pvals->push_back(to_double(pobj->get_timing().get_pts_duration_sec_mad()));
+  pvals->push_back(pobj->get_timing().get_pts_duration_sec_mad());
   pkeys->push_back("frame_drop_count");
   pvals->push_back(pobj->get_timing().get_frame_drop_count());
   pkeys->push_back("frame_drop_ratio");
-  pvals->push_back(to_double(pobj->get_timing().get_frame_drop_ratio()));
+  pvals->push_back(pobj->get_timing().get_frame_drop_ratio());
   pkeys->push_back("normalized_frame_drop_average_length");
   pvals->push_back(
-      to_double(pobj->get_timing().get_normalized_frame_drop_average_length()));
+      pobj->get_timing().get_normalized_frame_drop_average_length());
 
   // Percentiles
-  std::vector<float> percentile_list = {50, 90};
-  std::vector<float> frame_drop_length_percentile_list;
+  std::vector<double> percentile_list = {50, 90};
+  std::vector<double> frame_drop_length_percentile_list;
   pobj->get_timing().calculate_percentile_list(
       percentile_list, frame_drop_length_percentile_list, debug);
   pkeys->push_back("frame_drop_length_percentile_50");
   pvals->push_back(frame_drop_length_percentile_list.size() > 0
-                       ? to_double(frame_drop_length_percentile_list[0])
+                       ? frame_drop_length_percentile_list[0]
                        : 0.0);
   pkeys->push_back("frame_drop_length_percentile_90");
   pvals->push_back(frame_drop_length_percentile_list.size() > 1
-                       ? to_double(frame_drop_length_percentile_list[1])
+                       ? frame_drop_length_percentile_list[1]
                        : 0.0);
 
   // Consecutive frame drop lists
@@ -221,7 +212,7 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
   pkeys->push_back("num_video_keyframes");
   pvals->push_back(pobj->get_timing().get_num_video_keyframes());
   pkeys->push_back("key_frame_ratio");
-  pvals->push_back(to_double(pobj->get_timing().get_key_frame_ratio()));
+  pvals->push_back(pobj->get_timing().get_key_frame_ratio());
   // audio values
   pkeys->push_back("audio_type");
   pvals->push_back(std::string(pobj->get_audio().get_audio_type()));
@@ -271,26 +262,26 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
         pobj->get_timing().get_stts_unit_list();
     std::vector<int32_t> ctts_unit_list =
         pobj->get_timing().get_ctts_unit_list();
-    std::vector<float> dts_sec_list = pobj->get_timing().get_dts_sec_list();
-    std::vector<float> pts_sec_list = pobj->get_timing().get_pts_sec_list();
-    std::vector<float> pts_duration_sec_list =
+    std::vector<double> dts_sec_list = pobj->get_timing().get_dts_sec_list();
+    std::vector<double> pts_sec_list = pobj->get_timing().get_pts_sec_list();
+    std::vector<double> pts_duration_sec_list =
         pobj->get_timing().get_pts_duration_sec_list();
-    std::vector<float> pts_duration_delta_sec_list =
+    std::vector<double> pts_duration_delta_sec_list =
         pobj->get_timing().get_pts_duration_delta_sec_list();
     // zip them
     size_t n = frame_num_orig_list.size();
     pvals_timing->reserve(n);
     for (size_t i = 0; i < n; ++i) {
-      pvals_timing->emplace_back(frame_num_orig_list[i], stts_unit_list[i],
-                                 ctts_unit_list[i], dts_sec_list[i],
-                                 pts_sec_list[i],
-                                 // we typically have 1 less value
-                                 (i < pts_duration_sec_list.size())
-                                     ? pts_duration_sec_list[i]
-                                     : std::numeric_limits<float>::quiet_NaN(),
-                                 (i < pts_duration_delta_sec_list.size())
-                                     ? pts_duration_delta_sec_list[i]
-                                     : std::numeric_limits<float>::quiet_NaN());
+      pvals_timing->emplace_back(
+          frame_num_orig_list[i], stts_unit_list[i], ctts_unit_list[i],
+          dts_sec_list[i], pts_sec_list[i],
+          // we typically have 1 less value
+          (i < pts_duration_sec_list.size())
+              ? pts_duration_sec_list[i]
+              : std::numeric_limits<double>::quiet_NaN(),
+          (i < pts_duration_delta_sec_list.size())
+              ? pts_duration_delta_sec_list[i]
+              : std::numeric_limits<double>::quiet_NaN());
     }
   }
 
@@ -382,7 +373,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     }
     uint32_t timescale_hz = mdhd->GetTimescale();
     uint64_t duration = mdhd->GetDuration();
-    float duration_sec = ((float)duration) / timescale_hz;
+    double duration_sec = ((double)duration) / timescale_hz;
     if (liblcvm_config.get_debug() > 1) {
       fprintf(stdout, "-> handler_type: %s ", handler_type.c_str());
       fprintf(stdout, "timescale: %u ", timescale_hz);
@@ -542,7 +533,7 @@ int TimingInformation::parse_timing_information(
       ptr->timing.stts_unit_list.push_back(sample_offset);
       // set the dts value of the next frame
       uint32_t dts_unit = last_dts_unit + sample_offset;
-      float dts_sec = ((float)dts_unit) / timescale_hz;
+      double dts_sec = ((double)dts_unit) / timescale_hz;
       ptr->timing.dts_sec_list.push_back(dts_sec);
       // init the pts value of the next frame
       ptr->timing.pts_unit_list.push_back(dts_unit);
@@ -580,7 +571,7 @@ int TimingInformation::parse_timing_information(
         // update the pts value
         ptr->timing.pts_unit_list[cur_video_frame] += sample_offset;
         ptr->timing.pts_sec_list[cur_video_frame] =
-            ((float)ptr->timing.pts_unit_list[cur_video_frame]) / timescale_hz;
+            ((double)ptr->timing.pts_unit_list[cur_video_frame]) / timescale_hz;
         ++cur_video_frame;
       }
       if (debug > 2) {
@@ -595,7 +586,7 @@ int TimingInformation::parse_timing_information(
       ptr->timing.pts_unit_list[cur_video_frame] +=
           last_ctts_sample_offset_unit;
       ptr->timing.pts_sec_list[cur_video_frame] =
-          ((float)ptr->timing.pts_unit_list[cur_video_frame]) / timescale_hz;
+          ((double)ptr->timing.pts_unit_list[cur_video_frame]) / timescale_hz;
       ++cur_video_frame;
     }
     if (debug > 2) {
@@ -647,12 +638,12 @@ void calculate_vector_deltas_int32_t(const std::vector<int32_t> in,
   }
 }
 
-float calculate_median(const std::vector<float> &vec) {
+double calculate_median(const std::vector<double> &vec) {
   if (vec.empty()) {
     fprintf(stderr, "error: calculate_median empty input vector\n");
     return 0.0f;
   }
-  std::vector<float> vec2 = vec;
+  std::vector<double> vec2 = vec;
   std::sort(vec2.begin(), vec2.end());
   size_t n = vec2.size();
   if (n % 2 == 0) {
@@ -662,11 +653,11 @@ float calculate_median(const std::vector<float> &vec) {
   }
 }
 
-float calculate_average(const std::vector<float> &vec) {
+double calculate_average(const std::vector<double> &vec) {
   return std::accumulate(vec.begin(), vec.end(), 0.0f) / vec.size();
 }
 
-float calculate_standard_deviation(const std::vector<float> &vec) {
+double calculate_standard_deviation(const std::vector<double> &vec) {
   if (vec.size() < 2) {
     fprintf(stderr,
             "error: calculate_standard_deviation needs at least 2 "
@@ -674,9 +665,9 @@ float calculate_standard_deviation(const std::vector<float> &vec) {
     return 0.0f;
   }
 
-  float mean = calculate_average(vec);
-  float sum_squares = 0.0f;
-  for (const float &x : vec) {
+  double mean = calculate_average(vec);
+  double sum_squares = 0.0f;
+  for (const double &x : vec) {
     sum_squares += (x - mean) * (x - mean);
   }
 
@@ -684,16 +675,16 @@ float calculate_standard_deviation(const std::vector<float> &vec) {
 }
 
 // https://en.wikipedia.org/wiki/Median_absolute_deviation
-float calculate_median_absolute_deviation(const std::vector<float> &vec) {
+double calculate_median_absolute_deviation(const std::vector<double> &vec) {
   // \tilde(X): median(vec)
-  float median = calculate_median(vec);
+  double median = calculate_median(vec);
   // |Xi - \tilde(X)|: vector of absolute differences to the median
-  std::vector<float> vec_abs_differences(vec.size());
+  std::vector<double> vec_abs_differences(vec.size());
   for (size_t i = 0; i < vec.size(); i++) {
     vec_abs_differences[i] = abs(vec[i] - median);
   }
   // MAD = median(|Xi - \tilde(X)|)
-  float mad = calculate_median(vec_abs_differences);
+  double mad = calculate_median(vec_abs_differences);
   return mad;
 }
 
@@ -731,7 +722,7 @@ int TimingInformation::derive_timing_info(
     }
     ptr->timing.ctts_unit_list = ctts_unit_list_alt;
     // 2.3. dts_sec_list
-    std::vector<float> dts_sec_list_alt(ptr->timing.dts_sec_list.size());
+    std::vector<double> dts_sec_list_alt(ptr->timing.dts_sec_list.size());
     for (uint32_t i = 0; i < ptr->timing.dts_sec_list.size(); ++i) {
       dts_sec_list_alt[i] =
           ptr->timing.dts_sec_list[ptr->timing.frame_num_orig_list[i]];
@@ -745,7 +736,7 @@ int TimingInformation::derive_timing_info(
     }
     ptr->timing.pts_unit_list = pts_unit_list_alt;
     // 2.5. pts_sec_list
-    std::vector<float> pts_sec_list_alt(ptr->timing.pts_sec_list.size());
+    std::vector<double> pts_sec_list_alt(ptr->timing.pts_sec_list.size());
     for (uint32_t i = 0; i < ptr->timing.pts_sec_list.size(); ++i) {
       pts_sec_list_alt[i] =
           ptr->timing.pts_sec_list[ptr->timing.frame_num_orig_list[i]];
@@ -761,7 +752,7 @@ int TimingInformation::derive_timing_info(
   ptr->timing.pts_duration_sec_list.resize(pts_duration_unit_list.size());
   for (uint32_t i = 0; i < pts_duration_unit_list.size(); ++i) {
     ptr->timing.pts_duration_sec_list[i] =
-        ((float)pts_duration_unit_list[i]) / ptr->timing.timescale_video_hz;
+        ((double)pts_duration_unit_list[i]) / ptr->timing.timescale_video_hz;
   }
   // 3.2. calculate the duration average/median
   ptr->timing.pts_duration_sec_average =
@@ -809,9 +800,9 @@ int TimingInformation::derive_timing_info(
       ptr->timing.pts_duration_sec_list.size());
   std::transform(ptr->timing.pts_duration_sec_list.begin(),
                  ptr->timing.pts_duration_sec_list.end(),
-                 ptr->timing.frame_rate_fps_list.begin(), [](float val) {
+                 ptr->timing.frame_rate_fps_list.begin(), [](double val) {
                    // Handle division by zero
-                   return val != 0.0f ? 1.0f / static_cast<float>(val) : 0.0f;
+                   return val != 0.0f ? 1.0f / static_cast<double>(val) : 0.0f;
                  });
   // 6.2. median
   ptr->timing.frame_rate_fps_median =
@@ -838,7 +829,7 @@ int TimingInformation::derive_timing_info(
   // 7. calculate the threshold to consider frame drop: This should be 2
   // times the median, minus a factor
   double FACTOR = 0.75;
-  float pts_duration_sec_threshold =
+  double pts_duration_sec_threshold =
       ptr->timing.pts_duration_sec_median * FACTOR * 2;
 
   // 8. get the list of all the drops (absolute inter-frame values)
@@ -852,18 +843,18 @@ int TimingInformation::derive_timing_info(
   // ...}
 
   // 9. sum all the drops, but adding only the length over 1x frame time
-  float frame_drop_length_sec_list = 0.0;
+  double frame_drop_length_sec_list = 0.0;
   for (const auto &drop_length_sec : ptr->timing.frame_drop_length_sec_list) {
     frame_drop_length_sec_list += drop_length_sec;
   }
-  float drop_length_duration_sec =
+  double drop_length_duration_sec =
       frame_drop_length_sec_list -
       ptr->timing.pts_duration_sec_median *
           ptr->timing.frame_drop_length_sec_list.size();
   // drop_length_duration_sec: sum({33.35900000000022, 66.92600000000168, ...})
 
   // 10. get the total duration as the sum of all the inter-frame distances
-  float total_duration_sec = 0.0;
+  double total_duration_sec = 0.0;
   for (const auto &pts_duration_sec : ptr->timing.pts_duration_sec_list) {
     total_duration_sec += pts_duration_sec;
   }
@@ -879,7 +870,7 @@ int TimingInformation::derive_timing_info(
   // should be close to 2
   ptr->timing.normalized_frame_drop_average_length = 0.0;
   if (ptr->timing.frame_drop_length_sec_list.size() > 0) {
-    float frame_drop_average_length =
+    double frame_drop_average_length =
         frame_drop_length_sec_list /
         ptr->timing.frame_drop_length_sec_list.size();
     ptr->timing.normalized_frame_drop_average_length =
@@ -890,22 +881,22 @@ int TimingInformation::derive_timing_info(
 }
 
 void TimingInformation::calculate_percentile_list(
-    const std::vector<float> percentile_list,
-    std::vector<float> &frame_drop_length_percentile_list, int debug) {
+    const std::vector<double> percentile_list,
+    std::vector<double> &frame_drop_length_percentile_list, int debug) {
   // calculate percentile list
   frame_drop_length_percentile_list.clear();
   if (frame_drop_length_sec_list.size() > 0) {
     std::sort(frame_drop_length_sec_list.begin(),
               frame_drop_length_sec_list.end());
-    for (const float &percentile : percentile_list) {
+    for (const double &percentile : percentile_list) {
       int position = (percentile / 100.0) * frame_drop_length_sec_list.size();
-      float frame_drop_length_percentile =
+      double frame_drop_length_percentile =
           frame_drop_length_sec_list[position] /
           this->get_pts_duration_sec_median();
       frame_drop_length_percentile_list.push_back(frame_drop_length_percentile);
     }
   } else {
-    for (const float &_ : percentile_list) {
+    for (const double &_ : percentile_list) {
       frame_drop_length_percentile_list.push_back(0.0);
     }
   }
@@ -921,7 +912,7 @@ void TimingInformation::calculate_consecutive_list(
   }
   if (frame_drop_length_sec_list.size() > 0) {
     for (const auto &frame_drop_length_sec : frame_drop_length_sec_list) {
-      float drop_length =
+      double drop_length =
           frame_drop_length_sec / this->get_pts_duration_sec_median();
       for (unsigned int i = 0; i < consecutive_list.size(); i++) {
         if (drop_length >= consecutive_list[i]) {
@@ -942,8 +933,8 @@ int FrameInformation::derive_frame_info(
     return -1;
   }
   ptr->frame.filesize = stat_buf.st_size;
-  ptr->frame.bitrate_bps = 8.0 * ((float)(ptr->frame.filesize)) /
-                           ((float)ptr->get_timing().get_duration_video_sec());
+  ptr->frame.bitrate_bps = 8.0 * ((double)(ptr->frame.filesize)) /
+                           ((double)ptr->get_timing().get_duration_video_sec());
 
   return 0;
 }
