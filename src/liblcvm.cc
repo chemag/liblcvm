@@ -52,6 +52,10 @@ std::string liblcvmvalue_to_string(const LiblcvmValue &value) {
     return std::get<std::string>(value);
   } else if (std::holds_alternative<int>(value)) {
     return std::to_string(std::get<int>(value));
+  } else if (std::holds_alternative<unsigned int>(value)) {
+    return std::to_string(std::get<unsigned int>(value));
+  } else if (std::holds_alternative<long int>(value)) {
+    return std::to_string(std::get<long int>(value));
   } else if (std::holds_alternative<double>(value)) {
     return std::to_string(std::get<double>(value));
   } else {
@@ -104,7 +108,6 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
   // TODO(chema): remove these lambdas
   // Helper lambdas
   auto to_double = [](auto v) { return static_cast<double>(v); };
-  auto to_int = [](auto v) { return static_cast<int>(v); };
 
   // 0. reset all vectors
   pkeys->clear();
@@ -118,7 +121,7 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
   // TODO(marko): why to_int() here? filesize should already be an int.
   // Same for all the other to_int() cases.
   pkeys->push_back("filesize");
-  pvals->push_back(to_int(pobj->get_frame().get_filesize()));
+  pvals->push_back(pobj->get_frame().get_filesize());
   // TODO(marko): move all the floats to double to avoid the conversion
   pkeys->push_back("bitrate_bps");
   pvals->push_back(to_double(pobj->get_frame().get_bitrate_bps()));
@@ -129,27 +132,27 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
   pkeys->push_back("type");
   pvals->push_back(std::string(pobj->get_frame().get_type()));
   pkeys->push_back("horizresolution");
-  pvals->push_back(to_int(pobj->get_frame().get_horizresolution()));
+  pvals->push_back(pobj->get_frame().get_horizresolution());
   pkeys->push_back("vertresolution");
-  pvals->push_back(to_int(pobj->get_frame().get_vertresolution()));
+  pvals->push_back(pobj->get_frame().get_vertresolution());
   pkeys->push_back("depth");
-  pvals->push_back(to_int(pobj->get_frame().get_depth()));
+  pvals->push_back(pobj->get_frame().get_depth());
   pkeys->push_back("chroma_format");
-  pvals->push_back(to_int(pobj->get_frame().get_chroma_format()));
+  pvals->push_back(pobj->get_frame().get_chroma_format());
   pkeys->push_back("bit_depth_luma");
-  pvals->push_back(to_int(pobj->get_frame().get_bit_depth_luma()));
+  pvals->push_back(pobj->get_frame().get_bit_depth_luma());
   pkeys->push_back("bit_depth_chroma");
-  pvals->push_back(to_int(pobj->get_frame().get_bit_depth_chroma()));
+  pvals->push_back(pobj->get_frame().get_bit_depth_chroma());
   pkeys->push_back("video_full_range_flag");
-  pvals->push_back(to_int(pobj->get_frame().get_video_full_range_flag()));
+  pvals->push_back(pobj->get_frame().get_video_full_range_flag());
   pkeys->push_back("colour_primaries");
-  pvals->push_back(to_int(pobj->get_frame().get_colour_primaries()));
+  pvals->push_back(pobj->get_frame().get_colour_primaries());
   pkeys->push_back("transfer_characteristics");
-  pvals->push_back(to_int(pobj->get_frame().get_transfer_characteristics()));
+  pvals->push_back(pobj->get_frame().get_transfer_characteristics());
   pkeys->push_back("matrix_coeffs");
-  pvals->push_back(to_int(pobj->get_frame().get_matrix_coeffs()));
+  pvals->push_back(pobj->get_frame().get_matrix_coeffs());
   pkeys->push_back("num_video_frames");
-  pvals->push_back(to_int(pobj->get_timing().get_num_video_frames()));
+  pvals->push_back(pobj->get_timing().get_num_video_frames());
   pkeys->push_back("frame_rate_fps_median");
   pvals->push_back(to_double(pobj->get_timing().get_frame_rate_fps_median()));
   pkeys->push_back("frame_rate_fps_average");
@@ -168,9 +171,9 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
   pkeys->push_back("duration_audio_sec");
   pvals->push_back(to_double(pobj->get_timing().get_duration_audio_sec()));
   pkeys->push_back("timescale_video_hz");
-  pvals->push_back(to_int(pobj->get_timing().get_timescale_video_hz()));
+  pvals->push_back(pobj->get_timing().get_timescale_video_hz());
   pkeys->push_back("timescale_audio_hz");
-  pvals->push_back(to_int(pobj->get_timing().get_timescale_audio_hz()));
+  pvals->push_back(pobj->get_timing().get_timescale_audio_hz());
   pkeys->push_back("pts_duration_sec_average");
   pvals->push_back(
       to_double(pobj->get_timing().get_pts_duration_sec_average()));
@@ -181,7 +184,7 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
   pkeys->push_back("pts_duration_sec_mad");
   pvals->push_back(to_double(pobj->get_timing().get_pts_duration_sec_mad()));
   pkeys->push_back("frame_drop_count");
-  pvals->push_back(to_int(pobj->get_timing().get_frame_drop_count()));
+  pvals->push_back(pobj->get_timing().get_frame_drop_count());
   pkeys->push_back("frame_drop_ratio");
   pvals->push_back(to_double(pobj->get_timing().get_frame_drop_ratio()));
   pkeys->push_back("normalized_frame_drop_average_length");
@@ -209,25 +212,25 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
       consecutive_list, frame_drop_length_consecutive, debug);
   pkeys->push_back("frame_drop_length_consecutive_2");
   pvals->push_back(frame_drop_length_consecutive.size() > 0
-                       ? to_int(frame_drop_length_consecutive[0])
-                       : 0);
+                       ? frame_drop_length_consecutive[0]
+                       : 0L);
   pkeys->push_back("frame_drop_length_consecutive_5");
   pvals->push_back(frame_drop_length_consecutive.size() > 1
-                       ? to_int(frame_drop_length_consecutive[1])
-                       : 0);
+                       ? frame_drop_length_consecutive[1]
+                       : 0L);
   pkeys->push_back("num_video_keyframes");
-  pvals->push_back(to_int(pobj->get_timing().get_num_video_keyframes()));
+  pvals->push_back(pobj->get_timing().get_num_video_keyframes());
   pkeys->push_back("key_frame_ratio");
   pvals->push_back(to_double(pobj->get_timing().get_key_frame_ratio()));
   // audio values
   pkeys->push_back("audio_type");
   pvals->push_back(std::string(pobj->get_audio().get_audio_type()));
   pkeys->push_back("channel_count");
-  pvals->push_back(to_int(pobj->get_audio().get_channel_count()));
+  pvals->push_back(pobj->get_audio().get_channel_count());
   pkeys->push_back("sample_rate");
-  pvals->push_back(to_int(pobj->get_audio().get_sample_rate()));
+  pvals->push_back(pobj->get_audio().get_sample_rate());
   pkeys->push_back("sample_size");
-  pvals->push_back(to_int(pobj->get_audio().get_sample_size()));
+  pvals->push_back(pobj->get_audio().get_sample_size());
 
   // 2. run the policy
   std::list<std::string> warn_list;

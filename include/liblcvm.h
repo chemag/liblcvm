@@ -247,7 +247,8 @@ class FrameInformation {
   friend class IsobmffFileInformation;
 };
 
-using LiblcvmValue = std::variant<int, double, std::string>;
+using LiblcvmValue =
+    std::variant<int, unsigned int, long int, double, std::string>;
 using LiblcvmValList = std::vector<LiblcvmValue>;
 using LiblcvmKeyList = std::vector<std::string>;
 
