@@ -97,6 +97,7 @@ if(BUILD_PYBINDINGS)
   set_target_properties(h264nal PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()
 
+
 # 2. build liblcvm library
 
 set(LIBLCVM_SOURCES src/liblcvm.cc)
@@ -157,28 +158,36 @@ target_link_libraries(liblcvm PRIVATE ${LIBLCVM_LINK_LIBRARIES})
 # Ensure code generation before building liblcvm
 add_dependencies(liblcvm gen_proto gen_antlr)
 
-# 3. build lcvm executable
-add_executable(lcvm
-    tools/lcvm.cc
-    src/policy_protovisitor.cc
-    src/policy_runner.cc
-    ${ANTLR_GEN_SRCS}
-    ${PROTO_GEN_SRCS}
+# Move implementation sources (including generated) into the lib
+target_sources(liblcvm PRIVATE
+  src/policy_protovisitor.cc
+  src/policy_runner.cc
+  ${ANTLR_GEN_SRCS}
+  ${PROTO_GEN_SRCS}
 )
-target_link_libraries(lcvm
-    liblcvm
+
+# Link third-party deps that liblcvm itself uses (PUBLIC so tests & tools get them)
+target_link_libraries(liblcvm
+  PUBLIC
     protobuf::libprotobuf
     antlr4-runtime
+    absl::strings
+    absl::base
     absl::log
     absl::log_internal_check_op
     absl::log_internal_message
     absl::log_internal_log_sink_set
     absl::log_internal_globals
     absl::log_severity
-    absl::strings
-    absl::base
 )
-add_dependencies(lcvm gen_proto gen_antlr)
+
+# Generated-code dependencies should be attached to the library
+add_dependencies(liblcvm gen_proto gen_antlr)
+
+# Executable is now just the tool front-end
+add_executable(lcvm tools/lcvm.cc)
+target_link_libraries(lcvm PRIVATE liblcvm)
+
 
 # configure a header file to pass some of the CMake settings
 configure_file(
@@ -206,6 +215,7 @@ add_custom_target(test2
 add_custom_target(lint
   COMMAND clang-format -i -style=google ${CMAKE_CURRENT_SOURCE_DIR}/include/*h
   COMMAND clang-format -i -style=google ${CMAKE_CURRENT_SOURCE_DIR}/src/*cc
+  COMMAND clang-format -i -style=google ${CMAKE_CURRENT_SOURCE_DIR}/test/*cc
   COMMAND clang-format -i -style=google ${CMAKE_CURRENT_SOURCE_DIR}/tools/*cc
 )
 

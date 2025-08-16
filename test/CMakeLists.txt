@@ -8,11 +8,27 @@ include_directories(PUBLIC ../src)
 include_directories(PUBLIC /usr/local/include)
 link_directories(/usr/local/lib)
 
+# define the root directory variable
+set(TEST_MEDIA_DIR ${CMAKE_SOURCE_DIR}/lib/isobmff/media)
+set(TEST_POLICY_DIR ${CMAKE_SOURCE_DIR}/policy)
+
 # Function to add a test executable
 function(add_liblcvm_test test_name)
   add_executable(${test_name} ${test_name}.cc)
+
+  # pass variables to C++ as a string literal
+  target_compile_definitions(${test_name}
+    PRIVATE TEST_MEDIA_DIR="${TEST_MEDIA_DIR}"
+  )
+  target_compile_definitions(${test_name}
+    PRIVATE TEST_POLICY_DIR="${TEST_POLICY_DIR}"
+  )
+
+  target_link_libraries(${test_name}
+    PUBLIC liblcvm GTest::gtest GTest::gtest_main
+  )
+
   add_test(NAME ${test_name} COMMAND ${test_name})
-  target_link_libraries(${test_name} PUBLIC liblcvm GTest::gtest GTest::gtest_main)
 endfunction()
 
 # Find all test files in the current directory
