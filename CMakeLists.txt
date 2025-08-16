@@ -2,86 +2,92 @@ cmake_minimum_required(VERSION 3.10)
 
 project(lcvm VERSION 0.17)
 
-# use C++17
+# Ensure modern behavior for add_custom_command(TARGET ...)
+if(POLICY CMP0175)
+  cmake_policy(SET CMP0175 NEW)
+endif()
+
+# ---- Language / flags --------------------------------------------------------
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Set compiler flags
+# Debug flags (you can still override from the CLI)
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -Wall -Wextra -Wno-unused-parameter -Wshadow")
 
 message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR} ")
 
-# --- ANTLR/Protobuf Autogen Setup ---
+# ---- Generated code dirs -----------------------------------------------------
 set(AUTOGEN_DIR ${CMAKE_SOURCE_DIR}/autogen)
 set(ANTLR_GEN_DIR ${AUTOGEN_DIR}/antlr-gen)
 set(PROTO_GEN_DIR ${AUTOGEN_DIR}/protobuf-gen)
 file(MAKE_DIRECTORY ${ANTLR_GEN_DIR})
 file(MAKE_DIRECTORY ${PROTO_GEN_DIR})
 
-# Download ANTLR jar at configure time (to build dir)
-set(ANTLR_JAR ${CMAKE_BINARY_DIR}/antlr-4.13.1-complete.jar)
-set(ANTLR_JAR_URL https://www.antlr.org/download/antlr-4.13.1-complete.jar)
-if(NOT EXISTS ${ANTLR_JAR})
-    message(STATUS "Downloading ANTLR jar to ${ANTLR_JAR} ...")
-    file(DOWNLOAD ${ANTLR_JAR_URL} ${ANTLR_JAR} SHOW_PROGRESS)
-endif()
-
+# ---- Dependencies ------------------------------------------------------------
 find_package(Protobuf REQUIRED)
 find_package(absl REQUIRED)
 find_package(antlr4-runtime REQUIRED)
 
-# Protobuf generation
+# Download ANTLR jar to build dir if missing
+set(ANTLR_JAR ${CMAKE_BINARY_DIR}/antlr-4.13.1-complete.jar)
+set(ANTLR_JAR_URL https://www.antlr.org/download/antlr-4.13.1-complete.jar)
+if(NOT EXISTS ${ANTLR_JAR})
+  message(STATUS "Downloading ANTLR jar to ${ANTLR_JAR} ...")
+  file(DOWNLOAD ${ANTLR_JAR_URL} ${ANTLR_JAR} SHOW_PROGRESS)
+endif()
+
+# ---- Protobuf generation -----------------------------------------------------
 set(PROTO_PATH ${CMAKE_SOURCE_DIR}/policy)
 set(PROTO_SRC rules.proto)
 set(PROTO_GEN_SRCS
-    ${PROTO_GEN_DIR}/rules.pb.cc
-    ${PROTO_GEN_DIR}/rules.pb.h
+  ${PROTO_GEN_DIR}/rules.pb.cc
+  ${PROTO_GEN_DIR}/rules.pb.h
 )
 add_custom_command(
-    OUTPUT ${PROTO_GEN_SRCS}
-    COMMAND ${Protobuf_PROTOC_EXECUTABLE}
-        --proto_path=${PROTO_PATH}
-        --cpp_out=${PROTO_GEN_DIR}
-        ${PROTO_SRC}
-    WORKING_DIRECTORY ${PROTO_PATH}
-    DEPENDS ${PROTO_PATH}/${PROTO_SRC}
-    COMMENT "Generating Protobuf sources in protobuf-gen/"
+  OUTPUT ${PROTO_GEN_SRCS}
+  COMMAND ${Protobuf_PROTOC_EXECUTABLE}
+          --proto_path=${PROTO_PATH}
+          --cpp_out=${PROTO_GEN_DIR}
+          ${PROTO_SRC}
+  WORKING_DIRECTORY ${PROTO_PATH}
+  DEPENDS ${PROTO_PATH}/${PROTO_SRC}
+  COMMENT "Generating Protobuf sources in protobuf-gen/"
 )
 add_custom_target(gen_proto DEPENDS ${PROTO_GEN_SRCS})
 
-# ANTLR generation
+# ---- ANTLR generation --------------------------------------------------------
 set(ANTLR_GRAMMAR ${CMAKE_SOURCE_DIR}/policy/rules.g4)
 set(ANTLR_GEN_SRCS
-    ${ANTLR_GEN_DIR}/rulesLexer.cpp
-    ${ANTLR_GEN_DIR}/rulesParser.cpp
-    ${ANTLR_GEN_DIR}/rulesBaseListener.cpp
-    ${ANTLR_GEN_DIR}/rulesListener.cpp
-    ${ANTLR_GEN_DIR}/rulesBaseVisitor.cpp
-    ${ANTLR_GEN_DIR}/rulesVisitor.cpp
+  ${ANTLR_GEN_DIR}/rulesLexer.cpp
+  ${ANTLR_GEN_DIR}/rulesParser.cpp
+  ${ANTLR_GEN_DIR}/rulesBaseListener.cpp
+  ${ANTLR_GEN_DIR}/rulesListener.cpp
+  ${ANTLR_GEN_DIR}/rulesBaseVisitor.cpp
+  ${ANTLR_GEN_DIR}/rulesVisitor.cpp
 )
 add_custom_command(
-    OUTPUT ${ANTLR_GEN_SRCS}
-    COMMAND java -Xmx500M -cp ${ANTLR_JAR} org.antlr.v4.Tool -Dlanguage=Cpp -visitor -o ${ANTLR_GEN_DIR} ${ANTLR_GRAMMAR}
-    DEPENDS ${ANTLR_GRAMMAR} ${ANTLR_JAR}
-    COMMENT "Generating ANTLR sources"
+  OUTPUT ${ANTLR_GEN_SRCS}
+  COMMAND java -Xmx500M -cp ${ANTLR_JAR} org.antlr.v4.Tool
+          -Dlanguage=Cpp -visitor -o ${ANTLR_GEN_DIR} ${ANTLR_GRAMMAR}
+  DEPENDS ${ANTLR_GRAMMAR} ${ANTLR_JAR}
+  COMMENT "Generating ANTLR sources"
 )
 add_custom_target(gen_antlr DEPENDS ${ANTLR_GEN_SRCS})
+add_custom_target(gen_all  DEPENDS gen_proto gen_antlr)
 
-add_custom_target(gen_all DEPENDS gen_proto gen_antlr)
-
-# Add include directories (including generated)
+# ---- Includes ----------------------------------------------------------------
 include_directories(
-    ${CMAKE_SOURCE_DIR}/include
-    ${ANTLR_GEN_DIR}
-    ${PROTO_GEN_DIR}
-    /usr/include/antlr4-runtime
-    /usr/local/include/antlr4-runtime
-    /opt/homebrew/include
-    ${Protobuf_INCLUDE_DIRS}
+  ${CMAKE_SOURCE_DIR}/include
+  ${ANTLR_GEN_DIR}
+  ${PROTO_GEN_DIR}
+  /usr/include/antlr4-runtime
+  /usr/local/include/antlr4-runtime
+  /opt/homebrew/include
+  ${Protobuf_INCLUDE_DIRS}
 )
 
-# 1. build external libraries
+# ---- Third-party subprojects -------------------------------------------------
 add_subdirectory(${CMAKE_SOURCE_DIR}/lib/isobmff)
 
 set(BUILD_CLANG_FUZZER OFF)
@@ -97,10 +103,10 @@ if(BUILD_PYBINDINGS)
   set_target_properties(h264nal PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()
 
-
-# 2. build liblcvm library
-
-set(LIBLCVM_SOURCES src/liblcvm.cc)
+# ---- lcvm library ------------------------------------------------------------
+set(LIBLCVM_SOURCES
+  src/liblcvm.cc
+)
 
 set(LIBLCVM_INCLUDE_DIRS
   ${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff/include
@@ -117,16 +123,16 @@ set(LIBLCVM_LINK_LIBRARIES
 if(BUILD_PYBINDINGS)
   message(STATUS "Configuring Liblcvm library with PyBind11 interface")
   execute_process(COMMAND python3 -m pybind11 --includes
-      OUTPUT_VARIABLE PYBIND11_INCLUDE OUTPUT_STRIP_TRAILING_WHITESPACE)
+                  OUTPUT_VARIABLE PYBIND11_INCLUDE OUTPUT_STRIP_TRAILING_WHITESPACE)
   string(REGEX REPLACE "-I" "" PYBIND11_INCLUDE "${PYBIND11_INCLUDE}")
   separate_arguments(PYBIND11_INCLUDE)
 
   execute_process(COMMAND python3-config --includes
-      OUTPUT_VARIABLE PYTHON_INCLUDE OUTPUT_STRIP_TRAILING_WHITESPACE)
+                  OUTPUT_VARIABLE PYTHON_INCLUDE OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(COMMAND python3-config --ldflags
-      OUTPUT_VARIABLE PYTHON_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+                  OUTPUT_VARIABLE PYTHON_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(COMMAND python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
-      OUTPUT_VARIABLE PYTHON_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
+                  OUTPUT_VARIABLE PYTHON_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
   string(REPLACE "-framework CoreFoundation" "" PYTHON_LDFLAGS "${PYTHON_LDFLAGS}")
   string(REGEX REPLACE "-I" "" PYTHON_INCLUDE "${PYTHON_INCLUDE}")
   separate_arguments(PYTHON_INCLUDE)
@@ -155,10 +161,10 @@ endif()
 target_include_directories(liblcvm PUBLIC ${LIBLCVM_INCLUDE_DIRS} ${ANTLR_GEN_DIR} ${PROTO_GEN_DIR})
 target_link_libraries(liblcvm PRIVATE ${LIBLCVM_LINK_LIBRARIES})
 
-# Ensure code generation before building liblcvm
+# Ensure code generation before building / using lib
 add_dependencies(liblcvm gen_proto gen_antlr)
 
-# Move implementation sources (including generated) into the lib
+# Add generated & implementation sources to lib
 target_sources(liblcvm PRIVATE
   src/policy_protovisitor.cc
   src/policy_runner.cc
@@ -166,7 +172,7 @@ target_sources(liblcvm PRIVATE
   ${PROTO_GEN_SRCS}
 )
 
-# Link third-party deps that liblcvm itself uses (PUBLIC so tests & tools get them)
+# Also link public deps so tools/tests get them transitively
 target_link_libraries(liblcvm
   PUBLIC
     protobuf::libprotobuf
@@ -181,30 +187,26 @@ target_link_libraries(liblcvm
     absl::log_severity
 )
 
-# Generated-code dependencies should be attached to the library
-add_dependencies(liblcvm gen_proto gen_antlr)
-
-# Executable is now just the tool front-end
+# ---- Tool executable ---------------------------------------------------------
+# NOTE: The real tool file is tools/lcvm.cc (not lcvm_tool.cpp).
 add_executable(lcvm tools/lcvm.cc)
 target_link_libraries(lcvm PRIVATE liblcvm)
 
-
-# configure a header file to pass some of the CMake settings
+# Generate config.h into the build dir and include it from the lib
 configure_file(
   ${CMAKE_SOURCE_DIR}/include/config.h.in
   ${CMAKE_BINARY_DIR}/config.h
 )
 target_include_directories(liblcvm PRIVATE ${CMAKE_BINARY_DIR})
 
-# 4. others
-
+# ---- Tests -------------------------------------------------------------------
 option(BUILD_TESTS "Build liblcvm tests" ON)
 if(BUILD_TESTS)
   enable_testing()
   add_subdirectory(test)
 endif()
 
-
+# Quick local commands
 add_custom_target(test2
   COMMAND ${CMAKE_COMMAND} -E echo "Running: ${CMAKE_BINARY_DIR}/lcvm ${CMAKE_SOURCE_DIR}/lib/isobmff/media/*MOV -o /tmp/full.csv"
   COMMAND ${CMAKE_BINARY_DIR}/lcvm ${CMAKE_SOURCE_DIR}/lib/isobmff/media/*MOV -o /tmp/full.csv
@@ -219,28 +221,34 @@ add_custom_target(lint
   COMMAND clang-format -i -style=google ${CMAKE_CURRENT_SOURCE_DIR}/tools/*cc
 )
 
+# ---- Fuzz harness convenience target -----------------------------------------
 set(CORPUS_DIR ${CMAKE_SOURCE_DIR}/lib/isobmff/fuzz/corpus)
 set(RUNS 100 CACHE STRING "Number of runs for fuzzers")
 add_custom_target(fuzz
   COMMAND ${CMAKE_COMMAND} -E echo "Running all fuzzers with ${RUNS} runs..."
 )
-file(GLOB FUZZER_EXECUTABLES "${CMAKE_SOURCE_DIR}/build/lib/isobmff/fuzz/*_fuzzer")
+# Find fuzzers built in the *build* tree
+file(GLOB FUZZER_EXECUTABLES "${CMAKE_BINARY_DIR}/lib/isobmff/fuzz/*_fuzzer")
 foreach(FUZZER_EXECUTABLE IN LISTS FUZZER_EXECUTABLES)
   get_filename_component(FUZZER_NAME ${FUZZER_EXECUTABLE} NAME_WE)
   add_custom_command(
-    TARGET fuzz
+    TARGET fuzz POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CORPUS_DIR}/${FUZZER_NAME}
+  )
+  add_custom_command(
+    TARGET fuzz POST_BUILD
     COMMAND ${FUZZER_EXECUTABLE}
             -artifact_prefix=${CORPUS_DIR}/${FUZZER_NAME}/
             ${CORPUS_DIR}/${FUZZER_NAME}/
-            -runs=$$RUNS
+            -runs=${RUNS}
   )
 endforeach()
 
-# Clean generated files
+# ---- Cleanup helpers ---------------------------------------------------------
 add_custom_target(clean-gen
-    COMMAND ${CMAKE_COMMAND} -E remove -f ${PROTO_GEN_SRCS}
-    COMMAND ${CMAKE_COMMAND} -E remove_directory ${ANTLR_GEN_DIR}
-    COMMAND ${CMAKE_COMMAND} -E remove_directory ${PROTO_GEN_DIR}
-    COMMAND ${CMAKE_COMMAND} -E remove -f ${ANTLR_JAR}
-    COMMENT "Cleaning generated files"
+  COMMAND ${CMAKE_COMMAND} -E remove -f ${PROTO_GEN_SRCS}
+  COMMAND ${CMAKE_COMMAND} -E remove_directory ${ANTLR_GEN_DIR}
+  COMMAND ${CMAKE_COMMAND} -E remove_directory ${PROTO_GEN_DIR}
+  COMMAND ${CMAKE_COMMAND} -E remove -f ${ANTLR_JAR}
+  COMMENT "Cleaning generated files"
 )
