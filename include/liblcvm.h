@@ -58,6 +58,8 @@ class TimingInformation {
   // pts_duration_delta_sec_list: PTS (presentation timestamp) duration
   // delta to the average list (seconds).
   std::vector<double> pts_duration_delta_sec_list;
+  // pts_framerate_list: Instantaneous framerate (fps).
+  std::vector<double> pts_framerate_list;
   // pts_duration_sec_average: pts duration average (sec).
   double pts_duration_sec_average;
   // pts_duration_sec_median: pts duration median (sec).
@@ -108,6 +110,7 @@ class TimingInformation {
   DECL_GETTER(pts_sec_list, std::vector<double>)
   DECL_GETTER(pts_duration_sec_list, std::vector<double>)
   DECL_GETTER(pts_duration_delta_sec_list, std::vector<double>)
+  DECL_GETTER(pts_framerate_list, std::vector<double>)
   DECL_GETTER(pts_duration_sec_average, double)
   DECL_GETTER(pts_duration_sec_median, double)
   DECL_GETTER(pts_duration_sec_stddev, double)
@@ -252,9 +255,10 @@ using LiblcvmValue =
 using LiblcvmValList = std::vector<LiblcvmValue>;
 using LiblcvmKeyList = std::vector<std::string>;
 
-// frame_num, stts, ctts, dts, pts, pts_duration, pts_duration_delta
-using LiblcvmTiming =
-    std::tuple<uint32_t, uint32_t, int32_t, double, double, double, double>;
+// frame_num, stts, ctts, dts, pts, pts_duration, pts_duration_delta,
+// pts_framerate
+using LiblcvmTiming = std::tuple<uint32_t, uint32_t, int32_t, double, double,
+                                 double, double, double>;
 using LiblcvmTimingList = std::vector<LiblcvmTiming>;
 
 double liblcvmvalue_to_double(const LiblcvmValue &value);

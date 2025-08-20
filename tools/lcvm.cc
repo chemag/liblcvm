@@ -145,20 +145,30 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
         fprintf(outtsfp, "%s", filename.c_str());
         fprintf(outtsfp, ",%zu", frame_num);
         const LiblcvmTiming &timing = vals_timing[frame_num];
+        // frame_num
         std::string value0 = std::to_string(std::get<0>(timing));
         fprintf(outtsfp, ",%s", csv_escape(value0).c_str());
+        // stts
         std::string value1 = std::to_string(std::get<1>(timing));
         fprintf(outtsfp, ",%s", csv_escape(value1).c_str());
+        // ctts
         std::string value2 = std::to_string(std::get<2>(timing));
         fprintf(outtsfp, ",%s", csv_escape(value2).c_str());
+        // dts
         std::string value3 = std::to_string(std::get<3>(timing));
         fprintf(outtsfp, ",%s", csv_escape(value3).c_str());
+        // pts
         std::string value4 = std::to_string(std::get<4>(timing));
         fprintf(outtsfp, ",%s", csv_escape(value4).c_str());
+        // pts_duration
         std::string value5 = std::to_string(std::get<5>(timing));
         fprintf(outtsfp, ",%s", csv_escape(value5).c_str());
+        // pts_duration_delta
         std::string value6 = std::to_string(std::get<6>(timing));
         fprintf(outtsfp, ",%s", csv_escape(value6).c_str());
+        // pts_framerate
+        std::string value7 = std::to_string(std::get<7>(timing));
+        fprintf(outtsfp, ",%s", csv_escape(value7).c_str());
         fprintf(outtsfp, "\n");
       }
     }

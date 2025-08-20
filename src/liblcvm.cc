@@ -248,9 +248,10 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
 
   // 3. run the per-file timings
   if (calculate_timestamps) {
-    pkeys_timing->insert(pkeys_timing->end(),
-                         {"frame_num_orig", "stts", "ctts", "dts", "pts",
-                          "pts_duration", "pts_duration_delta"});
+    pkeys_timing->insert(
+        pkeys_timing->end(),
+        {"frame_num_orig", "stts", "ctts", "dts", "pts", "pts_duration",
+         "pts_duration_delta", "pts_framerate"});
 
     std::vector<uint32_t> frame_num_orig_list =
         pobj->get_timing().get_frame_num_orig_list();
@@ -264,6 +265,8 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
         pobj->get_timing().get_pts_duration_sec_list();
     std::vector<double> pts_duration_delta_sec_list =
         pobj->get_timing().get_pts_duration_delta_sec_list();
+    std::vector<double> pts_framerate_list =
+        pobj->get_timing().get_pts_framerate_list();
     // zip them
     size_t n = frame_num_orig_list.size();
     pvals_timing->reserve(n);
@@ -277,6 +280,9 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
               : std::numeric_limits<double>::quiet_NaN(),
           (i < pts_duration_delta_sec_list.size())
               ? pts_duration_delta_sec_list[i]
+              : std::numeric_limits<double>::quiet_NaN(),
+          (i < pts_framerate_list.size())
+              ? pts_framerate_list[i]
               : std::numeric_limits<double>::quiet_NaN());
     }
   }
@@ -767,6 +773,15 @@ int TimingInformation::derive_timing_info(
     ptr->timing.pts_duration_delta_sec_list[i] =
         ptr->timing.pts_duration_sec_list[i] -
         ptr->timing.pts_duration_sec_average;
+  }
+  // 3.5 derive the pts_framerate_list (instantaneous framerate)
+  ptr->timing.pts_framerate_list.resize(
+      ptr->timing.pts_duration_sec_list.size());
+  for (uint32_t i = 0; i < ptr->timing.pts_duration_sec_list.size(); ++i) {
+    ptr->timing.pts_framerate_list[i] =
+        (ptr->timing.pts_duration_sec_list[i] == 0.0)
+            ? std::nan("")
+            : 1.0 / ptr->timing.pts_duration_sec_list[i];
   }
 
   // 4. derive keyframe-related values
