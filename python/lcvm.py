@@ -267,7 +267,7 @@ def capture_timestamps(
     dts_sec_list_dict[infile] = dts_sec_list
     pts_sec_list_dict[infile] = pts_sec_list
     pts_duration_sec_list_dict[infile] = pts_duration_sec_list
-    pts_duration_delta_sec_list_dict[infile] = pts_duration_sec_list
+    pts_duration_delta_sec_list_dict[infile] = pts_duration_delta_sec_list
 
 
 def write_timestamps_to_file(
