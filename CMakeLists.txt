@@ -19,6 +19,8 @@ message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR} ")
 
 # ---- Generated code dirs -----------------------------------------------------
 set(AUTOGEN_DIR ${CMAKE_SOURCE_DIR}/autogen)
+file(MAKE_DIRECTORY ${AUTOGEN_DIR})
+
 set(ANTLR_GEN_DIR ${AUTOGEN_DIR}/antlr-gen)
 set(PROTO_GEN_DIR ${AUTOGEN_DIR}/protobuf-gen)
 file(MAKE_DIRECTORY ${ANTLR_GEN_DIR})
