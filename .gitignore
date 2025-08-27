@@ -2,7 +2,4 @@
 # cmake stuff
 build/
 
-autogen/*
-
 */*.o
-
