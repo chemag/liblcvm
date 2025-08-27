@@ -18,7 +18,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -Wall -Wextra -Wno-unused-parameter -Wshadow")
 message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR} ")
 
 # ---- Generated code dirs -----------------------------------------------------
-set(AUTOGEN_DIR ${CMAKE_SOURCE_DIR}/autogen)
+set(AUTOGEN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/autogen)
 file(MAKE_DIRECTORY ${AUTOGEN_DIR})
 
 set(ANTLR_GEN_DIR ${AUTOGEN_DIR}/antlr-gen)
@@ -40,7 +40,7 @@ if(NOT EXISTS ${ANTLR_JAR})
 endif()
 
 # ---- Protobuf generation -----------------------------------------------------
-set(PROTO_PATH ${CMAKE_SOURCE_DIR}/policy)
+set(PROTO_PATH ${CMAKE_CURRENT_SOURCE_DIR}/policy)
 set(PROTO_SRC rules.proto)
 set(PROTO_GEN_SRCS
   ${PROTO_GEN_DIR}/rules.pb.cc
@@ -59,7 +59,7 @@ add_custom_command(
 add_custom_target(gen_proto DEPENDS ${PROTO_GEN_SRCS})
 
 # ---- ANTLR generation --------------------------------------------------------
-set(ANTLR_GRAMMAR ${CMAKE_SOURCE_DIR}/policy/rules.g4)
+set(ANTLR_GRAMMAR ${CMAKE_CURRENT_SOURCE_DIR}/policy/rules.g4)
 set(ANTLR_GEN_SRCS
   ${ANTLR_GEN_DIR}/rulesLexer.cpp
   ${ANTLR_GEN_DIR}/rulesParser.cpp
@@ -80,7 +80,7 @@ add_custom_target(gen_all  DEPENDS gen_proto gen_antlr)
 
 # ---- Includes ----------------------------------------------------------------
 include_directories(
-  ${CMAKE_SOURCE_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${ANTLR_GEN_DIR}
   ${PROTO_GEN_DIR}
   /usr/include/antlr4-runtime
@@ -90,17 +90,17 @@ include_directories(
 )
 
 # ---- Third-party subprojects -------------------------------------------------
-add_subdirectory(${CMAKE_SOURCE_DIR}/lib/isobmff)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff)
 
 set(BUILD_CLANG_FUZZER OFF)
 option(BUILD_PYBINDINGS "Build Python bindings for liblcvm" OFF)
 
-add_subdirectory(${CMAKE_SOURCE_DIR}/lib/h265nal)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/lib/h265nal)
 if(BUILD_PYBINDINGS)
   set_target_properties(h265nal PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()
 
-add_subdirectory(${CMAKE_SOURCE_DIR}/lib/h264nal)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/lib/h264nal)
 if(BUILD_PYBINDINGS)
   set_target_properties(h264nal PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()
@@ -196,7 +196,7 @@ target_link_libraries(lcvm PRIVATE liblcvm)
 
 # Generate config.h into the build dir and include it from the lib
 configure_file(
-  ${CMAKE_SOURCE_DIR}/include/config.h.in
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/config.h.in
   ${CMAKE_BINARY_DIR}/config.h
 )
 target_include_directories(liblcvm PRIVATE ${CMAKE_BINARY_DIR})
@@ -210,10 +210,10 @@ endif()
 
 # Quick local commands
 add_custom_target(test2
-  COMMAND ${CMAKE_COMMAND} -E echo "Running: ${CMAKE_BINARY_DIR}/lcvm ${CMAKE_SOURCE_DIR}/lib/isobmff/media/*MOV -o /tmp/full.csv"
-  COMMAND ${CMAKE_BINARY_DIR}/lcvm ${CMAKE_SOURCE_DIR}/lib/isobmff/media/*MOV -o /tmp/full.csv
-  COMMAND ${CMAKE_COMMAND} -E echo "Running: ${CMAKE_BINARY_DIR}/lcvm ${CMAKE_SOURCE_DIR}/lib/isobmff/media/*MOV -p ${CMAKE_SOURCE_DIR}/policy/example.txt -o /tmp/full.policy.csv"
-  COMMAND ${CMAKE_BINARY_DIR}/lcvm ${CMAKE_SOURCE_DIR}/lib/isobmff/media/*MOV -p ${CMAKE_SOURCE_DIR}/policy/example.txt -o /tmp/full.policy.csv
+  COMMAND ${CMAKE_COMMAND} -E echo "Running: ${CMAKE_BINARY_DIR}/lcvm ${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff/media/*MOV -o /tmp/full.csv"
+  COMMAND ${CMAKE_BINARY_DIR}/lcvm ${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff/media/*MOV -o /tmp/full.csv
+  COMMAND ${CMAKE_COMMAND} -E echo "Running: ${CMAKE_BINARY_DIR}/lcvm ${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff/media/*MOV -p ${CMAKE_CURRENT_SOURCE_DIR}/policy/example.txt -o /tmp/full.policy.csv"
+  COMMAND ${CMAKE_BINARY_DIR}/lcvm ${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff/media/*MOV -p ${CMAKE_CURRENT_SOURCE_DIR}/policy/example.txt -o /tmp/full.policy.csv
 )
 
 add_custom_target(lint
@@ -224,7 +224,7 @@ add_custom_target(lint
 )
 
 # ---- Fuzz harness convenience target -----------------------------------------
-set(CORPUS_DIR ${CMAKE_SOURCE_DIR}/lib/isobmff/fuzz/corpus)
+set(CORPUS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff/fuzz/corpus)
 set(RUNS 100 CACHE STRING "Number of runs for fuzzers")
 add_custom_target(fuzz
   COMMAND ${CMAKE_COMMAND} -E echo "Running all fuzzers with ${RUNS} runs..."
