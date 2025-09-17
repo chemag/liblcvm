@@ -2,7 +2,9 @@ grammar rules;
 
 // === Parser Rules ===
 
-program     : statement+ EOF ;
+program     : version? statement+ EOF ;
+
+version     : VERSION VERSIONID ;
 
 statement   : (WARN | ERROR) STRING expr ;
 
@@ -30,7 +32,8 @@ value
     ;
 
 number
-    : NUMBER
+    : VERSIONID
+    | NUMBER
     ;
 
 // === Lexer Rules ===
@@ -52,11 +55,12 @@ LPAREN  : '(';
 RPAREN  : ')';
 COMMA   : ',';
 
+VERSION : 'version';
 WARN    : 'warn';
 ERROR   : 'error';
 
 IDENT   : [a-zA-Z_][a-zA-Z_0-9]*;
+VERSIONID : ([A-Za-z0-9]+ '.' )+ [A-Za-z0-9]+;
 NUMBER  : [0-9]+ ('.' [0-9]+)?;
 STRING  : '"' (~["\\] | '\\' .)* '"';
 WS      : [ \t\r\n]+ -> skip;
-

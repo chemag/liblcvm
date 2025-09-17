@@ -19,6 +19,10 @@ public:
     return visitChildren(ctx);
   }
 
+  virtual std::any visitVersion(rulesParser::VersionContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
   virtual std::any visitStatement(rulesParser::StatementContext *ctx) override {
     return visitChildren(ctx);
   }

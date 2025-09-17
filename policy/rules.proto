@@ -4,6 +4,7 @@ package dsl;
 
 message RuleSet {
   repeated Rule rules = 1;
+  optional string version = 2;  // Optional version field (e.g., "1.0")
 }
 
 message Rule {
@@ -61,4 +62,3 @@ enum LogicOpType {
 message NotExpr {
   Expr expr = 1;
 }
-

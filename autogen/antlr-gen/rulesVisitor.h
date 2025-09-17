@@ -21,6 +21,8 @@ public:
    */
     virtual std::any visitProgram(rulesParser::ProgramContext *context) = 0;
 
+    virtual std::any visitVersion(rulesParser::VersionContext *context) = 0;
+
     virtual std::any visitStatement(rulesParser::StatementContext *context) = 0;
 
     virtual std::any visitAndExpr(rulesParser::AndExprContext *context) = 0;

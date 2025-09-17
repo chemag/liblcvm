@@ -222,10 +222,11 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
   // 2. run the policy
   std::list<std::string> warn_list;
   std::list<std::string> error_list;
+  std::string version_str;
   if (!pobj->get_policy().empty()) {
     // Policy string provided, run policy logic
     int policy_status = policy_runner(pobj->get_policy(), pkeys, pvals,
-                                      &warn_list, &error_list);
+                                      &warn_list, &error_list, &version_str);
     if (policy_status != 0 || !pvals || pvals->empty()) {
       fprintf(stderr, "Policy evaluation failed for file: %s\n",
               pobj->get_filename().c_str());
@@ -241,6 +242,8 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
       return -1;
     }
   }
+  pkeys->push_back("policy_version");
+  pvals->push_back(version_str); // Populated by policy parser
   pkeys->push_back("warn_list");
   pvals->push_back(join_list(warn_list));
   pkeys->push_back("error_list");

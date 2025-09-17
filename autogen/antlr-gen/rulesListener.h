@@ -17,6 +17,9 @@ public:
   virtual void enterProgram(rulesParser::ProgramContext *ctx) = 0;
   virtual void exitProgram(rulesParser::ProgramContext *ctx) = 0;
 
+  virtual void enterVersion(rulesParser::VersionContext *ctx) = 0;
+  virtual void exitVersion(rulesParser::VersionContext *ctx) = 0;
+
   virtual void enterStatement(rulesParser::StatementContext *ctx) = 0;
   virtual void exitStatement(rulesParser::StatementContext *ctx) = 0;
 
