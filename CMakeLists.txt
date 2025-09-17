@@ -7,6 +7,10 @@ if(POLICY CMP0175)
   cmake_policy(SET CMP0175 NEW)
 endif()
 
+# ---- Options -----------------------------------------------------------------
+option(BUILD_PYBINDINGS "Build Python bindings for liblcvm" OFF)
+option(ADD_POLICY "Build policy system with ANTLR and protobuf support" OFF)
+
 # ---- Language / flags --------------------------------------------------------
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -21,79 +25,89 @@ message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR} ")
 set(AUTOGEN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/autogen)
 file(MAKE_DIRECTORY ${AUTOGEN_DIR})
 
-set(ANTLR_GEN_DIR ${AUTOGEN_DIR}/antlr-gen)
-set(PROTO_GEN_DIR ${AUTOGEN_DIR}/protobuf-gen)
-file(MAKE_DIRECTORY ${ANTLR_GEN_DIR})
-file(MAKE_DIRECTORY ${PROTO_GEN_DIR})
-
-# ---- Dependencies ------------------------------------------------------------
-find_package(Protobuf REQUIRED)
-find_package(absl REQUIRED)
-find_package(antlr4-runtime REQUIRED)
-
-# Download ANTLR jar to build dir if missing
-set(ANTLR_JAR ${CMAKE_BINARY_DIR}/antlr-4.13.1-complete.jar)
-set(ANTLR_JAR_URL https://www.antlr.org/download/antlr-4.13.1-complete.jar)
-if(NOT EXISTS ${ANTLR_JAR})
-  message(STATUS "Downloading ANTLR jar to ${ANTLR_JAR} ...")
-  file(DOWNLOAD ${ANTLR_JAR_URL} ${ANTLR_JAR} SHOW_PROGRESS)
+if(ADD_POLICY)
+  set(ANTLR_GEN_DIR ${AUTOGEN_DIR}/antlr-gen)
+  set(PROTO_GEN_DIR ${AUTOGEN_DIR}/protobuf-gen)
+  file(MAKE_DIRECTORY ${ANTLR_GEN_DIR})
+  file(MAKE_DIRECTORY ${PROTO_GEN_DIR})
 endif()
 
-# ---- Protobuf generation -----------------------------------------------------
-set(PROTO_PATH ${CMAKE_CURRENT_SOURCE_DIR}/policy)
-set(PROTO_SRC rules.proto)
-set(PROTO_GEN_SRCS
-  ${PROTO_GEN_DIR}/rules.pb.cc
-  ${PROTO_GEN_DIR}/rules.pb.h
-)
-add_custom_command(
-  OUTPUT ${PROTO_GEN_SRCS}
-  COMMAND ${Protobuf_PROTOC_EXECUTABLE}
-          --proto_path=${PROTO_PATH}
-          --cpp_out=${PROTO_GEN_DIR}
-          ${PROTO_SRC}
-  WORKING_DIRECTORY ${PROTO_PATH}
-  DEPENDS ${PROTO_PATH}/${PROTO_SRC}
-  COMMENT "Generating Protobuf sources in protobuf-gen/"
-)
-add_custom_target(gen_proto DEPENDS ${PROTO_GEN_SRCS})
+# ---- Dependencies ------------------------------------------------------------
+find_package(absl REQUIRED)
+if(ADD_POLICY)
+  find_package(Protobuf REQUIRED)
+  find_package(antlr4-runtime REQUIRED)
+endif()
 
-# ---- ANTLR generation --------------------------------------------------------
-set(ANTLR_GRAMMAR ${CMAKE_CURRENT_SOURCE_DIR}/policy/rules.g4)
-set(ANTLR_GEN_SRCS
-  ${ANTLR_GEN_DIR}/rulesLexer.cpp
-  ${ANTLR_GEN_DIR}/rulesParser.cpp
-  ${ANTLR_GEN_DIR}/rulesBaseListener.cpp
-  ${ANTLR_GEN_DIR}/rulesListener.cpp
-  ${ANTLR_GEN_DIR}/rulesBaseVisitor.cpp
-  ${ANTLR_GEN_DIR}/rulesVisitor.cpp
-)
-add_custom_command(
-  OUTPUT ${ANTLR_GEN_SRCS}
-  COMMAND java -Xmx500M -cp ${ANTLR_JAR} org.antlr.v4.Tool
-          -Dlanguage=Cpp -visitor -o ${ANTLR_GEN_DIR} ${ANTLR_GRAMMAR}
-  DEPENDS ${ANTLR_GRAMMAR} ${ANTLR_JAR}
-  COMMENT "Generating ANTLR sources"
-)
-add_custom_target(gen_antlr DEPENDS ${ANTLR_GEN_SRCS})
-add_custom_target(gen_all  DEPENDS gen_proto gen_antlr)
+if(ADD_POLICY)
+  # Download ANTLR jar to build dir if missing
+  set(ANTLR_JAR ${CMAKE_BINARY_DIR}/antlr-4.13.1-complete.jar)
+  set(ANTLR_JAR_URL https://www.antlr.org/download/antlr-4.13.1-complete.jar)
+  if(NOT EXISTS ${ANTLR_JAR})
+    message(STATUS "Downloading ANTLR jar to ${ANTLR_JAR} ...")
+    file(DOWNLOAD ${ANTLR_JAR_URL} ${ANTLR_JAR} SHOW_PROGRESS)
+  endif()
+
+  # ---- Protobuf generation -----------------------------------------------------
+  set(PROTO_PATH ${CMAKE_CURRENT_SOURCE_DIR}/policy)
+  set(PROTO_SRC rules.proto)
+  set(PROTO_GEN_SRCS
+    ${PROTO_GEN_DIR}/rules.pb.cc
+    ${PROTO_GEN_DIR}/rules.pb.h
+  )
+  add_custom_command(
+    OUTPUT ${PROTO_GEN_SRCS}
+    COMMAND ${Protobuf_PROTOC_EXECUTABLE}
+            --proto_path=${PROTO_PATH}
+            --cpp_out=${PROTO_GEN_DIR}
+            ${PROTO_SRC}
+    WORKING_DIRECTORY ${PROTO_PATH}
+    DEPENDS ${PROTO_PATH}/${PROTO_SRC}
+    COMMENT "Generating Protobuf sources in protobuf-gen/"
+  )
+  add_custom_target(gen_proto DEPENDS ${PROTO_GEN_SRCS})
+
+  # ---- ANTLR generation --------------------------------------------------------
+  set(ANTLR_GRAMMAR ${CMAKE_CURRENT_SOURCE_DIR}/policy/rules.g4)
+  set(ANTLR_GEN_SRCS
+    ${ANTLR_GEN_DIR}/rulesLexer.cpp
+    ${ANTLR_GEN_DIR}/rulesParser.cpp
+    ${ANTLR_GEN_DIR}/rulesBaseListener.cpp
+    ${ANTLR_GEN_DIR}/rulesListener.cpp
+    ${ANTLR_GEN_DIR}/rulesBaseVisitor.cpp
+    ${ANTLR_GEN_DIR}/rulesVisitor.cpp
+  )
+  add_custom_command(
+    OUTPUT ${ANTLR_GEN_SRCS}
+    COMMAND java -Xmx500M -cp ${ANTLR_JAR} org.antlr.v4.Tool
+            -Dlanguage=Cpp -visitor -o ${ANTLR_GEN_DIR} ${ANTLR_GRAMMAR}
+    DEPENDS ${ANTLR_GRAMMAR} ${ANTLR_JAR}
+    COMMENT "Generating ANTLR sources"
+  )
+  add_custom_target(gen_antlr DEPENDS ${ANTLR_GEN_SRCS})
+  add_custom_target(gen_all  DEPENDS gen_proto gen_antlr)
+endif()
 
 # ---- Includes ----------------------------------------------------------------
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/include
-  ${ANTLR_GEN_DIR}
-  ${PROTO_GEN_DIR}
-  /usr/include/antlr4-runtime
-  /usr/local/include/antlr4-runtime
   /opt/homebrew/include
-  ${Protobuf_INCLUDE_DIRS}
 )
+
+if(ADD_POLICY)
+  include_directories(
+    ${ANTLR_GEN_DIR}
+    ${PROTO_GEN_DIR}
+    /usr/include/antlr4-runtime
+    /usr/local/include/antlr4-runtime
+    ${Protobuf_INCLUDE_DIRS}
+  )
+endif()
 
 # ---- Third-party subprojects -------------------------------------------------
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff)
 
 set(BUILD_CLANG_FUZZER OFF)
-option(BUILD_PYBINDINGS "Build Python bindings for liblcvm" OFF)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/lib/h265nal)
 if(BUILD_PYBINDINGS)
@@ -160,25 +174,28 @@ else()
   set_target_properties(liblcvm PROPERTIES OUTPUT_NAME "lcvm")
 endif()
 
-target_include_directories(liblcvm PUBLIC ${LIBLCVM_INCLUDE_DIRS} ${ANTLR_GEN_DIR} ${PROTO_GEN_DIR})
+target_include_directories(liblcvm PUBLIC ${LIBLCVM_INCLUDE_DIRS})
 target_link_libraries(liblcvm PRIVATE ${LIBLCVM_LINK_LIBRARIES})
 
-# Ensure code generation before building / using lib
-add_dependencies(liblcvm gen_proto gen_antlr)
+if(ADD_POLICY)
+  # Add policy-specific include directories
+  target_include_directories(liblcvm PUBLIC ${ANTLR_GEN_DIR} ${PROTO_GEN_DIR})
 
-# Add generated & implementation sources to lib
-target_sources(liblcvm PRIVATE
-  src/policy_protovisitor.cc
-  src/policy_runner.cc
-  ${ANTLR_GEN_SRCS}
-  ${PROTO_GEN_SRCS}
-)
+  # Ensure code generation before building / using lib
+  add_dependencies(liblcvm gen_proto gen_antlr)
+
+  # Add generated & implementation sources to lib
+  target_sources(liblcvm PRIVATE
+    src/policy_protovisitor.cc
+    src/policy_runner.cc
+    ${ANTLR_GEN_SRCS}
+    ${PROTO_GEN_SRCS}
+  )
+endif()
 
 # Also link public deps so tools/tests get them transitively
 target_link_libraries(liblcvm
   PUBLIC
-    protobuf::libprotobuf
-    antlr4-runtime
     absl::strings
     absl::base
     absl::log
@@ -188,6 +205,14 @@ target_link_libraries(liblcvm
     absl::log_internal_globals
     absl::log_severity
 )
+
+if(ADD_POLICY)
+  target_link_libraries(liblcvm
+    PUBLIC
+      protobuf::libprotobuf
+      antlr4-runtime
+  )
+endif()
 
 # ---- Tool executable ---------------------------------------------------------
 # NOTE: The real tool file is tools/lcvm.cc (not lcvm_tool.cpp).
@@ -200,6 +225,7 @@ configure_file(
   ${CMAKE_BINARY_DIR}/config.h
 )
 target_include_directories(liblcvm PRIVATE ${CMAKE_BINARY_DIR})
+target_include_directories(lcvm PRIVATE ${CMAKE_BINARY_DIR})
 
 # ---- Tests -------------------------------------------------------------------
 option(BUILD_TESTS "Build liblcvm tests" ON)
@@ -248,9 +274,14 @@ endforeach()
 
 # ---- Cleanup helpers ---------------------------------------------------------
 add_custom_target(clean-gen
-  COMMAND ${CMAKE_COMMAND} -E remove -f ${PROTO_GEN_SRCS}
-  COMMAND ${CMAKE_COMMAND} -E remove_directory ${ANTLR_GEN_DIR}
-  COMMAND ${CMAKE_COMMAND} -E remove_directory ${PROTO_GEN_DIR}
-  COMMAND ${CMAKE_COMMAND} -E remove -f ${ANTLR_JAR}
   COMMENT "Cleaning generated files"
 )
+
+if(ADD_POLICY)
+  add_custom_command(TARGET clean-gen POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E remove -f ${PROTO_GEN_SRCS}
+    COMMAND ${CMAKE_COMMAND} -E remove_directory ${ANTLR_GEN_DIR}
+    COMMAND ${CMAKE_COMMAND} -E remove_directory ${PROTO_GEN_DIR}
+    COMMAND ${CMAKE_COMMAND} -E remove -f ${ANTLR_JAR}
+  )
+endif()

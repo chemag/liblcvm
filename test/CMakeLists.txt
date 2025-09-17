@@ -34,6 +34,11 @@ endfunction()
 # Find all test files in the current directory
 file(GLOB TEST_FILES "*_unittest.cc")
 
+# Filter out policy tests if ADD_POLICY is disabled
+if(NOT ADD_POLICY)
+  list(FILTER TEST_FILES EXCLUDE REGEX ".*policy.*_unittest\\.cc$")
+endif()
+
 # Extract test names from file names
 foreach(test_file IN LISTS TEST_FILES)
   get_filename_component(test_name ${test_file} NAME_WE)

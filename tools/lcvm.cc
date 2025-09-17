@@ -14,8 +14,11 @@
 #include <string>  // for basic_string, string
 #include <vector>
 
+#include "config.h"
 #include "liblcvm.h"
+#if ADD_POLICY
 #include "policy_protovisitor.h"
+#endif
 
 extern int optind;
 
@@ -27,7 +30,9 @@ typedef struct arg_options {
   char *outfile_timestamps;
   bool outfile_timestamps_sort_pts;
   std::vector<std::string> infile_list;
+#if ADD_POLICY
   char *policy_file;
+#endif
 } arg_options;
 
 /* default option values */
@@ -38,7 +43,9 @@ arg_options DEFAULT_OPTIONS{
     .outfile_timestamps = nullptr,
     .outfile_timestamps_sort_pts = true,
     .infile_list = {},
+#if ADD_POLICY
     .policy_file = nullptr,
+#endif
 };
 
 std::string csv_escape(const std::string &value) {
@@ -188,9 +195,11 @@ void usage(char *name) {
   fprintf(stderr, "\t-q:\t\tZero debug verbosity\n");
   fprintf(stderr, "\t--runs <nruns>:\t\tRun the analysis multiple times [%i]\n",
           DEFAULT_OPTIONS.nruns);
+#if ADD_POLICY
   fprintf(stderr, "\t-p policy file:\t\tSpecify policy file to be parsed\n");
   fprintf(stderr,
           "\t--policy policy file:\t\tSpecify policy file to be parsed\n");
+#endif
   fprintf(stderr, "\t-o outfile:\t\tSelect outfile\n");
   fprintf(stderr,
           "\t--outfile-timestamps outfile_timestamps:\t\tSelect outfile to "
@@ -227,7 +236,9 @@ arg_options *parse_args(int argc, char **argv) {
       // matching options to short options
       {"debug", no_argument, nullptr, 'd'},
       {"outfile", required_argument, nullptr, 'o'},
+#if ADD_POLICY
       {"policy", required_argument, nullptr, 'p'},
+#endif
       {"outfile-timestamps", required_argument, nullptr,
        OUTFILE_TIMESTAMPS_OPTION},
       {"sort-pts", no_argument, nullptr, SORT_PTS_OPTION},
@@ -241,7 +252,11 @@ arg_options *parse_args(int argc, char **argv) {
 
   // parse arguments
   while (true) {
+#if ADD_POLICY
     c = getopt_long(argc, argv, "do:hp:", longopts, &optindex);
+#else
+    c = getopt_long(argc, argv, "do:h", longopts, &optindex);
+#endif
     if (c == -1) {
       break;
     }
@@ -262,9 +277,11 @@ arg_options *parse_args(int argc, char **argv) {
         options.outfile = optarg;
         break;
 
+#if ADD_POLICY
       case 'p':
         options.policy_file = optarg;
         break;
+#endif
 
       case OUTFILE_TIMESTAMPS_OPTION:
         options.outfile_timestamps = optarg;
@@ -328,6 +345,7 @@ int main(int argc, char **argv) {
   }
 
   std::string policy_str;
+#if ADD_POLICY
   if (options->policy_file) {
     FILE *pf = fopen(options->policy_file, "r");
     if (!pf) {
@@ -344,6 +362,7 @@ int main(int argc, char **argv) {
       printf("Read policy file (%ld bytes)\n", fsize);
     }
   }
+#endif
 
   for (int i = 0; i < options->nruns; ++i) {
     parse_files(

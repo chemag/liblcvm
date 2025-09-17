@@ -2,4 +2,7 @@
 # cmake stuff
 build/
 
+autogen/antlr-gen/*
+autogen/protobuf-gen/*
+
 */*.o

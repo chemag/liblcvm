@@ -358,7 +358,9 @@ class IsobmffFileInformation {
   friend class AudioInformation;
 };
 
+#if ADD_POLICY
 // policy runner code
 int policy_runner(const std::string &policy_str, LiblcvmKeyList *pkeys,
                   LiblcvmValList *pvals, std::list<std::string> *warn_list,
                   std::list<std::string> *error_list);
+#endif

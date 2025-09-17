@@ -14,6 +14,7 @@
 
 using ::testing::ElementsAreArray;
 
+#if ADD_POLICY
 namespace {
 std::string readFileToString(const std::string& filename) {
   std::ifstream file(filename, std::ios::in | std::ios::binary);
@@ -26,6 +27,7 @@ std::string readFileToString(const std::string& filename) {
   return contents.str();
 }
 }  // namespace
+#endif
 
 namespace liblcvm {
 
@@ -39,15 +41,19 @@ TEST_F(LiblcvmTest, TestParserPolicy) {
   // 1. set input files
   std::string input_filename = "MOV1.MOV";
   std::string infile = std::string(TEST_MEDIA_DIR) + "/" + input_filename;
+#if ADD_POLICY
   std::string policy_filename = "example.txt";
   std::string policy_infile =
       std::string(TEST_POLICY_DIR) + "/" + policy_filename;
   std::string policy = readFileToString(policy_infile);
+#endif
 
   // 2. set parsing parameters
   auto liblcvm_config = std::make_unique<LiblcvmConfig>();
   liblcvm_config->set_sort_by_pts(true);
+#if ADD_POLICY
   liblcvm_config->set_policy(policy);
+#endif
   liblcvm_config->set_debug(1);
 
   // 3. parse the input files
@@ -107,8 +113,10 @@ TEST_F(LiblcvmTest, TestParserPolicy) {
       "channel_count",
       "sample_rate",
       "sample_size",
+#if ADD_POLICY
       "warn_list",
       "error_list",
+#endif
   };
   EXPECT_EQ(expected_keys, keys) << "output keys incorrect";
   // check the file name
@@ -162,9 +170,11 @@ TEST_F(LiblcvmTest, TestParserPolicy) {
       1,
       44100,
       16,
+#if ADD_POLICY
       std::string("Suspicious bitrate_bps;Suspicious depth"),
       std::string("Invalid bitrate_bps;Invalid width;Invalid height;Invalid "
                   "type;Invalid audio_video_ratio"),
+#endif
   };
   EXPECT_THAT(expected_vals, ElementsAreArray(vals.begin() + 1, vals.end()))
       << "output vals incorrect";

@@ -4,6 +4,7 @@
 // A show case of using [ISOBMFF](https://github.com/DigiDNA/ISOBMFF) to
 // detect frame dups and video freezes in ISOBMFF files.
 
+#include "config.h"
 #include "liblcvm.h"
 
 #include <h264_bitstream_parser.h>
@@ -27,8 +28,9 @@
 #include <string>       // for basic_string, string
 #include <vector>       // for vector
 
-#include "config.h"
+#if ADD_POLICY
 #include "policy_protovisitor.h"
+#endif
 
 #define MAX_AUDIO_VIDEO_RATIO 1.05
 
@@ -220,6 +222,7 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
   pvals->push_back(pobj->get_audio().get_sample_size());
 
   // 2. run the policy
+#if ADD_POLICY
   std::list<std::string> warn_list;
   std::list<std::string> error_list;
   if (!pobj->get_policy().empty()) {
@@ -245,6 +248,7 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
   pvals->push_back(join_list(warn_list));
   pkeys->push_back("error_list");
   pvals->push_back(join_list(error_list));
+#endif
 
   // 3. run the per-file timings
   if (calculate_timestamps) {
