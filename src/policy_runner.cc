@@ -1,5 +1,3 @@
-#include <google/protobuf/text_format.h>
-
 #include <fstream>
 #include <iostream>
 #include <list>
@@ -90,18 +88,20 @@ dsl::RuleSet convert_parser_context_to_proto(ParserContext& ctx) {
 }
 
 void writeProtoToFile(dsl::RuleSet ruleSet, std::string outfile) {
-  // Serialize to text proto
-  google::protobuf::TextFormat::Printer printer;
-  std::string textProto;
-  printer.PrintToString(ruleSet, &textProto);
+  // Serialize to binary format (text format not available in protobuf lite)
+  std::string binaryProto;
+  if (!ruleSet.SerializeToString(&binaryProto)) {
+    std::cerr << "Error: Failed to serialize protobuf to binary format.\n";
+    throw std::runtime_error("Failed to serialize protobuf");
+  }
 
   // write to file
-  std::ofstream outfile_stream(outfile);
+  std::ofstream outfile_stream(outfile, std::ios::binary);
   if (!outfile_stream) {
     std::cerr << "Error: Could not open " << outfile << " for writing.\n";
     throw std::runtime_error("Failed to open output file: " + outfile);
   }
-  outfile_stream << textProto;
+  outfile_stream.write(binaryProto.data(), binaryProto.size());
   outfile_stream.close();
 }
 

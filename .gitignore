@@ -1,5 +1,4 @@
-
 # cmake stuff
 build/
-
+autogen/protobuf-gen/
 */*.o
