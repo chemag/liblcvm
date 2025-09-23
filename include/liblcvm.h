@@ -216,6 +216,10 @@ class FrameInformation {
   int transfer_characteristics;
   // matrix_coeffs: Video matrix coefficients (from HEVC/AVC SPS).
   int matrix_coeffs;
+  // profile_idc: Video profile IDC (from HEVC/AVC SPS).
+  int profile_idc;
+  // profile_type_str: Video profile type string (from HEVC/AVC SPS).
+  std::string profile_type_str;
 
   // internal functions
   void parse_hvcc(std::shared_ptr<ISOBMFF::HVCC> hvcc, int debug);
@@ -239,6 +243,8 @@ class FrameInformation {
   DECL_GETTER(colour_primaries, int)
   DECL_GETTER(transfer_characteristics, int)
   DECL_GETTER(matrix_coeffs, int)
+  DECL_GETTER(profile_idc, int)
+  DECL_GETTER(profile_type_str, std::string)
 
   int parse_frame_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
                               std::shared_ptr<IsobmffFileInformation> ptr,

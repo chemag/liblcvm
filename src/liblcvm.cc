@@ -4,7 +4,6 @@
 // A show case of using [ISOBMFF](https://github.com/DigiDNA/ISOBMFF) to
 // detect frame dups and video freezes in ISOBMFF files.
 
-#include "config.h"
 #include "liblcvm.h"
 
 #include <h264_bitstream_parser.h>
@@ -27,6 +26,8 @@
 #include <numeric>      // for accumulate
 #include <string>       // for basic_string, string
 #include <vector>       // for vector
+
+#include "config.h"
 
 #if ADD_POLICY
 #include "policy_protovisitor.h"
@@ -142,6 +143,10 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
   pvals->push_back(pobj->get_frame().get_transfer_characteristics());
   pkeys->push_back("matrix_coeffs");
   pvals->push_back(pobj->get_frame().get_matrix_coeffs());
+  pkeys->push_back("profile_idc");
+  pvals->push_back(pobj->get_frame().get_profile_idc());
+  pkeys->push_back("profile_type_str");
+  pvals->push_back(pobj->get_frame().get_profile_type_str());
   pkeys->push_back("num_video_frames");
   pvals->push_back(pobj->get_timing().get_num_video_frames());
   pkeys->push_back("frame_rate_fps_median");
@@ -971,6 +976,8 @@ void FrameInformation::parse_avcc(std::shared_ptr<ISOBMFF::AVCC> avcc,
   this->transfer_characteristics = -1;
   this->matrix_coeffs = -1;
   this->video_full_range_flag = -1;
+  this->profile_idc = -1;
+  this->profile_type_str = "";
 
   // extract the SPS NAL Units
   for (const auto &sps : avcc->GetSequenceParameterSetNALUnits()) {
@@ -985,22 +992,29 @@ void FrameInformation::parse_avcc(std::shared_ptr<ISOBMFF::AVCC> avcc,
     // Look for valid SPS NAL units
     if ((nal_unit->nal_unit_payload != nullptr) &&
         (nal_unit->nal_unit_payload->sps != nullptr) &&
-        (nal_unit->nal_unit_payload->sps->sps_data != nullptr) &&
-        (nal_unit->nal_unit_payload->sps->sps_data->vui_parameters !=
-         nullptr) &&
-        (nal_unit->nal_unit_payload->sps->sps_data->vui_parameters
-             ->colour_description_present_flag == 1) &&
-        (nal_unit->nal_unit_payload->sps->sps_data
-             ->vui_parameters_present_flag == 1)) {
-      this->colour_primaries = nal_unit->nal_unit_payload->sps->sps_data
-                                   ->vui_parameters->colour_primaries;
-      this->transfer_characteristics =
-          nal_unit->nal_unit_payload->sps->sps_data->vui_parameters
-              ->transfer_characteristics;
-      this->matrix_coeffs = nal_unit->nal_unit_payload->sps->sps_data
-                                ->vui_parameters->matrix_coefficients;
-      this->video_full_range_flag = nal_unit->nal_unit_payload->sps->sps_data
-                                        ->vui_parameters->video_full_range_flag;
+        (nal_unit->nal_unit_payload->sps->sps_data != nullptr)) {
+      if ((nal_unit->nal_unit_payload->sps->sps_data->vui_parameters !=
+           nullptr) &&
+          (nal_unit->nal_unit_payload->sps->sps_data->vui_parameters
+               ->colour_description_present_flag == 1) &&
+          (nal_unit->nal_unit_payload->sps->sps_data
+               ->vui_parameters_present_flag == 1)) {
+        this->colour_primaries = nal_unit->nal_unit_payload->sps->sps_data
+                                     ->vui_parameters->colour_primaries;
+        this->transfer_characteristics =
+            nal_unit->nal_unit_payload->sps->sps_data->vui_parameters
+                ->transfer_characteristics;
+        this->matrix_coeffs = nal_unit->nal_unit_payload->sps->sps_data
+                                  ->vui_parameters->matrix_coefficients;
+        this->video_full_range_flag =
+            nal_unit->nal_unit_payload->sps->sps_data->vui_parameters
+                ->video_full_range_flag;
+      }
+      this->profile_idc =
+          nal_unit->nal_unit_payload->sps->sps_data->profile_idc;
+      h264nal::profileTypeToString(
+          nal_unit->nal_unit_payload->sps->sps_data->profile_type,
+          this->profile_type_str);
     }
   }
 }
@@ -1022,6 +1036,8 @@ void FrameInformation::parse_hvcc(std::shared_ptr<ISOBMFF::HVCC> hvcc,
   this->transfer_characteristics = -1;
   this->matrix_coeffs = -1;
   this->video_full_range_flag = -1;
+  this->profile_idc = -1;
+  this->profile_type_str = "";
 
   // extract the NAL Units
   for (const auto &array : hvcc->GetArrays()) {
@@ -1040,21 +1056,33 @@ void FrameInformation::parse_hvcc(std::shared_ptr<ISOBMFF::HVCC> hvcc,
       // Look for SPS NAL units
       if ((nal_unit_type == h265nal::NalUnitType::SPS_NUT) &&
           (nal_unit->nal_unit_payload != nullptr) &&
-          (nal_unit->nal_unit_payload->sps != nullptr) &&
-          (nal_unit->nal_unit_payload->sps->vui_parameters != nullptr) &&
-          (nal_unit->nal_unit_payload->sps->vui_parameters_present_flag == 1) &&
-          (nal_unit->nal_unit_payload->sps->vui_parameters
-               ->colour_description_present_flag == 1)) {
-        this->colour_primaries =
-            nal_unit->nal_unit_payload->sps->vui_parameters->colour_primaries;
-        this->transfer_characteristics =
-            nal_unit->nal_unit_payload->sps->vui_parameters
-                ->transfer_characteristics;
-        this->matrix_coeffs =
-            nal_unit->nal_unit_payload->sps->vui_parameters->matrix_coeffs;
-        this->video_full_range_flag =
-            nal_unit->nal_unit_payload->sps->vui_parameters
-                ->video_full_range_flag;
+          (nal_unit->nal_unit_payload->sps != nullptr)) {
+        if ((nal_unit->nal_unit_payload->sps->vui_parameters != nullptr) &&
+            (nal_unit->nal_unit_payload->sps->vui_parameters_present_flag ==
+             1) &&
+            (nal_unit->nal_unit_payload->sps->vui_parameters
+                 ->colour_description_present_flag == 1)) {
+          this->colour_primaries =
+              nal_unit->nal_unit_payload->sps->vui_parameters->colour_primaries;
+          this->transfer_characteristics =
+              nal_unit->nal_unit_payload->sps->vui_parameters
+                  ->transfer_characteristics;
+          this->matrix_coeffs =
+              nal_unit->nal_unit_payload->sps->vui_parameters->matrix_coeffs;
+          this->video_full_range_flag =
+              nal_unit->nal_unit_payload->sps->vui_parameters
+                  ->video_full_range_flag;
+        }
+        if ((nal_unit->nal_unit_payload->sps->profile_tier_level != nullptr) &&
+            (nal_unit->nal_unit_payload->sps->profile_tier_level->general !=
+             nullptr)) {
+          this->profile_idc = nal_unit->nal_unit_payload->sps
+                                  ->profile_tier_level->general->profile_idc;
+          h265nal::profileTypeToString(
+              nal_unit->nal_unit_payload->sps->profile_tier_level->general
+                  ->profile_type,
+              this->profile_type_str);
+        }
       }
     }
   }
