@@ -122,7 +122,8 @@ bool eval_comparison(const dsl::Comparison& cmp,
   if (std::holds_alternative<std::string>(val)) {
     // string comparisons
     std::string rhs = cmp.value();
-    std::string lhs = liblcvmvalue_to_string(val);
+    std::string lhs;
+    if (liblcvmvalue_to_string(val, &lhs) != 0) return false;
     switch (cmp.op()) {
       case dsl::ComparisonOpType::EQ:
         return lhs == rhs;
@@ -135,7 +136,8 @@ bool eval_comparison(const dsl::Comparison& cmp,
   }
 
   // numeric comparisons
-  double lhs = liblcvmvalue_to_double(val);
+  double lhs;
+  if (liblcvmvalue_to_double(val, &lhs) != 0) return false;
   double rhs = std::stod(cmp.value());
   switch (cmp.op()) {
     case dsl::ComparisonOpType::EQ:
@@ -161,7 +163,8 @@ bool eval_range(const dsl::RangeCheck& range,
   auto it = dict.find(range.column());
   if (it == dict.end()) return false;
 
-  double val = liblcvmvalue_to_double(it->second);
+  double val;
+  if (liblcvmvalue_to_double(it->second, &val) != 0) return false;
   double low = range.low();
   double high = range.high();
 

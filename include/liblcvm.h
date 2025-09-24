@@ -270,8 +270,8 @@ using LiblcvmTiming = std::tuple<uint32_t, uint32_t, int32_t, double, double,
                                  double, double, double>;
 using LiblcvmTimingList = std::vector<LiblcvmTiming>;
 
-double liblcvmvalue_to_double(const LiblcvmValue &value);
-std::string liblcvmvalue_to_string(const LiblcvmValue &value);
+int liblcvmvalue_to_double(const LiblcvmValue &value, double *result);
+int liblcvmvalue_to_string(const LiblcvmValue &value, std::string *result);
 
 class LiblcvmConfig {
  private:

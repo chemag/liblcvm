@@ -111,7 +111,10 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
 
     // write CSV rows
     for (size_t i = 0; i < vals.size(); ++i) {
-      std::string value = liblcvmvalue_to_string(vals[i]);
+      std::string value;
+      if (liblcvmvalue_to_string(vals[i], &value) != 0) {
+        value = "ERROR";
+      }
       fprintf(outfp, "%s%s", csv_escape(value).c_str(),
               (i + 1 < vals.size()) ? "," : "\n");
     }

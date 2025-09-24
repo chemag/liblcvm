@@ -40,29 +40,36 @@ void IsobmffFileInformation::get_liblcvm_version(std::string &version) {
 }
 
 // variant operation
-double liblcvmvalue_to_double(const LiblcvmValue &value) {
+int liblcvmvalue_to_double(const LiblcvmValue &value, double *result) {
   if (std::holds_alternative<int>(value)) {
-    return static_cast<double>(std::get<int>(value));
+    *result = static_cast<double>(std::get<int>(value));
+    return 0;
   } else if (std::holds_alternative<double>(value)) {
-    return std::get<double>(value);
+    *result = std::get<double>(value);
+    return 0;
   } else {
-    throw std::runtime_error("LiblcvmValue is not numeric");
+    return -1;  // Error: LiblcvmValue is not numeric
   }
 }
 
-std::string liblcvmvalue_to_string(const LiblcvmValue &value) {
+int liblcvmvalue_to_string(const LiblcvmValue &value, std::string *result) {
   if (std::holds_alternative<std::string>(value)) {
-    return std::get<std::string>(value);
+    *result = std::get<std::string>(value);
+    return 0;
   } else if (std::holds_alternative<int>(value)) {
-    return std::to_string(std::get<int>(value));
+    *result = std::to_string(std::get<int>(value));
+    return 0;
   } else if (std::holds_alternative<unsigned int>(value)) {
-    return std::to_string(std::get<unsigned int>(value));
+    *result = std::to_string(std::get<unsigned int>(value));
+    return 0;
   } else if (std::holds_alternative<long int>(value)) {
-    return std::to_string(std::get<long int>(value));
+    *result = std::to_string(std::get<long int>(value));
+    return 0;
   } else if (std::holds_alternative<double>(value)) {
-    return std::to_string(std::get<double>(value));
+    *result = std::to_string(std::get<double>(value));
+    return 0;
   } else {
-    throw std::runtime_error("LiblcvmValue type is unsupported");
+    return -1;  // Error: LiblcvmValue type is unsupported
   }
 }
 
@@ -303,24 +310,17 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
 
 std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     const char *infile, const LiblcvmConfig &liblcvm_config) {
-  // 0. create a new object
-  std::shared_ptr<IsobmffFileInformation> ptr = nullptr;
-  try {
-    ptr = std::make_shared<IsobmffFileInformation>();
-  } catch (...) {
-    return nullptr;
-  }
-
-  // 0. store the filename and policy
+  // 0. create an ISOBMFF configuration object
+  std::shared_ptr<IsobmffFileInformation> ptr =
+      std::make_shared<IsobmffFileInformation>();
   ptr->filename = infile;
   ptr->policy = liblcvm_config.get_policy();
 
   // 1. parse the input file
   ISOBMFF::Parser parser;
-  try {
-    parser.Parse(ptr->filename.c_str());
-  } catch (std::runtime_error &e) {
-    fprintf(stderr, "error: %s\n", e.what());
+  ISOBMFF::Error err = parser.Parse(ptr->filename.c_str());
+  if (err) {
+    fprintf(stderr, "error: %s\n", err.GetMessage().c_str());
     return nullptr;
   }
   std::shared_ptr<ISOBMFF::File> file = parser.GetFile();
