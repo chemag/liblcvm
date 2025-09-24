@@ -20,8 +20,12 @@ std::any RulesToProtoVisitor::visitStatement(
 
 dsl::SeverityType RulesToProtoVisitor::getSeverity(
     const std::string& tokenText) {
-  if (tokenText == "warn") return dsl::SeverityType::WARN;
-  if (tokenText == "error") return dsl::SeverityType::ERROR;
+  if (tokenText == "warn") {
+    return dsl::SeverityType::WARN;
+  }
+  if (tokenText == "error") {
+    return dsl::SeverityType::ERROR;
+  }
   throw std::runtime_error("Unknown severity token: " + tokenText);
 }
 
@@ -75,20 +79,21 @@ std::any RulesToProtoVisitor::visitCompareExpr(
   cmp->set_column(ctx->IDENT()->getText());
 
   std::string op = ctx->compOp()->getText();
-  if (op == "==")
+  if (op == "==") {
     cmp->set_op(dsl::EQ);
-  else if (op == "!=")
+  } else if (op == "!=") {
     cmp->set_op(dsl::NE);
-  else if (op == ">")
+  } else if (op == ">") {
     cmp->set_op(dsl::GT);
-  else if (op == ">=")
+  } else if (op == ">=") {
     cmp->set_op(dsl::GE);
-  else if (op == "<")
+  } else if (op == "<") {
     cmp->set_op(dsl::LT);
-  else if (op == "<=")
+  } else if (op == "<=") {
     cmp->set_op(dsl::LE);
-  else
+  } else {
     throw std::runtime_error("Unknown comparison operator: " + op);
+  }
 
   std::string raw = ctx->value()->getText();
   if (!raw.empty() && raw.front() == '"' && raw.back() == '"') {

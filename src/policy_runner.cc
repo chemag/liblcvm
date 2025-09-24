@@ -50,7 +50,9 @@ ParserContext create_parser_content(const std::string& infile) {
 
 void printTree(antlr4::tree::ParseTree* tree, rulesParser* parser,
                std::ofstream& outfile_stream, int indent = 0) {
-  if (!tree) return;
+  if (!tree) {
+    return;
+  }
 
   std::string ind(indent * 2, ' ');
   std::string text = antlr4::tree::Trees::getNodeText(tree, parser);
@@ -115,7 +117,9 @@ bool eval_expr(const dsl::Expr& expr,
 bool eval_comparison(const dsl::Comparison& cmp,
                      const std::map<std::string, LiblcvmValue>& dict) {
   auto it = dict.find(cmp.column());
-  if (it == dict.end()) return false;
+  if (it == dict.end()) {
+    return false;
+  }
 
   const LiblcvmValue& val = it->second;
 
@@ -123,7 +127,9 @@ bool eval_comparison(const dsl::Comparison& cmp,
     // string comparisons
     std::string rhs = cmp.value();
     std::string lhs;
-    if (liblcvmvalue_to_string(val, &lhs) != 0) return false;
+    if (liblcvmvalue_to_string(val, &lhs) != 0) {
+      return false;
+    }
     switch (cmp.op()) {
       case dsl::ComparisonOpType::EQ:
         return lhs == rhs;
@@ -137,7 +143,9 @@ bool eval_comparison(const dsl::Comparison& cmp,
 
   // numeric comparisons
   double lhs;
-  if (liblcvmvalue_to_double(val, &lhs) != 0) return false;
+  if (liblcvmvalue_to_double(val, &lhs) != 0) {
+    return false;
+  }
   double rhs = std::stod(cmp.value());
   switch (cmp.op()) {
     case dsl::ComparisonOpType::EQ:
@@ -161,10 +169,14 @@ bool eval_comparison(const dsl::Comparison& cmp,
 bool eval_range(const dsl::RangeCheck& range,
                 const std::map<std::string, LiblcvmValue>& dict) {
   auto it = dict.find(range.column());
-  if (it == dict.end()) return false;
+  if (it == dict.end()) {
+    return false;
+  }
 
   double val;
-  if (liblcvmvalue_to_double(it->second, &val) != 0) return false;
+  if (liblcvmvalue_to_double(it->second, &val) != 0) {
+    return false;
+  }
   double low = range.low();
   double high = range.high();
 
@@ -181,11 +193,15 @@ bool eval_logical(const dsl::Logical& logic,
   switch (logic.op()) {
     case dsl::LogicOpType::AND:
       for (const auto& e : logic.operands())
-        if (!eval_expr(e, dict)) return false;
+        if (!eval_expr(e, dict)) {
+          return false;
+        }
       return true;
     case dsl::LogicOpType::OR:
       for (const auto& e : logic.operands())
-        if (eval_expr(e, dict)) return true;
+        if (eval_expr(e, dict)) {
+          return true;
+        }
       return false;
     default:
       return false;

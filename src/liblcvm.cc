@@ -78,7 +78,9 @@ std::string join_list(const std::list<std::string> &lst,
   std::ostringstream oss;
   bool first = true;
   for (const auto &s : lst) {
-    if (!first) oss << sep;
+    if (!first) {
+      oss << sep;
+    }
     oss << s;
     first = false;
   }

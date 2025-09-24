@@ -5,10 +5,10 @@ all: none
 
 
 lint:
-	clang-format -i -style=google ./include/*h
-	clang-format -i -style=google ./src/*cc
-	clang-format -i -style=google ./tools/*cc
-	clang-format -i -style=google ./test/*cc
+	clang-format -i -style=file ./include/*h
+	clang-format -i -style=file ./src/*cc
+	clang-format -i -style=file ./tools/*cc
+	clang-format -i -style=file ./test/*cc
 
 
 .PHONY: build
