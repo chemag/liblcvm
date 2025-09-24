@@ -145,6 +145,8 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
   pvals->push_back(pobj->get_frame().get_matrix_coeffs());
   pkeys->push_back("profile_idc");
   pvals->push_back(pobj->get_frame().get_profile_idc());
+  pkeys->push_back("level_idc");
+  pvals->push_back(pobj->get_frame().get_level_idc());
   pkeys->push_back("profile_type_str");
   pvals->push_back(pobj->get_frame().get_profile_type_str());
   pkeys->push_back("num_video_frames");
@@ -977,6 +979,7 @@ void FrameInformation::parse_avcc(std::shared_ptr<ISOBMFF::AVCC> avcc,
   this->matrix_coeffs = -1;
   this->video_full_range_flag = -1;
   this->profile_idc = -1;
+  this->level_idc = -1;
   this->profile_type_str = "";
 
   // extract the SPS NAL Units
@@ -1012,6 +1015,7 @@ void FrameInformation::parse_avcc(std::shared_ptr<ISOBMFF::AVCC> avcc,
       }
       this->profile_idc =
           nal_unit->nal_unit_payload->sps->sps_data->profile_idc;
+      this->level_idc = nal_unit->nal_unit_payload->sps->sps_data->level_idc;
       h264nal::profileTypeToString(
           nal_unit->nal_unit_payload->sps->sps_data->profile_type,
           this->profile_type_str);
@@ -1037,6 +1041,7 @@ void FrameInformation::parse_hvcc(std::shared_ptr<ISOBMFF::HVCC> hvcc,
   this->matrix_coeffs = -1;
   this->video_full_range_flag = -1;
   this->profile_idc = -1;
+  this->level_idc = -1;
   this->profile_type_str = "";
 
   // extract the NAL Units
@@ -1078,6 +1083,8 @@ void FrameInformation::parse_hvcc(std::shared_ptr<ISOBMFF::HVCC> hvcc,
              nullptr)) {
           this->profile_idc = nal_unit->nal_unit_payload->sps
                                   ->profile_tier_level->general->profile_idc;
+          this->level_idc = nal_unit->nal_unit_payload->sps->profile_tier_level
+                                ->general_level_idc;
           h265nal::profileTypeToString(
               nal_unit->nal_unit_payload->sps->profile_tier_level->general
                   ->profile_type,

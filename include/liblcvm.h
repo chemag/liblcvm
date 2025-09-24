@@ -218,6 +218,8 @@ class FrameInformation {
   int matrix_coeffs;
   // profile_idc: Video profile IDC (from HEVC/AVC SPS).
   int profile_idc;
+  // level_idc: Video level IDC (from HEVC/AVC SPS).
+  int level_idc;
   // profile_type_str: Video profile type string (from HEVC/AVC SPS).
   std::string profile_type_str;
 
@@ -244,6 +246,7 @@ class FrameInformation {
   DECL_GETTER(transfer_characteristics, int)
   DECL_GETTER(matrix_coeffs, int)
   DECL_GETTER(profile_idc, int)
+  DECL_GETTER(level_idc, int)
   DECL_GETTER(profile_type_str, std::string)
 
   int parse_frame_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
