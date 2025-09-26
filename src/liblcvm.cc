@@ -1201,8 +1201,8 @@ int FrameInformation::parse_frame_information(
   } else {
     if (debug > 0) {
       fprintf(stderr,
-              "error: no /moov/trak/mdia/minf/stbl/stsd/hvc1 or "
-              "/moov/trak/mdia/minf/stbl/stsd/avc1 in %s\n",
+              "error: cannot find a supported video trak in %s. Searched "
+              "/moov/trak/mdia/minf/stbl/stsd/{hvc1|avc1}\n",
               ptr->filename.c_str());
     }
     return -1;
