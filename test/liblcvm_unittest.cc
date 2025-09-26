@@ -186,7 +186,15 @@ TEST_F(LiblcvmTest, TestParserPolicy) {
                   "type;Invalid audio_video_ratio"),
 #endif
   };
-  EXPECT_THAT(expected_vals, ElementsAreArray(vals.begin() + 1, vals.end()))
-      << "output vals incorrect";
+  for (unsigned int index = 0; index < expected_vals.size(); index++) {
+    auto key = expected_keys[index + 1];
+    std::string expected_val;
+    (void)liblcvmvalue_to_string(expected_vals[index], &expected_val);
+    std::string val;
+    (void)liblcvmvalue_to_string(vals[index + 1], &val);
+    EXPECT_THAT(expected_val, val)
+        << "index: " << index << " key: " << key
+        << " expected_val: " << expected_val << " val: " << val;
+  }
 }
 }  // namespace liblcvm
