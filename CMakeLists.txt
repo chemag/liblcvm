@@ -17,7 +17,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Debug flags (you can still override from the CLI)
-set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -Wall -Wextra -Wno-unused-parameter -Wshadow")
+# Set debug flags for both C and C++
+set(COMMON_DEBUG_FLAGS "-g -O0 -Wall -Wextra -Wno-unused-parameter -Wshadow -Werror")
+set(CMAKE_C_FLAGS_DEBUG "${COMMON_DEBUG_FLAGS}")
+set(CMAKE_CXX_FLAGS_DEBUG "${COMMON_DEBUG_FLAGS}")
 
 message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR} ")
 
