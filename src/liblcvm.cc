@@ -920,9 +920,7 @@ void TimingInformation::calculate_percentile_list(
       frame_drop_length_percentile_list.push_back(frame_drop_length_percentile);
     }
   } else {
-    for (const double &_ : percentile_list) {
-      frame_drop_length_percentile_list.push_back(0.0);
-    }
+    frame_drop_length_percentile_list.resize(percentile_list.size(), 0.0);
   }
 }
 
@@ -931,9 +929,7 @@ void TimingInformation::calculate_consecutive_list(
     std::vector<long int> &frame_drop_length_consecutive, int debug) {
   // calculate consecutive list
   frame_drop_length_consecutive.clear();
-  for (int _ : consecutive_list) {
-    frame_drop_length_consecutive.push_back(0);
-  }
+  frame_drop_length_consecutive.resize(consecutive_list.size(), 0);
   if (frame_drop_length_sec_list.size() > 0) {
     for (const auto &frame_drop_length_sec : frame_drop_length_sec_list) {
       double drop_length =
