@@ -287,7 +287,7 @@ class LiblcvmConfig {
     sort_by_pts = true;
     policy = "";
     debug = 0;
-  };
+  }
 
   DECL_GETTER(sort_by_pts, bool)
   DECL_SETTER(sort_by_pts, bool)
