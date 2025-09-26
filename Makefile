@@ -4,7 +4,7 @@ all: none
 	echo "use cmake to build"
 
 
-lint:
+format:
 	clang-format -i -style=file ./include/*h
 	clang-format -i -style=file ./src/*cc
 	clang-format -i -style=file ./tools/*cc
