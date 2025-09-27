@@ -961,7 +961,7 @@ int FrameInformation::derive_frame_info(
 
 void FrameInformation::parse_avcc(std::shared_ptr<ISOBMFF::AVCC> avcc,
                                   int debug) {
-  // define an hevc parser state
+  // define an avcc parser state
   h264nal::H264BitstreamParserState bitstream_parser_state;
   std::unique_ptr<h264nal::H264BitstreamParser::BitstreamState> bitstream;
   h264nal::ParsingOptions parsing_options;
@@ -1138,30 +1138,35 @@ int FrameInformation::parse_frame_information(
     return -1;
   }
 
-  // 2. look for hvc1 or avc1 (container) boxes
+  // 2. look for hvc1/hev1 or avc1/avc3 (container) boxes
   std::shared_ptr<ISOBMFF::HVC1> hvc1 =
       stsd->GetTypedBox<ISOBMFF::HVC1>("hvc1");
+  std::shared_ptr<ISOBMFF::HEV1> hev1 =
+      stsd->GetTypedBox<ISOBMFF::HEV1>("hev1");
   std::shared_ptr<ISOBMFF::AVC1> avc1 =
       stsd->GetTypedBox<ISOBMFF::AVC1>("avc1");
+  std::shared_ptr<ISOBMFF::AVC3> avc3 =
+      stsd->GetTypedBox<ISOBMFF::AVC3>("avc3");
 
-  if (hvc1 != nullptr) {
+  if (hvc1 != nullptr || hev1 != nullptr) {
+    auto hevc_box = (hvc1 != nullptr) ? hvc1 : hev1;
     // 3. look for an hvcC box
     std::shared_ptr<ISOBMFF::HVCC> hvcc =
-        hvc1->GetTypedBox<ISOBMFF::HVCC>("hvcC");
+        hevc_box->GetTypedBox<ISOBMFF::HVCC>("hvcC");
     if (hvcc == nullptr) {
       if (debug > 0) {
         fprintf(stderr,
-                "error: no /moov/trak/mdia/minf/stbl/stsd/hvc1/hvcC in %s\n",
-                ptr->filename.c_str());
+                "error: no /moov/trak/mdia/minf/stbl/stsd/%s/hvcC in %s\n",
+                (hvc1 != nullptr) ? "hvc1" : "hev1", ptr->filename.c_str());
       }
       return -1;
     }
-    ptr->frame.type = "hvc1";
-    ptr->frame.width2 = hvc1->GetWidth();
-    ptr->frame.height2 = hvc1->GetHeight();
-    ptr->frame.horizresolution = hvc1->GetHorizResolution();
-    ptr->frame.vertresolution = hvc1->GetVertResolution();
-    ptr->frame.depth = hvc1->GetDepth();
+    ptr->frame.type = (hvc1 != nullptr) ? "hvc1" : "hev1";
+    ptr->frame.width2 = hevc_box->GetWidth();
+    ptr->frame.height2 = hevc_box->GetHeight();
+    ptr->frame.horizresolution = hevc_box->GetHorizResolution();
+    ptr->frame.vertresolution = hevc_box->GetVertResolution();
+    ptr->frame.depth = hevc_box->GetDepth();
     ptr->frame.chroma_format = hvcc->GetChromaFormat();
     ptr->frame.bit_depth_luma = 8 + hvcc->GetBitDepthLumaMinus8();
     ptr->frame.bit_depth_chroma = 8 + hvcc->GetBitDepthChromaMinus8();
@@ -1171,24 +1176,25 @@ int FrameInformation::parse_frame_information(
     ptr->frame.video_full_range_flag = -1;
     ptr->frame.parse_hvcc(hvcc, debug);
 
-  } else if (avc1 != nullptr) {
+  } else if (avc1 != nullptr || avc3 != nullptr) {
+    auto avc_box = (avc1 != nullptr) ? avc1 : avc3;
     // 4. look for an avcC box
     std::shared_ptr<ISOBMFF::AVCC> avcc =
-        avc1->GetTypedBox<ISOBMFF::AVCC>("avcC");
+        avc_box->GetTypedBox<ISOBMFF::AVCC>("avcC");
     if (avcc == nullptr) {
       if (debug > 0) {
         fprintf(stderr,
-                "error: no /moov/trak/mdia/minf/stbl/stsd/avc1/avcC in %s\n",
-                ptr->filename.c_str());
+                "error: no /moov/trak/mdia/minf/stbl/stsd/%s/avcC in %s\n",
+                (avc1 != nullptr) ? "avc1" : "avc3", ptr->filename.c_str());
       }
       return -1;
     }
-    ptr->frame.type = "avc1";
-    ptr->frame.width2 = avc1->GetWidth();
-    ptr->frame.height2 = avc1->GetHeight();
-    ptr->frame.horizresolution = avc1->GetHorizResolution();
-    ptr->frame.vertresolution = avc1->GetVertResolution();
-    ptr->frame.depth = avc1->GetDepth();
+    ptr->frame.type = (avc1 != nullptr) ? "avc1" : "avc3";
+    ptr->frame.width2 = avc_box->GetWidth();
+    ptr->frame.height2 = avc_box->GetHeight();
+    ptr->frame.horizresolution = avc_box->GetHorizResolution();
+    ptr->frame.vertresolution = avc_box->GetVertResolution();
+    ptr->frame.depth = avc_box->GetDepth();
     ptr->frame.chroma_format = -1;
     ptr->frame.bit_depth_luma = -1;
     ptr->frame.bit_depth_chroma = -1;
@@ -1198,7 +1204,7 @@ int FrameInformation::parse_frame_information(
     if (debug > 0) {
       fprintf(stderr,
               "error: cannot find a supported video trak in %s. Searched "
-              "/moov/trak/mdia/minf/stbl/stsd/{hvc1|avc1}\n",
+              "/moov/trak/mdia/minf/stbl/stsd/{hvc1|hev1|avc1|avc3}\n",
               ptr->filename.c_str());
     }
     return -1;

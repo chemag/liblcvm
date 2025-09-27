@@ -79,7 +79,7 @@ typedef struct {
   double bitrate_bps;
   double width;
   double height;
-  char type[8];  // "hvc1" or "avc1"
+  char type[8];  // "hvc1", "hev1", "avc1", or "avc3"
   int width2;
   int height2;
   int horizresolution;

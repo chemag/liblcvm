@@ -189,17 +189,17 @@ class FrameInformation {
   double width;
   // height: Video height.
   double height;
-  // type: Video type ("hvc1" or "avc1").
+  // type: Video type ("hvc1", "hev1", "avc1", or "avc3").
   std::string type;
-  // width2: Video width (from hvc1/avc1).
+  // width2: Video width (from hvc1/hev1/avc1/avc3).
   int width2;
-  // height2: Video height (from hvc1/avc1).
+  // height2: Video height (from hvc1/hev1/avc1/avc3).
   int height2;
-  // horizresolution: Video horizresolution (from hvc1/avc1).
+  // horizresolution: Video horizresolution (from hvc1/hev1/avc1/avc3).
   int horizresolution;
-  // vertresolution: Video vertresolution (from hvc1/avc1).
+  // vertresolution: Video vertresolution (from hvc1/hev1/avc1/avc3).
   int vertresolution;
-  // depth: Video depth (from hvc1/avc1).
+  // depth: Video depth (from hvc1/hev1/avc1/avc3).
   int depth;
   // chroma_format: Video chroma format (from hvcC/avcC).
   int chroma_format;
