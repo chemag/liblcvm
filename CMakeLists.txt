@@ -10,6 +10,7 @@ endif()
 # ---- Options -----------------------------------------------------------------
 option(BUILD_PYBINDINGS "Build Python bindings for liblcvm" OFF)
 option(ADD_POLICY "Build policy system with ANTLR and protobuf support" OFF)
+option(ADD_C_INTERFACE "Build C interface library for Android/exception-disabled environments" OFF)
 
 # ---- Language / flags --------------------------------------------------------
 set(CMAKE_CXX_STANDARD 17)
@@ -214,6 +215,91 @@ if(ADD_POLICY)
     PUBLIC
       protobuf::libprotobuf
       antlr4-runtime
+  )
+endif()
+
+# ---- C Interface Library -----------------------------------------------------
+if(ADD_C_INTERFACE)
+  message(STATUS "Configuring liblcvm C interface library")
+
+  # C interface library sources
+  set(LIBLCVM_C_SOURCES
+    src/liblcvm_c_impl.cpp
+  )
+
+  # Create the C interface library
+  add_library(liblcvm_c SHARED ${LIBLCVM_C_SOURCES})
+
+  # Set library properties
+  set_target_properties(liblcvm_c PROPERTIES
+    OUTPUT_NAME "lcvm_c"
+    VERSION ${PROJECT_VERSION}
+    SOVERSION ${PROJECT_VERSION_MAJOR}
+    PUBLIC_HEADER "include/liblcvm_c.h"
+    POSITION_INDEPENDENT_CODE ON
+  )
+
+  # Ensure main liblcvm library is built with PIC for C interface
+  set_target_properties(liblcvm PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  set_target_properties(isobmff PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  set_target_properties(h265nal PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  set_target_properties(h264nal PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+  # Include directories for C interface
+  target_include_directories(liblcvm_c
+    PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+      $<INSTALL_INTERFACE:include>
+    PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/include
+      ${LIBLCVM_INCLUDE_DIRS}
+  )
+
+  # Link against the main liblcvm library
+  target_link_libraries(liblcvm_c
+    PRIVATE
+      liblcvm
+  )
+
+  # Ensure proper symbol visibility for C interface
+  target_compile_definitions(liblcvm_c PRIVATE
+    LIBLCVM_C_EXPORTS=1
+  )
+
+  # Set up installation for C interface
+  install(TARGETS liblcvm_c
+    EXPORT liblcvm_c_targets
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+    RUNTIME DESTINATION bin
+    PUBLIC_HEADER DESTINATION include
+  )
+
+  # Export the targets
+  install(EXPORT liblcvm_c_targets
+    FILE liblcvm_c_targets.cmake
+    NAMESPACE liblcvm::
+    DESTINATION lib/cmake/liblcvm_c
+  )
+
+  # Create config file
+  include(CMakePackageConfigHelpers)
+  write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/liblcvm_c_config_version.cmake"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY AnyNewerVersion
+  )
+
+  configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/liblcvm_c_config.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/liblcvm_c_config.cmake"
+    INSTALL_DESTINATION lib/cmake/liblcvm_c
+  )
+
+  install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/liblcvm_c_config.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/liblcvm_c_config_version.cmake"
+    DESTINATION lib/cmake/liblcvm_c
   )
 endif()
 
