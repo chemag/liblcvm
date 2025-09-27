@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(lcvm VERSION 0.20)
+project(lcvm VERSION 0.21)
 
 # Ensure modern behavior for add_custom_command(TARGET ...)
 if(POLICY CMP0175)
