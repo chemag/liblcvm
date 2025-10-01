@@ -131,6 +131,7 @@ sudo dnf install cmake
 sudo dnf install gtest-devel
 sudo dnf install gmock-devel
 sudo dnf install llvm-toolset
+sudo dnf install abseil-cpp-devel
 # or
 sudo dnf install clang-tidy  # ubuntu
 sudo dnf install clang-tools-extra  # fedora
