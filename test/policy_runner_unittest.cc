@@ -2,6 +2,8 @@
  *  Copyright (c) Meta Platforms, Inc. and its affiliates.
  */
 
+#include "config.h"
+
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <liblcvm.h>  // for various
