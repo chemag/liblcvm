@@ -26,10 +26,9 @@ set(CMAKE_CXX_FLAGS_DEBUG "${COMMON_DEBUG_FLAGS}")
 message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR} ")
 
 # ---- Generated code dirs -----------------------------------------------------
-set(AUTOGEN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/autogen)
-file(MAKE_DIRECTORY ${AUTOGEN_DIR})
-
 if(ADD_POLICY)
+  set(AUTOGEN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/autogen)
+  file(MAKE_DIRECTORY ${AUTOGEN_DIR})
   set(ANTLR_GEN_DIR ${AUTOGEN_DIR}/antlr-gen)
   set(PROTO_GEN_DIR ${AUTOGEN_DIR}/protobuf-gen)
   file(MAKE_DIRECTORY ${ANTLR_GEN_DIR})
@@ -38,72 +37,249 @@ endif()
 
 # ---- Dependencies ------------------------------------------------------------
 find_package(absl REQUIRED)
-if(ADD_POLICY)
-  find_package(Protobuf REQUIRED)
-  find_package(antlr4-runtime REQUIRED)
-endif()
 
 if(ADD_POLICY)
-  # Download ANTLR jar to build dir if missing
-  set(ANTLR_JAR ${CMAKE_BINARY_DIR}/antlr-4.13.1-complete.jar)
-  set(ANTLR_JAR_URL https://www.antlr.org/download/antlr-4.13.1-complete.jar)
-  if(NOT EXISTS ${ANTLR_JAR})
-    message(STATUS "Downloading ANTLR jar to ${ANTLR_JAR} ...")
-    file(DOWNLOAD ${ANTLR_JAR_URL} ${ANTLR_JAR} SHOW_PROGRESS)
+# Download Protocol Buffers to build dir if missing
+set(PROTOBUF_DIR ${CMAKE_BINARY_DIR}/protobuf)
+set(PROTOBUF_ZIP ${CMAKE_BINARY_DIR}/protobuf-25.3.tar.gz)
+set(PROTOBUF_URL https://github.com/protocolbuffers/protobuf/archive/v25.3.tar.gz)
+
+if(NOT EXISTS ${PROTOBUF_DIR}/CMakeLists.txt)
+  if(NOT EXISTS ${PROTOBUF_ZIP})
+    message(STATUS "Downloading Protocol Buffers to ${PROTOBUF_ZIP} ...")
+    file(DOWNLOAD ${PROTOBUF_URL} ${PROTOBUF_ZIP} SHOW_PROGRESS)
   endif()
 
-  # ---- Protobuf generation -----------------------------------------------------
-  set(PROTO_PATH ${CMAKE_CURRENT_SOURCE_DIR}/policy)
-  set(PROTO_SRC rules.proto)
-  set(PROTO_GEN_SRCS
-    ${PROTO_GEN_DIR}/rules.pb.cc
-    ${PROTO_GEN_DIR}/rules.pb.h
-  )
-  add_custom_command(
-    OUTPUT ${PROTO_GEN_SRCS}
-    COMMAND ${Protobuf_PROTOC_EXECUTABLE}
-            --proto_path=${PROTO_PATH}
-            --cpp_out=${PROTO_GEN_DIR}
-            ${PROTO_SRC}
-    WORKING_DIRECTORY ${PROTO_PATH}
-    DEPENDS ${PROTO_PATH}/${PROTO_SRC}
-    COMMENT "Generating Protobuf sources in protobuf-gen/"
-  )
-  add_custom_target(gen_proto DEPENDS ${PROTO_GEN_SRCS})
+  # Create a temporary extraction directory
+  set(TEMP_PROTOBUF_EXTRACT_DIR ${CMAKE_BINARY_DIR}/temp_protobuf_extract)
+  file(REMOVE_RECURSE ${TEMP_PROTOBUF_EXTRACT_DIR})
+  file(MAKE_DIRECTORY ${TEMP_PROTOBUF_EXTRACT_DIR})
 
-  # ---- ANTLR generation --------------------------------------------------------
-  set(ANTLR_GRAMMAR ${CMAKE_CURRENT_SOURCE_DIR}/policy/rules.g4)
-  set(ANTLR_GEN_SRCS
-    ${ANTLR_GEN_DIR}/rulesLexer.cpp
-    ${ANTLR_GEN_DIR}/rulesParser.cpp
-    ${ANTLR_GEN_DIR}/rulesBaseListener.cpp
-    ${ANTLR_GEN_DIR}/rulesListener.cpp
-    ${ANTLR_GEN_DIR}/rulesBaseVisitor.cpp
-    ${ANTLR_GEN_DIR}/rulesVisitor.cpp
+  message(STATUS "Extracting Protocol Buffers to temporary directory ...")
+  file(ARCHIVE_EXTRACT INPUT ${PROTOBUF_ZIP} DESTINATION ${TEMP_PROTOBUF_EXTRACT_DIR})
+
+  # Find the extracted directory and move it to the correct location
+  file(GLOB EXTRACTED_PROTOBUF_DIRS "${TEMP_PROTOBUF_EXTRACT_DIR}/protobuf-*")
+  list(LENGTH EXTRACTED_PROTOBUF_DIRS NUM_DIRS)
+  if(NUM_DIRS GREATER 0)
+    list(GET EXTRACTED_PROTOBUF_DIRS 0 EXTRACTED_DIR)
+    message(STATUS "Moving Protocol Buffers from ${EXTRACTED_DIR} to ${PROTOBUF_DIR} ...")
+    file(RENAME ${EXTRACTED_DIR} ${PROTOBUF_DIR})
+  else()
+    # If no versioned directory found, move the entire temp directory
+    file(RENAME ${TEMP_PROTOBUF_EXTRACT_DIR} ${PROTOBUF_DIR})
+  endif()
+
+  # Clean up temporary directory if it still exists
+  if(EXISTS ${TEMP_PROTOBUF_EXTRACT_DIR})
+    file(REMOVE_RECURSE ${TEMP_PROTOBUF_EXTRACT_DIR})
+  endif()
+endif()
+
+# Build Protocol Buffers as static libraries
+if(NOT TARGET protobuf::libprotobuf)
+  # Configure protobuf build options
+  set(protobuf_BUILD_TESTS OFF CACHE BOOL "Build protobuf tests" FORCE)
+  set(protobuf_BUILD_EXAMPLES OFF CACHE BOOL "Build protobuf examples" FORCE)
+  set(protobuf_BUILD_PROTOC_BINARIES ON CACHE BOOL "Build protoc compiler" FORCE)
+  set(protobuf_MSVC_STATIC_RUNTIME OFF CACHE BOOL "Link static runtime libraries" FORCE)
+  set(protobuf_BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
+
+  # Completely disable testing to prevent googletest
+  set(BUILD_TESTING OFF CACHE BOOL "Build testing" FORCE)
+  set(protobuf_FETCH_DEPENDENCIES OFF CACHE BOOL "Fetch dependencies" FORCE)
+
+  # Add protobuf subdirectory
+  add_subdirectory(${PROTOBUF_DIR} ${CMAKE_BINARY_DIR}/protobuf-build EXCLUDE_FROM_ALL)
+
+  # Set protobuf variables for compatibility - newer protobuf versions use different paths
+  if(TARGET protoc)
+    set(Protobuf_PROTOC_EXECUTABLE $<TARGET_FILE:protoc>)
+  else()
+    # Fallback paths for different protobuf versions
+    set(POSSIBLE_PROTOC_PATHS
+      ${CMAKE_BINARY_DIR}/protobuf-build/protoc
+      ${CMAKE_BINARY_DIR}/protobuf-build/Release/protoc
+      ${CMAKE_BINARY_DIR}/protobuf-build/Debug/protoc
+      ${CMAKE_BINARY_DIR}/protobuf-build/bin/protoc
+    )
+    foreach(PROTOC_PATH ${POSSIBLE_PROTOC_PATHS})
+      if(EXISTS ${PROTOC_PATH})
+        set(Protobuf_PROTOC_EXECUTABLE ${PROTOC_PATH})
+        break()
+      endif()
+    endforeach()
+
+    # If still not found, use the target reference
+    if(NOT Protobuf_PROTOC_EXECUTABLE)
+      set(Protobuf_PROTOC_EXECUTABLE ${CMAKE_BINARY_DIR}/protobuf-build/protoc)
+    endif()
+  endif()
+
+  set(Protobuf_INCLUDE_DIRS ${PROTOBUF_DIR}/src)
+endif()
+
+# Download ANTLR jar to build dir if missing
+set(ANTLR_JAR ${CMAKE_BINARY_DIR}/antlr-4.13.1-complete.jar)
+set(ANTLR_JAR_URL https://www.antlr.org/download/antlr-4.13.1-complete.jar)
+if(NOT EXISTS ${ANTLR_JAR})
+  message(STATUS "Downloading ANTLR jar to ${ANTLR_JAR} ...")
+  file(DOWNLOAD ${ANTLR_JAR_URL} ${ANTLR_JAR} SHOW_PROGRESS)
+endif()
+
+# Download ANTLR4 C++ runtime to build dir if missing
+set(ANTLR_RUNTIME_DIR ${CMAKE_BINARY_DIR}/antlr4-cpp-runtime)
+set(ANTLR_RUNTIME_ZIP ${CMAKE_BINARY_DIR}/antlr4-cpp-runtime-4.13.1-source.zip)
+set(ANTLR_RUNTIME_URL https://www.antlr.org/download/antlr4-cpp-runtime-4.13.1-source.zip)
+
+if(NOT EXISTS ${ANTLR_RUNTIME_DIR}/runtime/CMakeLists.txt)
+  if(NOT EXISTS ${ANTLR_RUNTIME_ZIP})
+    message(STATUS "Downloading ANTLR4 C++ runtime to ${ANTLR_RUNTIME_ZIP} ...")
+    file(DOWNLOAD ${ANTLR_RUNTIME_URL} ${ANTLR_RUNTIME_ZIP} SHOW_PROGRESS)
+  endif()
+
+  # Create a temporary extraction directory
+  set(TEMP_EXTRACT_DIR ${CMAKE_BINARY_DIR}/temp_antlr_extract)
+  file(REMOVE_RECURSE ${TEMP_EXTRACT_DIR})
+  file(MAKE_DIRECTORY ${TEMP_EXTRACT_DIR})
+
+  message(STATUS "Extracting ANTLR4 C++ runtime to temporary directory ...")
+  file(ARCHIVE_EXTRACT INPUT ${ANTLR_RUNTIME_ZIP} DESTINATION ${TEMP_EXTRACT_DIR})
+
+  # Find the extracted directory and move it to the correct location
+  file(GLOB EXTRACTED_DIRS "${TEMP_EXTRACT_DIR}/antlr4-cpp-runtime-*")
+  list(LENGTH EXTRACTED_DIRS NUM_DIRS)
+  if(NUM_DIRS GREATER 0)
+    list(GET EXTRACTED_DIRS 0 EXTRACTED_DIR)
+    message(STATUS "Moving ANTLR4 runtime from ${EXTRACTED_DIR} to ${ANTLR_RUNTIME_DIR} ...")
+    file(RENAME ${EXTRACTED_DIR} ${ANTLR_RUNTIME_DIR})
+  else()
+    # If no versioned directory found, move the entire temp directory
+    file(RENAME ${TEMP_EXTRACT_DIR} ${ANTLR_RUNTIME_DIR})
+  endif()
+
+  # Clean up temporary directory if it still exists
+  if(EXISTS ${TEMP_EXTRACT_DIR})
+    file(REMOVE_RECURSE ${TEMP_EXTRACT_DIR})
+  endif()
+endif()
+
+# Build ANTLR4 runtime as a static library manually
+if(NOT TARGET antlr4_static)
+  # Collect all ANTLR4 runtime source files
+  file(GLOB ANTLR_RUNTIME_SRCS
+    "${ANTLR_RUNTIME_DIR}/runtime/src/*.cpp"
+    "${ANTLR_RUNTIME_DIR}/runtime/src/atn/*.cpp"
+    "${ANTLR_RUNTIME_DIR}/runtime/src/dfa/*.cpp"
+    "${ANTLR_RUNTIME_DIR}/runtime/src/internal/*.cpp"
+    "${ANTLR_RUNTIME_DIR}/runtime/src/misc/*.cpp"
+    "${ANTLR_RUNTIME_DIR}/runtime/src/support/*.cpp"
+    "${ANTLR_RUNTIME_DIR}/runtime/src/tree/*.cpp"
+    "${ANTLR_RUNTIME_DIR}/runtime/src/tree/pattern/*.cpp"
+    "${ANTLR_RUNTIME_DIR}/runtime/src/tree/xpath/*.cpp"
   )
-  add_custom_command(
-    OUTPUT ${ANTLR_GEN_SRCS}
-    COMMAND java -Xmx500M -cp ${ANTLR_JAR} org.antlr.v4.Tool
-            -Dlanguage=Cpp -visitor -o ${ANTLR_GEN_DIR} ${ANTLR_GRAMMAR}
-    DEPENDS ${ANTLR_GRAMMAR} ${ANTLR_JAR}
-    COMMENT "Generating ANTLR sources"
+
+  # Create the static library
+  add_library(antlr4_static STATIC ${ANTLR_RUNTIME_SRCS})
+
+  # Set include directories
+  target_include_directories(antlr4_static PUBLIC
+    ${ANTLR_RUNTIME_DIR}/runtime/src
+    ${ANTLR_RUNTIME_DIR}/runtime/src/atn
+    ${ANTLR_RUNTIME_DIR}/runtime/src/dfa
+    ${ANTLR_RUNTIME_DIR}/runtime/src/internal
+    ${ANTLR_RUNTIME_DIR}/runtime/src/misc
+    ${ANTLR_RUNTIME_DIR}/runtime/src/support
+    ${ANTLR_RUNTIME_DIR}/runtime/src/tree
+    ${ANTLR_RUNTIME_DIR}/runtime/src/tree/pattern
+    ${ANTLR_RUNTIME_DIR}/runtime/src/tree/xpath
   )
-  add_custom_target(gen_antlr DEPENDS ${ANTLR_GEN_SRCS})
-  add_custom_target(gen_all  DEPENDS gen_proto gen_antlr)
+
+  # Link threads for cross-platform compatibility
+  find_package(Threads REQUIRED)
+  target_link_libraries(antlr4_static PUBLIC Threads::Threads)
+
+  # Set compiler flags
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    target_compile_options(antlr4_static PRIVATE
+      -Wno-overloaded-virtual
+      -Wno-dollar-in-identifier-extension
+      -Wno-four-char-constants
+    )
+  elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+    target_compile_options(antlr4_static PRIVATE
+      -Wno-overloaded-virtual
+      -Wno-multichar
+    )
+  endif()
+
+  # Set library properties
+  set_target_properties(antlr4_static PROPERTIES
+    OUTPUT_NAME "antlr4-runtime-static"
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+  )
+
+  # Add preprocessor definitions
+  target_compile_definitions(antlr4_static PUBLIC ANTLR4CPP_STATIC)
+
+  # On Apple platforms, link CoreFoundation
+  if(APPLE)
+    find_library(COREFOUNDATION_LIBRARY CoreFoundation)
+    target_link_libraries(antlr4_static PUBLIC ${COREFOUNDATION_LIBRARY})
+  endif()
+endif()
+
+# ---- Protobuf generation -----------------------------------------------------
+set(PROTO_PATH ${CMAKE_CURRENT_SOURCE_DIR}/policy)
+set(PROTO_SRC rules.proto)
+set(PROTO_GEN_SRCS
+  ${PROTO_GEN_DIR}/rules.pb.cc
+  ${PROTO_GEN_DIR}/rules.pb.h
+)
+add_custom_command(
+  OUTPUT ${PROTO_GEN_SRCS}
+  COMMAND $<TARGET_FILE:protoc>
+          --proto_path=${PROTO_PATH}
+          --cpp_out=${PROTO_GEN_DIR}
+          ${PROTO_SRC}
+  WORKING_DIRECTORY ${PROTO_PATH}
+  DEPENDS ${PROTO_PATH}/${PROTO_SRC} protoc
+  COMMENT "Generating Protobuf sources in protobuf-gen/"
+)
+add_custom_target(gen_proto DEPENDS ${PROTO_GEN_SRCS})
+
+# ---- ANTLR generation --------------------------------------------------------
+set(ANTLR_GRAMMAR ${CMAKE_CURRENT_SOURCE_DIR}/policy/rules.g4)
+set(ANTLR_GEN_SRCS
+  ${ANTLR_GEN_DIR}/rulesLexer.cpp
+  ${ANTLR_GEN_DIR}/rulesParser.cpp
+  ${ANTLR_GEN_DIR}/rulesBaseListener.cpp
+  ${ANTLR_GEN_DIR}/rulesListener.cpp
+  ${ANTLR_GEN_DIR}/rulesBaseVisitor.cpp
+  ${ANTLR_GEN_DIR}/rulesVisitor.cpp
+)
+add_custom_command(
+  OUTPUT ${ANTLR_GEN_SRCS}
+  COMMAND java -Xmx500M -cp ${ANTLR_JAR} org.antlr.v4.Tool
+          -Dlanguage=Cpp -visitor -o ${ANTLR_GEN_DIR} ${ANTLR_GRAMMAR}
+  DEPENDS ${ANTLR_GRAMMAR} ${ANTLR_JAR}
+  COMMENT "Generating ANTLR sources"
+)
+add_custom_target(gen_antlr DEPENDS ${ANTLR_GEN_SRCS})
+add_custom_target(gen_all  DEPENDS gen_proto gen_antlr)
 endif()
 
 # ---- Includes ----------------------------------------------------------------
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/include
-  /opt/homebrew/include
 )
 
 if(ADD_POLICY)
   include_directories(
     ${ANTLR_GEN_DIR}
     ${PROTO_GEN_DIR}
-    /usr/include/antlr4-runtime
-    /usr/local/include/antlr4-runtime
+    ${ANTLR_RUNTIME_DIR}/runtime/src
     ${Protobuf_INCLUDE_DIRS}
   )
 endif()
@@ -213,8 +389,8 @@ target_link_libraries(liblcvm
 if(ADD_POLICY)
   target_link_libraries(liblcvm
     PUBLIC
-      protobuf::libprotobuf
-      antlr4-runtime
+      libprotobuf
+      antlr4_static
   )
 endif()
 
