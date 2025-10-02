@@ -4,6 +4,7 @@
 // A show case of using [ISOBMFF](https://github.com/DigiDNA/ISOBMFF) to
 // detect frame dups and video freezes in ISOBMFF files.
 
+#include "config.h"
 #include "liblcvm.h"
 
 #include <h264_bitstream_parser.h>
@@ -26,8 +27,6 @@
 #include <numeric>      // for accumulate
 #include <string>       // for basic_string, string
 #include <vector>       // for vector
-
-#include "config.h"
 
 #if ADD_POLICY
 #include "policy_protovisitor.h"

@@ -16,6 +16,9 @@ set(TEST_POLICY_DIR ${CMAKE_SOURCE_DIR}/policy)
 function(add_liblcvm_test test_name)
   add_executable(${test_name} ${test_name}.cc)
 
+  # Include the build directory for config.h
+  target_include_directories(${test_name} PRIVATE ${CMAKE_BINARY_DIR})
+
   # pass variables to C++ as a string literal
   target_compile_definitions(${test_name}
     PRIVATE TEST_MEDIA_DIR="${TEST_MEDIA_DIR}"
