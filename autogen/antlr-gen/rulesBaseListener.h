@@ -19,6 +19,9 @@ public:
   virtual void enterProgram(rulesParser::ProgramContext * /*ctx*/) override { }
   virtual void exitProgram(rulesParser::ProgramContext * /*ctx*/) override { }
 
+  virtual void enterVersion(rulesParser::VersionContext * /*ctx*/) override { }
+  virtual void exitVersion(rulesParser::VersionContext * /*ctx*/) override { }
+
   virtual void enterStatement(rulesParser::StatementContext * /*ctx*/) override { }
   virtual void exitStatement(rulesParser::StatementContext * /*ctx*/) override { }
 

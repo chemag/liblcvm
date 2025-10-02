@@ -83,6 +83,11 @@ dsl::RuleSet convert_parser_context_to_proto(ParserContext& ctx) {
   RulesToProtoVisitor visitor;
   dsl::RuleSet ruleSet;
 
+  // Set version if present
+  if (ctx.tree->version()) {
+    ruleSet.set_version(ctx.tree->version()->VERSIONID()->getText());
+  }
+
   for (auto stmt : ctx.tree->statement()) {
     auto rule = std::any_cast<dsl::Rule>(visitor.visitStatement(stmt));
     ruleSet.add_rules()->CopyFrom(rule);
@@ -255,7 +260,7 @@ ParserContext create_parser_content_from_string(const std::string& policy_str) {
 
 int policy_runner(const std::string& policy_str, LiblcvmKeyList* pkeys,
                   LiblcvmValList* pvals, std::list<std::string>* warn_list,
-                  std::list<std::string>* error_list) {
+                  std::list<std::string>* error_list, std::string* version) {
   // convert the keys/vals into a dictionary
   std::map<std::string, LiblcvmValue> dict;
   auto itK = pkeys->begin();
@@ -269,10 +274,19 @@ int policy_runner(const std::string& policy_str, LiblcvmKeyList* pkeys,
   warn_list->clear();
   error_list->clear();
 
+  if (version) {
+    version->clear();
+  }
+
   // run the policy
   try {
     ParserContext ctx = create_parser_content_from_string(policy_str);
     dsl::RuleSet ruleSet = convert_parser_context_to_proto(ctx);
+
+    if (version) {
+      *version = ruleSet.version();
+    }
+
     evaluate_rules(ruleSet, dict, warn_list, error_list);
   } catch (const std::exception& ex) {
     std::cerr << "Fatal error: " << ex.what() << std::endl;
