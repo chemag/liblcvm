@@ -1,3 +1,4 @@
+version 0.22
 error "Invalid bitrate_bps" (bitrate_bps < 5000000 or bitrate_bps > 60000000)
 error "Invalid width" width != 1728
 error "Invalid height" height != 3402

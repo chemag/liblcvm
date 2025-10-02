@@ -3,62 +3,62 @@ syntax = "proto3";
 package dsl;
 
 message RuleSet {
-  repeated Rule rules = 1;
+repeated Rule rules = 1;
+optional string version = 2;  // Optional version field (e.g., "1.0")
 }
 
 message Rule {
-  SeverityType severity = 1;
-  string label = 2;
-  Expr condition = 3;
+SeverityType severity = 1;
+string label = 2;
+Expr condition = 3;
 }
 
 enum SeverityType {
-  WARN = 0;
-  ERROR = 1;
+WARN = 0;
+ERROR = 1;
 }
 
 message Expr {
-  oneof expr_kind {
-    Comparison comparison = 1;
-    RangeCheck range = 2;
-    Logical logical = 3;
-    NotExpr not_expr = 4;
-  }
+oneof expr_kind {
+Comparison comparison = 1;
+RangeCheck range = 2;
+Logical logical = 3;
+NotExpr not_expr = 4;
+}
 }
 
 message Comparison {
-  string column = 1;
-  ComparisonOpType op = 2;
-  string value = 3;
+string column = 1;
+ComparisonOpType op = 2;
+string value = 3;
 }
 
 enum ComparisonOpType {
-  UNSPECIFIED = 0;
-  EQ = 1;
-  NE = 2;
-  GT = 3;
-  GE = 4;
-  LT = 5;
-  LE = 6;
+UNSPECIFIED = 0;
+EQ = 1;
+NE = 2;
+GT = 3;
+GE = 4;
+LT = 5;
+LE = 6;
 }
 
 message RangeCheck {
-  string column = 1;
-  double low = 2;
-  double high = 3;
+string column = 1;
+double low = 2;
+double high = 3;
 }
 
 message Logical {
-  LogicOpType op = 1;
-  repeated Expr operands = 2;
+LogicOpType op = 1;
+repeated Expr operands = 2;
 }
 
 enum LogicOpType {
-  AND = 0;
-  OR = 1;
+AND = 0;
+OR = 1;
 }
 
 message NotExpr {
-  Expr expr = 1;
+Expr expr = 1;
 }
-

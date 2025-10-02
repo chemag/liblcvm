@@ -13,13 +13,14 @@ class  rulesParser : public antlr4::Parser {
 public:
   enum {
     OR = 1, AND = 2, NOT = 3, IN = 4, RANGE = 5, EQ = 6, NE = 7, LT = 8, 
-    GT = 9, LE = 10, GE = 11, LPAREN = 12, RPAREN = 13, COMMA = 14, WARN = 15, 
-    ERROR = 16, IDENT = 17, NUMBER = 18, STRING = 19, WS = 20
+    GT = 9, LE = 10, GE = 11, LPAREN = 12, RPAREN = 13, COMMA = 14, VERSION = 15, 
+    WARN = 16, ERROR = 17, IDENT = 18, VERSIONID = 19, NUMBER = 20, STRING = 21, 
+    WS = 22
   };
 
   enum {
-    RuleProgram = 0, RuleStatement = 1, RuleExpr = 2, RuleCompOp = 3, RuleValue = 4, 
-    RuleNumber = 5
+    RuleProgram = 0, RuleVersion = 1, RuleStatement = 2, RuleExpr = 3, RuleCompOp = 4, 
+    RuleValue = 5, RuleNumber = 6
   };
 
   explicit rulesParser(antlr4::TokenStream *input);
@@ -40,6 +41,7 @@ public:
 
 
   class ProgramContext;
+  class VersionContext;
   class StatementContext;
   class ExprContext;
   class CompOpContext;
@@ -51,6 +53,7 @@ public:
     ProgramContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *EOF();
+    VersionContext *version();
     std::vector<StatementContext *> statement();
     StatementContext* statement(size_t i);
 
@@ -62,6 +65,22 @@ public:
   };
 
   ProgramContext* program();
+
+  class  VersionContext : public antlr4::ParserRuleContext {
+  public:
+    VersionContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    antlr4::tree::TerminalNode *VERSION();
+    antlr4::tree::TerminalNode *VERSIONID();
+
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+   
+  };
+
+  VersionContext* version();
 
   class  StatementContext : public antlr4::ParserRuleContext {
   public:
@@ -218,6 +237,7 @@ public:
   public:
     NumberContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
+    antlr4::tree::TerminalNode *VERSIONID();
     antlr4::tree::TerminalNode *NUMBER();
 
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
