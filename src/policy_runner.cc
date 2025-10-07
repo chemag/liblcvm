@@ -229,6 +229,60 @@ bool eval_expr(const dsl::Expr& expr,
   }
 }
 
+std::string format_rule_message_with_values(
+    const dsl::Rule& rule, const std::map<std::string, LiblcvmValue>& dict) {
+  std::string message = rule.label();
+
+  // Extract values from the rule condition and format the message
+  if (rule.condition().has_comparison()) {
+    const auto& comparison = rule.condition().comparison();
+    auto it = dict.find(comparison.column());
+    if (it != dict.end()) {
+      std::string value_str;
+      if (liblcvmvalue_to_string(it->second, &value_str) == 0) {
+        message += ": " + value_str;
+      }
+    }
+  } else if (rule.condition().has_range()) {
+    const auto& range = rule.condition().range();
+    auto it = dict.find(range.column());
+    if (it != dict.end()) {
+      std::string value_str;
+      if (liblcvmvalue_to_string(it->second, &value_str) == 0) {
+        message += ": " + value_str;
+      }
+    }
+  } else if (rule.condition().has_logical()) {
+    // For logical expressions (AND/OR), try to extract values from operands
+    const auto& logical = rule.condition().logical();
+    for (const auto& operand : logical.operands()) {
+      if (operand.has_comparison()) {
+        const auto& comparison = operand.comparison();
+        auto it = dict.find(comparison.column());
+        if (it != dict.end()) {
+          std::string value_str;
+          if (liblcvmvalue_to_string(it->second, &value_str) == 0) {
+            message += ": " + value_str;
+            break;  // Just use the first value found
+          }
+        }
+      } else if (operand.has_range()) {
+        const auto& range = operand.range();
+        auto it = dict.find(range.column());
+        if (it != dict.end()) {
+          std::string value_str;
+          if (liblcvmvalue_to_string(it->second, &value_str) == 0) {
+            message += ": " + value_str;
+            break;  // Just use the first value found
+          }
+        }
+      }
+    }
+  }
+
+  return message;
+}
+
 void evaluate_rules(const dsl::RuleSet& rules,
                     const std::map<std::string, LiblcvmValue>& dict,
                     std::list<std::string>* warn_list,
@@ -236,10 +290,12 @@ void evaluate_rules(const dsl::RuleSet& rules,
   for (const auto& rule : rules.rules()) {
     bool result = eval_expr(rule.condition(), dict);
     if (result) {
+      std::string formatted_message =
+          format_rule_message_with_values(rule, dict);
       if (rule.severity() == dsl::SeverityType::WARN && warn_list) {
-        warn_list->push_back(rule.label());
+        warn_list->push_back(formatted_message);
       } else if (rule.severity() == dsl::SeverityType::ERROR && error_list) {
-        error_list->push_back(rule.label());
+        error_list->push_back(formatted_message);
       }
     }
   }
