@@ -29,6 +29,7 @@ compOp
 value
     : STRING
     | number
+    | IDENT
     ;
 
 number

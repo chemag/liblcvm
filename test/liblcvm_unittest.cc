@@ -53,7 +53,7 @@ TEST_F(LiblcvmTest, TestParserPolicy) {
 #endif
 
   // 2. set parsing parameters
-  auto liblcvm_config = std::make_unique<LiblcvmConfig>();
+  LiblcvmConfig* liblcvm_config = new LiblcvmConfig();
   liblcvm_config->set_sort_by_pts(true);
 #if ADD_POLICY
   liblcvm_config->set_policy(policy);
@@ -181,9 +181,12 @@ TEST_F(LiblcvmTest, TestParserPolicy) {
       44100,
       16,
 #if ADD_POLICY
-      std::string("Suspicious bitrate_bps;Suspicious depth"),
-      std::string("Invalid bitrate_bps;Invalid width;Invalid height;Invalid "
-                  "type;Invalid audio_video_ratio"),
+      std::string("Suspicious bitrate_bps too low (bitrate_bps: "
+                  "13455.737704918032);Suspicious depth (depth: 24)"),
+      std::string("Invalid bitrate_bps too low (bitrate_bps: "
+                  "13455.737704918032);Invalid width (width: 1920);Invalid "
+                  "height (height: 1080);Invalid type (type: hvc1);Invalid "
+                  "audio_video_ratio (audio_video_ratio: 1.0058076193907575)"),
 #endif
   };
   for (unsigned int index = 0; index < expected_vals.size(); index++) {

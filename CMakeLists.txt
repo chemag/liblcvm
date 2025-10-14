@@ -17,6 +17,9 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# ---- Version defines ---------------------------------------------------------
+add_compile_definitions(LIBLCVM_POLICY_LANGUAGE_VERSION="0.1")
+
 # Debug flags (you can still override from the CLI)
 # Set debug flags for both C and C++
 set(COMMON_DEBUG_FLAGS "-g -O0 -Wall -Wextra -Wno-unused-parameter -Wshadow -Werror")
