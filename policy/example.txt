@@ -1,9 +1,12 @@
-version 0.22
-error "Invalid bitrate_bps" (bitrate_bps < 5000000 or bitrate_bps > 60000000)
+version 0.1
+error "Invalid bitrate_bps too low" bitrate_bps < 5000000
+error "Invalid bitrate_bps too high" bitrate_bps > 60000000
 error "Invalid width" width != 1728
 error "Invalid height" height != 3402
 error "Invalid type" type == "hvc1"
 error "Invalid bit_depth_luma" bit_depth_luma != 8
 error "Invalid audio_video_ratio" audio_video_ratio in range(0.9, 1.1)
-warn "Suspicious bitrate_bps" (bitrate_bps < 6000000 or bitrate_bps > 40000000)
+warn "HEVC hev1 type detected" type == "hev1"
+warn "Suspicious bitrate_bps too low" bitrate_bps < 6000000
+warn "Suspicious bitrate_bps too high" bitrate_bps > 40000000
 warn "Suspicious depth" depth == 24

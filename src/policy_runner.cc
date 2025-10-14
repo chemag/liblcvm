@@ -128,13 +128,34 @@ bool eval_comparison(const dsl::Comparison& cmp,
 
   const LiblcvmValue& val = it->second;
 
+  // Check if the RHS is a variable name or a literal value
+  std::string rhs_str = cmp.value();
+  bool rhs_is_variable = false;
+  LiblcvmValue rhs_val;
+
+  // Check if the RHS value is a variable name (exists in dict)
+  auto rhs_it = dict.find(rhs_str);
+  if (rhs_it != dict.end()) {
+    rhs_is_variable = true;
+    rhs_val = rhs_it->second;
+  }
+
   if (std::holds_alternative<std::string>(val)) {
     // string comparisons
-    std::string rhs = cmp.value();
     std::string lhs;
     if (liblcvmvalue_to_string(val, &lhs) != 0) {
       return false;
     }
+
+    std::string rhs;
+    if (rhs_is_variable) {
+      if (liblcvmvalue_to_string(rhs_val, &rhs) != 0) {
+        return false;
+      }
+    } else {
+      rhs = rhs_str;
+    }
+
     switch (cmp.op()) {
       case dsl::ComparisonOpType::EQ:
         return lhs == rhs;
@@ -151,7 +172,22 @@ bool eval_comparison(const dsl::Comparison& cmp,
   if (liblcvmvalue_to_double(val, &lhs) != 0) {
     return false;
   }
-  double rhs = std::stod(cmp.value());
+
+  double rhs;
+  if (rhs_is_variable) {
+    if (liblcvmvalue_to_double(rhs_val, &rhs) != 0) {
+      return false;
+    }
+  } else {
+    // Try to convert RHS to a number; if it fails, the variable doesn't exist
+    try {
+      rhs = std::stod(rhs_str);
+    } catch (const std::exception&) {
+      // RHS is not a number and not a variable in dict - return false
+      return false;
+    }
+  }
+
   switch (cmp.op()) {
     case dsl::ComparisonOpType::EQ:
       return lhs == rhs;
@@ -229,55 +265,56 @@ bool eval_expr(const dsl::Expr& expr,
   }
 }
 
-std::string format_rule_message_with_values(
-    const dsl::Rule& rule, const std::map<std::string, LiblcvmValue>& dict) {
-  std::string message = rule.label();
-
-  // Extract values from the rule condition and format the message
-  if (rule.condition().has_comparison()) {
-    const auto& comparison = rule.condition().comparison();
+// Helper function to collect variable names and values from an expression
+void collect_variables_from_expr(
+    const dsl::Expr& expr, const std::map<std::string, LiblcvmValue>& dict,
+    std::vector<std::pair<std::string, std::string>>& var_values) {
+  if (expr.has_comparison()) {
+    const auto& comparison = expr.comparison();
     auto it = dict.find(comparison.column());
     if (it != dict.end()) {
       std::string value_str;
       if (liblcvmvalue_to_string(it->second, &value_str) == 0) {
-        message += ": " + value_str;
+        var_values.push_back({comparison.column(), value_str});
       }
     }
-  } else if (rule.condition().has_range()) {
-    const auto& range = rule.condition().range();
+  } else if (expr.has_range()) {
+    const auto& range = expr.range();
     auto it = dict.find(range.column());
     if (it != dict.end()) {
       std::string value_str;
       if (liblcvmvalue_to_string(it->second, &value_str) == 0) {
-        message += ": " + value_str;
+        var_values.push_back({range.column(), value_str});
       }
     }
-  } else if (rule.condition().has_logical()) {
-    // For logical expressions (AND/OR), try to extract values from operands
-    const auto& logical = rule.condition().logical();
+  } else if (expr.has_not_expr()) {
+    collect_variables_from_expr(expr.not_expr().expr(), dict, var_values);
+  } else if (expr.has_logical()) {
+    const auto& logical = expr.logical();
     for (const auto& operand : logical.operands()) {
-      if (operand.has_comparison()) {
-        const auto& comparison = operand.comparison();
-        auto it = dict.find(comparison.column());
-        if (it != dict.end()) {
-          std::string value_str;
-          if (liblcvmvalue_to_string(it->second, &value_str) == 0) {
-            message += ": " + value_str;
-            break;  // Just use the first value found
-          }
-        }
-      } else if (operand.has_range()) {
-        const auto& range = operand.range();
-        auto it = dict.find(range.column());
-        if (it != dict.end()) {
-          std::string value_str;
-          if (liblcvmvalue_to_string(it->second, &value_str) == 0) {
-            message += ": " + value_str;
-            break;  // Just use the first value found
-          }
-        }
-      }
+      collect_variables_from_expr(operand, dict, var_values);
     }
+  }
+}
+
+std::string format_rule_message_with_values(
+    const dsl::Rule& rule, const std::map<std::string, LiblcvmValue>& dict) {
+  std::string message = rule.label();
+
+  // Collect all variable names and their values
+  std::vector<std::pair<std::string, std::string>> var_values;
+  collect_variables_from_expr(rule.condition(), dict, var_values);
+
+  // Format the message with variable names and values
+  if (!var_values.empty()) {
+    message += " (";
+    for (size_t i = 0; i < var_values.size(); ++i) {
+      if (i > 0) {
+        message += ", ";
+      }
+      message += var_values[i].first + ": " + var_values[i].second;
+    }
+    message += ")";
   }
 
   return message;
