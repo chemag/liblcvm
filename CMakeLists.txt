@@ -374,6 +374,13 @@ if(ADD_POLICY)
     ${ANTLR_GEN_SRCS}
     ${PROTO_GEN_SRCS}
   )
+
+  # Disable shadow and overloaded-virtual warnings for ANTLR headers
+  # These are third-party headers we can't modify
+  target_compile_options(liblcvm PRIVATE
+    -Wno-shadow
+    -Wno-overloaded-virtual
+  )
 endif()
 
 # Also link public deps so tools/tests get them transitively
@@ -486,6 +493,14 @@ endif()
 # NOTE: The real tool file is tools/lcvm.cc (not lcvm_tool.cpp).
 add_executable(lcvm tools/lcvm.cc)
 target_link_libraries(lcvm PRIVATE liblcvm)
+
+# Disable shadow and overloaded-virtual warnings for ANTLR headers in tool
+if(ADD_POLICY)
+  target_compile_options(lcvm PRIVATE
+    -Wno-shadow
+    -Wno-overloaded-virtual
+  )
+endif()
 
 # Generate config.h into the build dir and include it from the lib
 configure_file(
