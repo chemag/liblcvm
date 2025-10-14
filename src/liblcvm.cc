@@ -10,9 +10,9 @@
 #include <h264_bitstream_parser.h>
 #include <h264_common.h>
 #include <h264_nal_unit_parser.h>
-#include <h265_bitstream_parser.h>
 #include <h265_common.h>
 #include <h265_nal_unit_parser.h>
+#include <h265_bitstream_parser.h>
 #include <inttypes.h>
 #include <stdint.h>  // for uint32_t, uint64_t
 #include <sys/stat.h>
@@ -22,9 +22,11 @@
 #include <algorithm>    // for sort
 #include <cmath>        // for sqrt
 #include <cstdio>       // for fprintf, stderr, stdout
+#include <list>         // for list
 #include <map>          // for map
 #include <memory>       // for shared_ptr, operator==, __shared...
 #include <numeric>      // for accumulate
+#include <sstream>      // for ostringstream
 #include <string>       // for basic_string, string
 #include <vector>       // for vector
 

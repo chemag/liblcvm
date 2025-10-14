@@ -6,6 +6,7 @@
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include "config.h"
 #include <liblcvm.h>  // for various
 
 #include <filesystem>
