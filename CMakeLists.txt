@@ -95,6 +95,47 @@ if(NOT TARGET protobuf::libprotobuf)
   # Add protobuf subdirectory
   add_subdirectory(${PROTOBUF_DIR} ${CMAKE_BINARY_DIR}/protobuf-build EXCLUDE_FROM_ALL)
 
+  # Suppress warnings in protobuf third-party code
+  if(TARGET libprotobuf)
+    target_compile_options(libprotobuf PRIVATE
+      -Wno-missing-field-initializers
+      -Wno-sign-compare
+      -Wno-shadow
+      -Wno-maybe-musttail-local-addr
+      -Wno-ignored-qualifiers
+      -Wno-attributes
+      -Wno-implicit-fallthrough
+      -Wno-redundant-move
+      -Wno-deprecated-declarations
+    )
+  endif()
+  if(TARGET libprotoc)
+    target_compile_options(libprotoc PRIVATE
+      -Wno-missing-field-initializers
+      -Wno-sign-compare
+      -Wno-shadow
+      -Wno-maybe-musttail-local-addr
+      -Wno-ignored-qualifiers
+      -Wno-attributes
+      -Wno-implicit-fallthrough
+      -Wno-redundant-move
+      -Wno-deprecated-declarations
+    )
+  endif()
+  if(TARGET protoc)
+    target_compile_options(protoc PRIVATE
+      -Wno-missing-field-initializers
+      -Wno-sign-compare
+      -Wno-shadow
+      -Wno-maybe-musttail-local-addr
+      -Wno-ignored-qualifiers
+      -Wno-attributes
+      -Wno-implicit-fallthrough
+      -Wno-redundant-move
+      -Wno-deprecated-declarations
+    )
+  endif()
+
   # Set protobuf variables for compatibility - newer protobuf versions use different paths
   if(TARGET protoc)
     set(Protobuf_PROTOC_EXECUTABLE $<TARGET_FILE:protoc>)
@@ -208,11 +249,15 @@ if(NOT TARGET antlr4_static)
       -Wno-overloaded-virtual
       -Wno-dollar-in-identifier-extension
       -Wno-four-char-constants
+      -Wno-shadow
+      -Wno-deprecated-declarations
     )
   elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     target_compile_options(antlr4_static PRIVATE
       -Wno-overloaded-virtual
       -Wno-multichar
+      -Wno-shadow
+      -Wno-deprecated-declarations
     )
   endif()
 
