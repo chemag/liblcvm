@@ -265,7 +265,8 @@ set(ANTLR_GEN_SRCS
 add_custom_command(
   OUTPUT ${ANTLR_GEN_SRCS}
   COMMAND java -Xmx500M -cp ${ANTLR_JAR} org.antlr.v4.Tool
-          -Dlanguage=Cpp -visitor -o ${ANTLR_GEN_DIR} ${ANTLR_GRAMMAR}
+          -Dlanguage=Cpp -visitor -o ${ANTLR_GEN_DIR} rules.g4
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/policy
   DEPENDS ${ANTLR_GRAMMAR} ${ANTLR_JAR}
   COMMENT "Generating ANTLR sources"
 )
