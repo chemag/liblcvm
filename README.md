@@ -181,3 +181,14 @@ lib/isobmff/Submodules/makelib/Common.mk +75
 # Appendix 4: autogen notes
 
 * The antlr files were generated using antlr-4.13.1-complete.jar.
+
+
+# Appendix 5: Additional Build Notes
+
+Build library and binary with policy mode and debug enabled, but disabling fuzzing.
+```
+$ mkdir build
+$ cd build
+$ cmake -DBUILD_CLANG_FUZZER=OFF -DADD_POLICY=ON -DCMAKE_BUILD_TYPE=DEBUG ..
+$ make
+```
