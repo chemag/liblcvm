@@ -20,6 +20,7 @@ VERSIONID=19
 NUMBER=20
 STRING=21
 WS=22
+COMMENT=23
 'or'=1
 'and'=2
 'not'=3

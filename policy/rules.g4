@@ -65,3 +65,4 @@ VERSIONID : ([A-Za-z0-9]+ '.' )+ [A-Za-z0-9]+;
 NUMBER  : [0-9]+ ('.' [0-9]+)?;
 STRING  : '"' (~["\\] | '\\' .)* '"';
 WS      : [ \t\r\n]+ -> skip;
+COMMENT : '#' ~[\r\n]* -> skip;

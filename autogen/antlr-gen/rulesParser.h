@@ -15,7 +15,7 @@ public:
     OR = 1, AND = 2, NOT = 3, IN = 4, RANGE = 5, EQ = 6, NE = 7, LT = 8, 
     GT = 9, LE = 10, GE = 11, LPAREN = 12, RPAREN = 13, COMMA = 14, VERSION = 15, 
     WARN = 16, ERROR = 17, IDENT = 18, VERSIONID = 19, NUMBER = 20, STRING = 21, 
-    WS = 22
+    WS = 22, COMMENT = 23
   };
 
   enum {
