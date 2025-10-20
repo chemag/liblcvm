@@ -407,6 +407,9 @@ target_include_directories(liblcvm PUBLIC ${LIBLCVM_INCLUDE_DIRS})
 target_link_libraries(liblcvm PRIVATE ${LIBLCVM_LINK_LIBRARIES})
 
 if(ADD_POLICY)
+  # Define ADD_POLICY preprocessor macro for the C++ code
+  target_compile_definitions(liblcvm PUBLIC ADD_POLICY=1)
+
   # Add policy-specific include directories
   target_include_directories(liblcvm PUBLIC ${ANTLR_GEN_DIR} ${PROTO_GEN_DIR})
 
