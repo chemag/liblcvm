@@ -189,8 +189,8 @@ class FrameInformation {
   double width;
   // height: Video height.
   double height;
-  // type: Video type ("hvc1", "hev1", "avc1", or "avc3").
-  std::string type;
+  // video_codec_type: Video type ("hvc1", "hev1", "avc1", or "avc3").
+  std::string video_codec_type;
   // width2: Video width (from hvc1/hev1/avc1/avc3).
   int width2;
   // height2: Video height (from hvc1/hev1/avc1/avc3).
@@ -232,7 +232,7 @@ class FrameInformation {
   DECL_GETTER(bitrate_bps, double)
   DECL_GETTER(width, double)
   DECL_GETTER(height, double)
-  DECL_GETTER(type, std::string)
+  DECL_GETTER(video_codec_type, std::string)
   DECL_GETTER(width2, int)
   DECL_GETTER(height2, int)
   DECL_GETTER(horizresolution, int)
