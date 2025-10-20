@@ -32,7 +32,7 @@ csv_header = [
     "bitrate_bps",
     "width",
     "height",
-    "type",
+    "video_codec_type",
     "horizresolution",
     "vertresolution",
     "depth",
@@ -128,7 +128,7 @@ def dump_output(infile, outfp, file_info, debug):
     bitrate_bps = frame_info.get_bitrate_bps()
     width = frame_info.get_width()
     height = frame_info.get_height()
-    type = frame_info.get_type()
+    video_codec_type = frame_info.get_video_codec_type()
     horizresolution = frame_info.get_horizresolution()
     vertresolution = frame_info.get_vertresolution()
     depth = frame_info.get_depth()
@@ -195,7 +195,7 @@ def dump_output(infile, outfp, file_info, debug):
     outfp.write(f",{bitrate_bps:.6f}")  # Format the double with 6 decimal places
     outfp.write(f",{width:.6f}")
     outfp.write(f",{height:.6f}")
-    outfp.write(f",{type}")
+    outfp.write(f",{video_codec_type}")
     outfp.write(f",{horizresolution}")
     outfp.write(f",{vertresolution}")
     outfp.write(f",{depth}")

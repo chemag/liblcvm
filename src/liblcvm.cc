@@ -131,8 +131,8 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
   pvals->push_back(pobj->get_frame().get_width());
   pkeys->push_back("height");
   pvals->push_back(pobj->get_frame().get_height());
-  pkeys->push_back("type");
-  pvals->push_back(std::string(pobj->get_frame().get_type()));
+  pkeys->push_back("video_codec_type");
+  pvals->push_back(std::string(pobj->get_frame().get_video_codec_type()));
   pkeys->push_back("horizresolution");
   pvals->push_back(pobj->get_frame().get_horizresolution());
   pkeys->push_back("vertresolution");
@@ -1165,7 +1165,7 @@ int FrameInformation::parse_frame_information(
       }
       return -1;
     }
-    ptr->frame.type = (hvc1 != nullptr) ? "hvc1" : "hev1";
+    ptr->frame.video_codec_type = (hvc1 != nullptr) ? "hvc1" : "hev1";
     ptr->frame.width2 = hevc_box->GetWidth();
     ptr->frame.height2 = hevc_box->GetHeight();
     ptr->frame.horizresolution = hevc_box->GetHorizResolution();
@@ -1193,7 +1193,7 @@ int FrameInformation::parse_frame_information(
       }
       return -1;
     }
-    ptr->frame.type = (avc1 != nullptr) ? "avc1" : "avc3";
+    ptr->frame.video_codec_type = (avc1 != nullptr) ? "avc1" : "avc3";
     ptr->frame.width2 = avc_box->GetWidth();
     ptr->frame.height2 = avc_box->GetHeight();
     ptr->frame.horizresolution = avc_box->GetHorizResolution();
