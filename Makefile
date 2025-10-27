@@ -14,7 +14,7 @@ format:
 .PHONY: build
 
 
-build:
+build-manually:
 	cd lib/isobmff/ && make && cd ../../
 	LD_LIBRARY_PATH=$${LD_LIBRARY_PATH}:./lib/isobmff/Build/Debug/Products/x86_64/ g++ -c -o src/liblcvm.o -g -O0 src/liblcvm.cc -I./lib/isobmff/ISOBMFF/include/
 	LD_LIBRARY_PATH=$${LD_LIBRARY_PATH}:./lib/isobmff/Build/Debug/Products/x86_64/ g++ -c -o tools/lcvm.o -g -O0 tools/lcvm.cc -I./lib/isobmff/ISOBMFF/include/ -I./include
@@ -36,9 +36,14 @@ test:
 	LD_LIBRARY_PATH=$${LD_LIBRARY_PATH}:./build/lib/isobmff/src/ ./build/lcvm ./lib/isobmff/media/*MOV -o /tmp/full.csv
 
 
-build-cmake:
+build-clang:
 	\rm -rf build
 	mkdir build
 	cd build && CC=clang CXX=clang++ cmake -DCMAKE_BUILD_TYPE=DEBUG ..
 	cd build && make -j 8
 
+build-gcc:
+	\rm -rf build
+	mkdir build
+	cd build && CC=gcc CXX=g++ cmake -DCMAKE_BUILD_TYPE=DEBUG ..
+	cd build && make -j 8
