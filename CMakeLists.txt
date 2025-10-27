@@ -23,6 +23,10 @@ add_compile_definitions(LIBLCVM_POLICY_LANGUAGE_VERSION="0.1")
 # Debug flags (you can still override from the CLI)
 # Set debug flags for both C and C++
 set(COMMON_DEBUG_FLAGS "-g -O0 -Wall -Wextra -Wno-unused-parameter -Wshadow -Werror")
+# Only Clang (incl. AppleClang) has -Wextra-semi-stmt
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  set(COMMON_DEBUG_FLAGS "${COMMON_DEBUG_FLAGS} -Wextra-semi-stmt")
+endif()
 set(CMAKE_C_FLAGS_DEBUG "${COMMON_DEBUG_FLAGS}")
 set(CMAKE_CXX_FLAGS_DEBUG "${COMMON_DEBUG_FLAGS}")
 
