@@ -2,15 +2,13 @@
  *  Copyright (c) Meta Platforms, Inc. and its affiliates.
  */
 
-#include "config.h"
-
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
-#include "config.h"
 #include <liblcvm.h>  // for various
 
 #include <filesystem>
 #include <fstream>
+#include <list>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -28,7 +26,7 @@ class PolicyRunnerTest : public ::testing::Test {
 };
 
 TEST_F(PolicyRunnerTest, TestComparisons) {
-  // 1. set input jeys/vals
+  // 1. set input keys/vals
   LiblcvmKeyList keys = {
       "int",
       "string",
@@ -54,13 +52,13 @@ TEST_F(PolicyRunnerTest, TestComparisons) {
   ASSERT_EQ(0, policy_runner(policy_str_int_2, &keys, &vals, &warn_list,
                              &error_list, &version));
   EXPECT_TRUE(warn_list.empty());
-  EXPECT_THAT(error_list, ElementsAre(StrEq("Invalid int")));
+  EXPECT_THAT(error_list, ElementsAre(StrEq("Invalid int (int: 1)")));
 
   // 3. string comparisons
   std::string policy_str_string_1 = "warn \"Invalid str\" string == \"hello\"";
   ASSERT_EQ(0, policy_runner(policy_str_string_1, &keys, &vals, &warn_list,
                              &error_list, &version));
-  EXPECT_THAT(warn_list, ElementsAre(StrEq("Invalid str")));
+  EXPECT_THAT(warn_list, ElementsAre(StrEq("Invalid str (string: hello)")));
   EXPECT_TRUE(error_list.empty());
 
   std::string policy_str_string_2 = "warn \"Invalid str\" string != \"hello\"";
@@ -86,6 +84,7 @@ TEST_F(PolicyRunnerTest, TestComparisons) {
   ASSERT_EQ(0, policy_runner(policy_str_double_2, &keys, &vals, &warn_list,
                              &error_list, &version));
   EXPECT_TRUE(warn_list.empty());
-  EXPECT_THAT(error_list, ElementsAre(StrEq("Invalid double")));
+  EXPECT_THAT(error_list,
+              ElementsAre(StrEq("Invalid double (double: 1.000000)")));
 }
 }  // namespace liblcvm
