@@ -21,6 +21,13 @@ build:
 	LD_LIBRARY_PATH=$${LD_LIBRARY_PATH}:./lib/isobmff/Build/Debug/Products/x86_64/ g++ -o tools/lcvm tools/lcvm.o src/liblcvm.o -g -O0 -L./lib/isobmff/Build/Debug/Products/x86_64/ -lISOBMFF
 
 
+build-policy:
+	\rm -rf build
+	mkdir build
+	cd build && cmake -DCMAKE_BUILD_TYPE=DEBUG -DADD_POLICY=ON ..
+	cd build && make -j
+
+
 ifeq ($(TESTDIR),)
 TESTDIR := /tmp
 endif
