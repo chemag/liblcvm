@@ -78,7 +78,7 @@ TEST_F(LiblcvmTest, TestParserPolicy) {
       "bitrate_bps",
       "width",
       "height",
-      "type",
+      "video_codec_type",
       "horizresolution",
       "vertresolution",
       "depth",
@@ -121,6 +121,7 @@ TEST_F(LiblcvmTest, TestParserPolicy) {
       "sample_rate",
       "sample_size",
 #if ADD_POLICY
+      "policy_version",
       "warn_list",
       "error_list",
 #endif
@@ -181,12 +182,13 @@ TEST_F(LiblcvmTest, TestParserPolicy) {
       44100,
       16,
 #if ADD_POLICY
+      std::string("0.1"),
       std::string("Suspicious bitrate_bps too low (bitrate_bps: "
-                  "13455.737704918032);Suspicious depth (depth: 24)"),
+                  "13455.737705);Suspicious depth (depth: 24)"),
       std::string("Invalid bitrate_bps too low (bitrate_bps: "
-                  "13455.737704918032);Invalid width (width: 1920);Invalid "
-                  "height (height: 1080);Invalid type (type: hvc1);Invalid "
-                  "audio_video_ratio (audio_video_ratio: 1.0058076193907575)"),
+                  "13455.737705);Invalid width (width: 1920.000000);Invalid "
+                  "height (height: 1080.000000);Invalid "
+                  "audio_video_ratio (audio_video_ratio: 1.005808)"),
 #endif
   };
   for (unsigned int index = 0; index < expected_vals.size(); index++) {
@@ -195,7 +197,7 @@ TEST_F(LiblcvmTest, TestParserPolicy) {
     (void)liblcvmvalue_to_string(expected_vals[index], &expected_val);
     std::string val;
     (void)liblcvmvalue_to_string(vals[index + 1], &val);
-    EXPECT_THAT(expected_val, val)
+    EXPECT_EQ(expected_val, val)
         << "index: " << index << " key: " << key
         << " expected_val: " << expected_val << " val: " << val;
   }
