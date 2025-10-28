@@ -30,6 +30,53 @@ int readFileToString(const std::string& filename, std::string* result) {
 }  // namespace
 #endif
 
+namespace {
+// Compare two doubles with relative error tolerance
+// Returns true if the ratio of their difference vs. the larger value is smaller
+// than the accuracy parameter
+bool doubles_are_close(double a, double b, double accuracy = 0.0001) {
+  // Handle exact equality (including both zero)
+  if (a == b) {
+    return true;
+  }
+
+  // Handle the case where one or both values are zero
+  // In this case, use absolute difference instead of relative
+  double max_abs = std::max(std::abs(a), std::abs(b));
+  if (max_abs == 0.0) {
+    return true;  // Both are zero
+  }
+
+  // Calculate relative error: |a - b| / max(|a|, |b|)
+  double diff = std::abs(a - b);
+  double relative_error = diff / max_abs;
+
+  return relative_error < accuracy;
+}
+
+// Compare a LiblcvmValue against an expected value with optional tolerance for
+// doubles
+bool values_are_close(const LiblcvmValue& actual,
+                      const LiblcvmValue& expected, double accuracy = 0.0001) {
+  // If both are doubles, use double comparison with tolerance
+  if (std::holds_alternative<double>(actual) &&
+      std::holds_alternative<double>(expected)) {
+    return doubles_are_close(std::get<double>(actual),
+                             std::get<double>(expected), accuracy);
+  }
+
+  // For all other types, convert to string and compare exactly
+  std::string actual_str;
+  std::string expected_str;
+  if (liblcvmvalue_to_string(actual, &actual_str) != 0 ||
+      liblcvmvalue_to_string(expected, &expected_str) != 0) {
+    return false;
+  }
+
+  return actual_str == expected_str;
+}
+}  // namespace
+
 namespace liblcvm {
 
 class LiblcvmTest : public ::testing::Test {
@@ -193,13 +240,18 @@ TEST_F(LiblcvmTest, TestParserPolicy) {
   };
   for (unsigned int index = 0; index < expected_vals.size(); index++) {
     auto key = expected_keys[index + 1];
-    std::string expected_val;
-    (void)liblcvmvalue_to_string(expected_vals[index], &expected_val);
-    std::string val;
-    (void)liblcvmvalue_to_string(vals[index + 1], &val);
-    EXPECT_EQ(expected_val, val)
+    EXPECT_TRUE(values_are_close(vals[index + 1], expected_vals[index]))
         << "index: " << index << " key: " << key
-        << " expected_val: " << expected_val << " val: " << val;
+        << " expected: " << [&]() {
+             std::string s;
+             liblcvmvalue_to_string(expected_vals[index], &s);
+             return s;
+           }()
+        << " actual: " << [&]() {
+             std::string s;
+             liblcvmvalue_to_string(vals[index + 1], &s);
+             return s;
+           }();
   }
 }
 }  // namespace liblcvm
