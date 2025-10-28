@@ -4,15 +4,14 @@
 // A show case of using [ISOBMFF](https://github.com/DigiDNA/ISOBMFF) to
 // detect frame dups and video freezes in ISOBMFF files.
 
-#include "config.h"
 #include "liblcvm.h"
 
 #include <h264_bitstream_parser.h>
 #include <h264_common.h>
 #include <h264_nal_unit_parser.h>
+#include <h265_bitstream_parser.h>
 #include <h265_common.h>
 #include <h265_nal_unit_parser.h>
-#include <h265_bitstream_parser.h>
 #include <inttypes.h>
 #include <stdint.h>  // for uint32_t, uint64_t
 #include <sys/stat.h>
@@ -29,6 +28,8 @@
 #include <sstream>      // for ostringstream
 #include <string>       // for basic_string, string
 #include <vector>       // for vector
+
+#include "config.h"
 
 #if ADD_POLICY
 #include "policy_protovisitor.h"
@@ -263,7 +264,7 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
     }
   }
   pkeys->push_back("policy_version");
-  pvals->push_back(version_str); // Populated by policy parser
+  pvals->push_back(version_str);  // Populated by policy parser
   pkeys->push_back("warn_list");
   pvals->push_back(join_list(warn_list));
   pkeys->push_back("error_list");

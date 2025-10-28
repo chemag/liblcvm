@@ -56,8 +56,8 @@ bool doubles_are_close(double a, double b, double accuracy = 0.0001) {
 
 // Compare a LiblcvmValue against an expected value with optional tolerance for
 // doubles
-bool values_are_close(const LiblcvmValue& actual,
-                      const LiblcvmValue& expected, double accuracy = 0.0001) {
+bool values_are_close(const LiblcvmValue& actual, const LiblcvmValue& expected,
+                      double accuracy = 0.0001) {
   // If both are doubles, use double comparison with tolerance
   if (std::holds_alternative<double>(actual) &&
       std::holds_alternative<double>(expected)) {
@@ -241,12 +241,12 @@ TEST_F(LiblcvmTest, TestParserPolicy) {
   for (unsigned int index = 0; index < expected_vals.size(); index++) {
     auto key = expected_keys[index + 1];
     EXPECT_TRUE(values_are_close(vals[index + 1], expected_vals[index]))
-        << "index: " << index << " key: " << key
-        << " expected: " << [&]() {
-             std::string s;
-             liblcvmvalue_to_string(expected_vals[index], &s);
-             return s;
-           }()
+        << "index: " << index << " key: " << key << " expected: " <<
+        [&]() {
+          std::string s;
+          liblcvmvalue_to_string(expected_vals[index], &s);
+          return s;
+        }()
         << " actual: " << [&]() {
              std::string s;
              liblcvmvalue_to_string(vals[index + 1], &s);
