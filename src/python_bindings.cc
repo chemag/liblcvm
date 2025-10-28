@@ -11,7 +11,7 @@ namespace py = pybind11;
       .def("get_bitrate_bps", &class_name::get_bitrate_bps)           \
       .def("get_width", &class_name::get_width)                       \
       .def("get_height", &class_name::get_height)                     \
-      .def("get_type", &class_name::get_type)                         \
+      .def("get_video_codec_type", &class_name::get_video_codec_type) \
       .def("get_horizresolution", &class_name::get_horizresolution)   \
       .def("get_vertresolution", &class_name::get_vertresolution)     \
       .def("get_depth", &class_name::get_depth)                       \
