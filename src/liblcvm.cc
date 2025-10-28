@@ -297,8 +297,14 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
     pvals_timing->reserve(n);
     for (size_t i = 0; i < n; ++i) {
       pvals_timing->emplace_back(
-          frame_num_orig_list[i], stts_unit_list[i], ctts_unit_list[i],
-          dts_sec_list[i], pts_sec_list[i],
+          frame_num_orig_list[i],
+          (i < stts_unit_list.size()) ? stts_unit_list[i] : 0,
+          // ctts may not exist
+          (i < ctts_unit_list.size()) ? ctts_unit_list[i] : 0,
+          (i < dts_sec_list.size()) ? dts_sec_list[i]
+                                    : std::numeric_limits<double>::quiet_NaN(),
+          (i < pts_sec_list.size()) ? pts_sec_list[i]
+                                    : std::numeric_limits<double>::quiet_NaN(),
           // we typically have 1 less value
           (i < pts_duration_sec_list.size())
               ? pts_duration_sec_list[i]
