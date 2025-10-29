@@ -3,6 +3,10 @@
 
 #include "liblcvm.h"
 
+#if ADD_POLICY
+#include <list>
+#endif
+
 namespace py = pybind11;
 
 // Define the macro to bind frame getters
@@ -83,7 +87,8 @@ namespace py = pybind11;
       .def("get_pts_duration_sec_list",                                       \
            &class_name::get_pts_duration_sec_list)                            \
       .def("get_pts_duration_delta_sec_list",                                 \
-           &class_name::get_pts_duration_delta_sec_list)
+           &class_name::get_pts_duration_delta_sec_list)                      \
+      .def("get_pts_framerate_list", &class_name::get_pts_framerate_list)
 
 // Define the macro to bind audio getters
 #define AUDIO_GETTERS(class_name)                               \
@@ -130,4 +135,43 @@ PYBIND11_MODULE(liblcvm, m) {
 
   // Expose the LiblcvmConfig class
   py::class_<LiblcvmConfig>(m, "LiblcvmConfig").def(py::init<>());
+
+#if ADD_POLICY
+  // Expose the policy_runner function
+  m.def(
+      "policy_runner",
+      [](const std::string& policy_str, const std::vector<std::string>& keys,
+         const std::vector<py::object>& vals) {
+        // Convert Python objects to LiblcvmValue
+        LiblcvmKeyList cpp_keys = keys;
+        LiblcvmValList cpp_vals;
+
+        for (const auto& val : vals) {
+          if (py::isinstance<py::int_>(val)) {
+            cpp_vals.push_back(val.cast<int>());
+          } else if (py::isinstance<py::float_>(val)) {
+            cpp_vals.push_back(val.cast<double>());
+          } else if (py::isinstance<py::str>(val)) {
+            cpp_vals.push_back(val.cast<std::string>());
+          } else {
+            throw std::runtime_error("Unsupported value type in policy_runner");
+          }
+        }
+
+        std::list<std::string> warn_list;
+        std::list<std::string> error_list;
+        std::string version;
+
+        int result = policy_runner(policy_str, &cpp_keys, &cpp_vals, &warn_list,
+                                   &error_list, &version);
+
+        // Convert std::list to std::vector for Python
+        std::vector<std::string> warn_vec(warn_list.begin(), warn_list.end());
+        std::vector<std::string> error_vec(error_list.begin(),
+                                           error_list.end());
+
+        return py::make_tuple(result, warn_vec, error_vec, version);
+      },
+      py::arg("policy_str"), py::arg("keys"), py::arg("vals"));
+#endif
 }
