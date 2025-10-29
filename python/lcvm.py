@@ -23,6 +23,7 @@ default_values = {
     "outfile_timestamps": "outfile_timestamps.csv",
     "infile_list": [],
     "outfile": None,
+    "policy": None,
 }
 
 
@@ -71,6 +72,9 @@ csv_header = [
     "channel_count",
     "sample_rate",
     "sample_size",
+    "policy_version",
+    "warn_list",
+    "error_list",
 ]
 
 
@@ -114,13 +118,67 @@ def get_options(argv):
         metavar="output-file",
         help="output file",
     )
+    parser.add_argument(
+        "-p",
+        "--policy",
+        dest="policy",
+        type=str,
+        default=default_values["policy"],
+        metavar="policy-file",
+        help="policy file for validation rules",
+    )
 
     # do the parsing
     options = parser.parse_args(argv[1:])
     return options
 
 
-def dump_output(infile, outfp, file_info, debug):
+def run_policy(policy_str, keys, vals, debug):
+    """Run policy validation on the extracted metrics.
+
+    Args:
+        policy_str: Policy string to evaluate
+        keys: List of metric names
+        vals: List of metric values
+        debug: Debug level
+
+    Returns:
+        Tuple of (result_code, warnings_list, errors_list, version)
+    """
+    try:
+        # Check if policy_runner is available (requires ADD_POLICY=ON)
+        if not hasattr(liblcvm, "policy_runner"):
+            if debug > 0:
+                print(
+                    "Warning: policy_runner not available. Library was built without ADD_POLICY=ON."
+                )
+            return None
+
+        result, warnings, errors, version = liblcvm.policy_runner(
+            policy_str, keys, vals
+        )
+
+        if debug > 0:
+            print(f"Policy validation result: {result}")
+            if version:
+                print(f"Policy version: {version}")
+            if warnings:
+                print(f"Warnings: {len(warnings)}")
+                for warn in warnings:
+                    print(f"  - {warn}")
+            if errors:
+                print(f"Errors: {len(errors)}")
+                for err in errors:
+                    print(f"  - {err}")
+
+        return (result, warnings, errors, version)
+
+    except Exception as e:
+        print(f"Error running policy validation: {e}")
+        return None
+
+
+def dump_output(infile, outfp, file_info, debug, policy_str=None):
 
     # Access the frame information
     frame_info = file_info.get_frame()
@@ -188,6 +246,112 @@ def dump_output(infile, outfp, file_info, debug):
     sample_rate = audio_info.get_sample_rate()
     sample_size = audio_info.get_sample_size()
 
+    # Run policy validation if policy string is provided
+    policy_version = ""
+    warn_list_str = ""
+    error_list_str = ""
+
+    if policy_str:
+        keys = [
+            "filesize",
+            "bitrate_bps",
+            "width",
+            "height",
+            "video_codec_type",
+            "horizresolution",
+            "vertresolution",
+            "depth",
+            "chroma_format",
+            "bit_depth_luma",
+            "bit_depth_chroma",
+            "video_full_range_flag",
+            "colour_primaries",
+            "transfer_characteristics",
+            "matrix_coeffs",
+            "num_video_frames",
+            "frame_rate_fps_median",
+            "frame_rate_fps_average",
+            "frame_rate_fps_reverse_average",
+            "frame_rate_fps_stddev",
+            "video_freeze",
+            "audio_video_ratio",
+            "duration_video_sec",
+            "duration_audio_sec",
+            "timescale_video_hz",
+            "timescale_audio_hz",
+            "pts_duration_sec_average",
+            "pts_duration_sec_median",
+            "pts_duration_sec_stddev",
+            "pts_duration_sec_mad",
+            "frame_drop_count",
+            "frame_drop_ratio",
+            "normalized_frame_drop_average_length",
+            "frame_drop_length_percentile_50",
+            "frame_drop_length_percentile_90",
+            "frame_drop_length_consecutive_2",
+            "frame_drop_length_consecutive_5",
+            "num_video_keyframes",
+            "key_frame_ratio",
+            "audio_type",
+            "channel_count",
+            "sample_rate",
+            "sample_size",
+        ]
+        vals = [
+            filesize,
+            bitrate_bps,
+            width,
+            height,
+            video_codec_type,
+            horizresolution,
+            vertresolution,
+            depth,
+            chroma_format,
+            bit_depth_luma,
+            bit_depth_chroma,
+            video_full_range_flag,
+            colour_primaries,
+            transfer_characteristics,
+            matrix_coeffs,
+            num_video_frames,
+            frame_rate_fps_median,
+            frame_rate_fps_average,
+            frame_rate_fps_reverse_average,
+            frame_rate_fps_stddev,
+            int(video_freeze),
+            audio_video_ratio,
+            duration_video_sec,
+            duration_audio_sec,
+            timescale_video_hz,
+            timescale_audio_hz,
+            pts_duration_sec_average,
+            pts_duration_sec_median,
+            pts_duration_sec_stddev,
+            pts_duration_sec_mad,
+            frame_drop_count,
+            frame_drop_ratio,
+            normalized_frame_drop_average_length,
+            frame_drop_length_percentile_list[0],
+            frame_drop_length_percentile_list[1],
+            frame_drop_length_consecutive[0],
+            frame_drop_length_consecutive[1],
+            num_video_keyframes,
+            key_frame_ratio,
+            audio_type,
+            channel_count,
+            sample_rate,
+            sample_size,
+        ]
+
+        policy_result = run_policy(policy_str, keys, vals, debug)
+        if policy_result:
+            result_code, warnings, errors, version = policy_result
+
+            policy_version = version if version else ""
+            # Join warnings and errors with semicolon for CSV
+            warn_list_str = "; ".join(warnings) if warnings else ""
+            error_list_str = "; ".join(errors) if errors else ""
+
     # Dump all output
     # Write to the output file
     outfp.write(f"{infile}")
@@ -235,6 +399,9 @@ def dump_output(infile, outfp, file_info, debug):
     outfp.write(f",{channel_count}")
     outfp.write(f",{sample_rate}")
     outfp.write(f",{sample_size}")
+    outfp.write(f",{policy_version}")
+    outfp.write(f',"{warn_list_str}"')
+    outfp.write(f',"{error_list_str}"')
     outfp.write("\n")
 
 
@@ -248,6 +415,7 @@ def capture_timestamps(
     pts_sec_list_dict,
     pts_duration_sec_list_dict,
     pts_duration_delta_sec_list_dict,
+    pts_framerate_list_dict,
 ):
     # Access the timing information
     timing_info = file_info.get_timing()
@@ -296,7 +464,9 @@ def write_timestamps_to_file(
             # Dump the file names (header row)
             outtsfp.write("frame_num,frame_num_orig")
             for infile in stts_unit_list_dict.keys():
-                outtsfp.write(f",stts_{infile},ctts_{infile},dts_{infile},pts_{infile},pts_duration_{infile}")
+                outtsfp.write(
+                    f",stts_{infile},ctts_{infile},dts_{infile},pts_{infile},pts_duration_{infile}"
+                )
             outtsfp.write("\n")
 
             # Dump the columns of inter-frame timestamps
@@ -346,7 +516,9 @@ def write_timestamps_to_file(
                         outtsfp.write(",")
 
                 # Dump pts_duration_delta_sec_list[frame_num]
-                for pts_duration_delta_sec_list in pts_duration_delta_sec_list_dict.values():
+                for (
+                    pts_duration_delta_sec_list
+                ) in pts_duration_delta_sec_list_dict.values():
                     if frame_num < len(pts_duration_delta_sec_list):
                         outtsfp.write(f",{pts_duration_delta_sec_list[frame_num]:.6f}")
                     else:
@@ -366,7 +538,14 @@ def write_timestamps_to_file(
         return -1
 
 
-def parse_files(infile_list, outfile, outfile_timestamps, outfile_timestamps_sort_pts, debug):
+def parse_files(
+    infile_list,
+    outfile,
+    outfile_timestamps,
+    outfile_timestamps_sort_pts,
+    debug,
+    policy_file=None,
+):
     # Open outfile
     if outfile is None or (len(outfile) == 1 and outfile == "-"):
         # Use stdout
@@ -378,6 +557,19 @@ def parse_files(infile_list, outfile, outfile_timestamps, outfile_timestamps_sor
             # Did not work
             sys.stderr.write(f'Could not open output file: "{outfile}"\n')
             return -1
+
+    # Read policy file if provided
+    policy_str = None
+    if policy_file:
+        try:
+            with open(policy_file, "r") as pf:
+                policy_str = pf.read()
+                if debug > 0:
+                    print(f"Loaded policy from: {policy_file}")
+        except IOError as e:
+            sys.stderr.write(f'Could not read policy file: "{policy_file}": {e}\n')
+            return -1
+
     # 1. Write CSV header
     csv_writer = csv.writer(outfp)
     csv_writer.writerow(csv_header)
@@ -404,7 +596,7 @@ def parse_files(infile_list, outfile, outfile_timestamps, outfile_timestamps_sor
             file_info = liblcvm.parse(infile, config)
             print("File information parsed successfully.")
 
-            dump_output(infile, outfp, file_info, debug)
+            dump_output(infile, outfp, file_info, debug, policy_str)
             # 2.4. capture outfile timestamps
             if outfile_timestamps is not None:
                 capture_timestamps(
@@ -462,6 +654,7 @@ def main(argv):
             options.outfile_timestamps,
             options.outfile_timestamps_sort_pts,
             options.debug,
+            options.policy,
         )
 
 
