@@ -11,6 +11,7 @@ link_directories(/usr/local/lib)
 # define the root directory variable
 set(TEST_MEDIA_DIR ${CMAKE_SOURCE_DIR}/lib/isobmff/media)
 set(TEST_POLICY_DIR ${CMAKE_SOURCE_DIR}/policy)
+set(TEST_CONFORMANCE_DIR ${CMAKE_SOURCE_DIR}/test)
 
 # Function to add a test executable
 function(add_liblcvm_test test_name)
@@ -26,6 +27,9 @@ function(add_liblcvm_test test_name)
   target_compile_definitions(${test_name}
     PRIVATE TEST_POLICY_DIR="${TEST_POLICY_DIR}"
   )
+  target_compile_definitions(${test_name}
+    PRIVATE TEST_CONFORMANCE_DIR="${TEST_CONFORMANCE_DIR}"
+  )
 
   target_link_libraries(${test_name}
     PUBLIC liblcvm GTest::gtest GTest::gtest_main
@@ -35,7 +39,7 @@ function(add_liblcvm_test test_name)
 endfunction()
 
 # Find all test files in the current directory
-file(GLOB TEST_FILES "*_unittest.cc")
+file(GLOB TEST_FILES "*_unittest.cc" "*_test.cc")
 
 # Filter out policy tests if ADD_POLICY is disabled
 if(NOT ADD_POLICY)
