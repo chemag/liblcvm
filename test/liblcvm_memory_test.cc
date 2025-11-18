@@ -2,6 +2,42 @@
  *  Copyright (c) Meta Platforms, Inc. and its affiliates.
  */
 
+/*
+ * Memory usage and leak detection tests for liblcvm video processing.
+ *
+ * This test suite measures memory consumption when processing multiple videos
+ * with liblcvm. It provides three types of tests:
+ *
+ * 1. MultipleVideosMemoryUsage: Processes all videos in test/corpus/ sequentially
+ *    and tracks memory usage after each video to ensure memory doesn't grow
+ *    excessively.
+ *
+ * 2. SingleVideoMemoryLeakCheck: Processes the same video multiple times (10
+ *    iterations) to detect memory leaks. If memory continuously grows with each
+ *    iteration, it indicates a leak.
+ *
+ * 3. DetailedMemoryProfileMassifStyle: Creates a timeline of memory snapshots
+ *    before and after each video processing, similar to Valgrind Massif. Outputs
+ *    both console timeline and a memory_profile.txt file.
+ *
+ * Memory Measurement:
+ * - Uses RSS (Resident Set Size) on both macOS and Linux
+ * - RSS represents the actual physical memory used by the process
+ * - This is complementary to tools like Valgrind Massif which track heap
+ *   allocations with detailed stack traces
+ *
+ * Usage:
+ *   # Run all memory tests
+ *   ./liblcvm_memory_test
+ *
+ *   # Run specific test
+ *   ./liblcvm_memory_test --gtest_filter=MemoryUsageTest.SingleVideoMemoryLeakCheck
+ *
+ * Setup:
+ *   Place test videos in test/corpus/ directory
+ *   Supported formats: .MOV, .mov, .MP4, .mp4, .m4v, .M4V
+ */
+
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <liblcvm.h>
@@ -23,13 +59,18 @@
 
 namespace liblcvm {
 
+// Test fixture for memory usage tests
 class MemoryUsageTest : public ::testing::Test {
  public:
   MemoryUsageTest() {}
   ~MemoryUsageTest() override {}
 
+  // Gets current memory usage (RSS - Resident Set Size) in bytes
+  // Returns the actual physical memory currently used by the process
+  // Platform-specific implementations for macOS and Linux
   size_t getCurrentMemoryUsageBytes() {
 #if defined(__APPLE__) && defined(__MACH__)
+    // macOS: Use Mach task_info API to get resident memory size
     struct mach_task_basic_info info;
     mach_msg_type_number_t info_count = MACH_TASK_BASIC_INFO_COUNT;
 
@@ -39,6 +80,8 @@ class MemoryUsageTest : public ::testing::Test {
     }
     return info.resident_size;
 #elif defined(__linux__)
+    // Linux: Read RSS from /proc/self/statm
+    // Second field is RSS in pages, multiply by page size for bytes
     long rss = 0L;
     FILE* fp = nullptr;
     if ((fp = fopen("/proc/self/statm", "r")) == nullptr) {
@@ -55,16 +98,21 @@ class MemoryUsageTest : public ::testing::Test {
 #endif
   }
 
+  // Converts bytes to megabytes for human-readable output
   double bytesToMB(size_t bytes) {
     return static_cast<double>(bytes) / (1024.0 * 1024.0);
   }
 
+  // Represents a single point-in-time memory measurement
+  // Used for creating timeline-based memory profiles
   struct MemorySnapshot {
-    size_t timestamp_ms;
-    size_t memory_bytes;
-    std::string event;
+    size_t timestamp_ms;     // Milliseconds since test start
+    size_t memory_bytes;     // Memory usage at this point
+    std::string event;       // Description of what happened
   };
 
+  // Writes memory snapshots to a file in a Massif-like format
+  // Output file can be analyzed to identify memory patterns over time
   void writeMemoryReport(const std::vector<MemorySnapshot>& snapshots,
                          const std::string& filename) {
     std::ofstream report(filename);
@@ -87,6 +135,9 @@ class MemoryUsageTest : public ::testing::Test {
     std::cout << "Memory report written to: " << filename << std::endl;
   }
 
+  // Scans test/corpus/ directory for video files to test with
+  // Returns a list of full paths to all supported video files
+  // Supported formats: .MOV, .mov, .MP4, .mp4, .m4v, .M4V
   std::vector<std::string> getTestVideos() {
     std::vector<std::string> videos;
     std::string corpus_dir = std::string(TEST_CONFORMANCE_DIR) + "/corpus";
@@ -107,6 +158,9 @@ class MemoryUsageTest : public ::testing::Test {
     return videos;
   }
 
+  // Processes a single video file using liblcvm
+  // This is the core operation being tested for memory usage
+  // Parses the video and extracts metrics and timing information
   void processVideo(const std::string& infile) {
     auto liblcvm_config = std::make_unique<LiblcvmConfig>();
     liblcvm_config->set_sort_by_pts(true);
@@ -126,6 +180,17 @@ class MemoryUsageTest : public ::testing::Test {
   }
 };
 
+// Test 1: MultipleVideosMemoryUsage
+// Purpose: Measures memory usage when processing multiple videos sequentially
+// What it checks:
+// - Initial memory footprint
+// - Memory delta after processing each video
+// - Peak memory usage across all videos
+// - Total memory increase should be < 100 MB (configurable threshold)
+// Expected behavior:
+// - First video may increase memory (allocations for data structures)
+// - Subsequent videos should show minimal memory increase
+// - Memory should not continuously grow with each video
 TEST_F(MemoryUsageTest, MultipleVideosMemoryUsage) {
   std::vector<std::string> videos = getTestVideos();
 
@@ -183,6 +248,21 @@ TEST_F(MemoryUsageTest, MultipleVideosMemoryUsage) {
       << " MB after processing " << videos.size() << " video(s)";
 }
 
+// Test 2: SingleVideoMemoryLeakCheck
+// Purpose: Detects memory leaks by processing the same video multiple times
+// What it checks:
+// - Processes the same video 10 times (configurable)
+// - Measures memory after each iteration
+// - Calculates memory increase per iteration
+// - Fails if memory grows > 1 MB per iteration (configurable threshold)
+// Expected behavior:
+// - First iteration may increase memory (initial allocations)
+// - Subsequent iterations should show minimal or no memory increase
+// - If memory keeps growing linearly, it indicates a leak
+// Example leak pattern:
+//   Iteration 1: 50 MB → 60 MB → 70 MB → 80 MB (LEAK!)
+// Example healthy pattern:
+//   Iteration 1: 50 MB → 52 MB → 52 MB → 52 MB (OK)
 TEST_F(MemoryUsageTest, SingleVideoMemoryLeakCheck) {
   std::vector<std::string> videos = getTestVideos();
 
@@ -192,7 +272,7 @@ TEST_F(MemoryUsageTest, SingleVideoMemoryLeakCheck) {
   }
 
   std::string test_video = videos[0];
-  int iterations = 10;
+  int iterations = 10;  // Process the same video 10 times
 
   std::cout << "\n=== Memory Leak Test ===" << std::endl;
   std::cout << "Processing "
@@ -211,6 +291,7 @@ TEST_F(MemoryUsageTest, SingleVideoMemoryLeakCheck) {
     size_t current_memory = getCurrentMemoryUsageBytes();
     memory_samples.push_back(current_memory);
 
+    // Print every 5th iteration plus the first one
     if ((i + 1) % 5 == 0 || i == 0) {
       std::cout << "Iteration " << (i + 1) << ": " << bytesToMB(current_memory)
                 << " MB" << std::endl;
@@ -230,6 +311,7 @@ TEST_F(MemoryUsageTest, SingleVideoMemoryLeakCheck) {
   std::cout << "Increase per iteration: "
             << bytesToMB(total_increase / iterations) << " MB" << std::endl;
 
+  // Threshold: If memory increases by more than 1 MB per iteration, fail
   double leak_threshold_per_iteration_mb = 1.0;
   double increase_per_iteration = bytesToMB(total_increase) / iterations;
 
@@ -239,6 +321,22 @@ TEST_F(MemoryUsageTest, SingleVideoMemoryLeakCheck) {
       << " MB)";
 }
 
+// Test 3: DetailedMemoryProfileMassifStyle
+// Purpose: Creates a timeline of memory usage similar to Valgrind Massif
+// What it does:
+// - Records memory snapshots before and after each video processing
+// - Creates a timeline with timestamps (milliseconds since test start)
+// - Outputs both to console and memory_profile.txt file
+// - Identifies peak memory usage and when it occurred
+// Use cases:
+// - Understanding memory patterns over time
+// - Identifying which video causes the most memory increase
+// - Detecting when memory is released (or not released)
+// Output format:
+//   Time(ms)  Memory(MB)  Event
+//   0         45.23       Test Start
+//   100       78.45       After processing video1.mp4
+//   250       82.11       After processing video2.mov
 TEST_F(MemoryUsageTest, DetailedMemoryProfileMassifStyle) {
   std::vector<std::string> videos = getTestVideos();
 
@@ -252,6 +350,7 @@ TEST_F(MemoryUsageTest, DetailedMemoryProfileMassifStyle) {
   std::vector<MemorySnapshot> snapshots;
   auto start_time = std::chrono::steady_clock::now();
 
+  // Lambda to capture memory snapshots with timestamps
   auto recordSnapshot = [&](const std::string& event) {
     auto now = std::chrono::steady_clock::now();
     auto elapsed =
@@ -263,6 +362,7 @@ TEST_F(MemoryUsageTest, DetailedMemoryProfileMassifStyle) {
 
   recordSnapshot("Test Start");
 
+  // Process up to 5 videos (to keep output manageable)
   for (size_t i = 0; i < videos.size() && i < 5; i++) {
     std::string video_name =
         std::filesystem::path(videos[i]).filename().string();
@@ -274,6 +374,7 @@ TEST_F(MemoryUsageTest, DetailedMemoryProfileMassifStyle) {
 
   recordSnapshot("Test End");
 
+  // Print timeline to console
   std::cout << "\n=== Timeline ===" << std::endl;
   std::cout << "Time(ms)\tMemory(MB)\tEvent" << std::endl;
   std::cout << "------------------------------------------------" << std::endl;
@@ -296,8 +397,8 @@ TEST_F(MemoryUsageTest, DetailedMemoryProfileMassifStyle) {
   std::cout << "Peak: " << bytesToMB(peak_memory) << " MB at " << peak_time
             << " ms" << std::endl;
 
+  // Write timeline to file for later analysis
   std::string report_filename = "memory_profile.txt";
   writeMemoryReport(snapshots, report_filename);
 }
-
 }  // namespace liblcvm
