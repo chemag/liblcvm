@@ -37,12 +37,12 @@
 
 #define MAX_AUDIO_VIDEO_RATIO 1.05
 
-void IsobmffFileInformation::get_liblcvm_version(std::string &version) {
+void IsobmffFileInformation::get_liblcvm_version(std::string& version) {
   version = PROJECT_VER;
 }
 
 // variant operation
-int liblcvmvalue_to_double(const LiblcvmValue &value, double *result) {
+int liblcvmvalue_to_double(const LiblcvmValue& value, double* result) {
   if (std::holds_alternative<int>(value)) {
     *result = static_cast<double>(std::get<int>(value));
     return 0;
@@ -54,7 +54,7 @@ int liblcvmvalue_to_double(const LiblcvmValue &value, double *result) {
   }
 }
 
-int liblcvmvalue_to_string(const LiblcvmValue &value, std::string *result) {
+int liblcvmvalue_to_string(const LiblcvmValue& value, std::string* result) {
   if (std::holds_alternative<std::string>(value)) {
     *result = std::get<std::string>(value);
     return 0;
@@ -75,11 +75,11 @@ int liblcvmvalue_to_string(const LiblcvmValue &value, std::string *result) {
   }
 }
 
-std::string join_list(const std::list<std::string> &lst,
-                      const char *sep = ";") {
+std::string join_list(const std::list<std::string>& lst,
+                      const char* sep = ";") {
   std::ostringstream oss;
   bool first = true;
-  for (const auto &s : lst) {
+  for (const auto& s : lst) {
     if (!first) {
       oss << sep;
     }
@@ -89,13 +89,13 @@ std::string join_list(const std::list<std::string> &lst,
   return oss.str();
 }
 
-int IsobmffFileInformation::parse_to_lists(const char *infile,
-                                           const LiblcvmConfig &liblcvm_config,
-                                           std::vector<std::string> *pkeys,
-                                           LiblcvmValList *pvals,
+int IsobmffFileInformation::parse_to_lists(const char* infile,
+                                           const LiblcvmConfig& liblcvm_config,
+                                           std::vector<std::string>* pkeys,
+                                           LiblcvmValList* pvals,
                                            bool calculate_timestamps,
-                                           LiblcvmKeyList *pkeys_timing,
-                                           LiblcvmTimingList *pvals_timing) {
+                                           LiblcvmKeyList* pkeys_timing,
+                                           LiblcvmTimingList* pvals_timing) {
   // Default parsing logic
   std::shared_ptr<IsobmffFileInformation> pobj =
       IsobmffFileInformation::parse(infile, liblcvm_config);
@@ -112,9 +112,9 @@ int IsobmffFileInformation::parse_to_lists(const char *infile,
 }
 
 int IsobmffFileInformation::LiblcvmConfig_to_lists(
-    std::shared_ptr<IsobmffFileInformation> pobj, LiblcvmKeyList *pkeys,
-    LiblcvmValList *pvals, bool calculate_timestamps,
-    LiblcvmKeyList *pkeys_timing, LiblcvmTimingList *pvals_timing, int debug) {
+    std::shared_ptr<IsobmffFileInformation> pobj, LiblcvmKeyList* pkeys,
+    LiblcvmValList* pvals, bool calculate_timestamps,
+    LiblcvmKeyList* pkeys_timing, LiblcvmTimingList* pvals_timing, int debug) {
   // 0. reset all vectors
   pkeys->clear();
   pvals->clear();
@@ -322,7 +322,7 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
 }
 
 std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
-    const char *infile, const LiblcvmConfig &liblcvm_config) {
+    const char* infile, const LiblcvmConfig& liblcvm_config) {
   // 0. create an ISOBMFF configuration object
   std::shared_ptr<IsobmffFileInformation> ptr =
       std::make_shared<IsobmffFileInformation>();
@@ -357,7 +357,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
   // 3. look for trak container boxes
   ptr->timing.duration_video_sec = -1.0;
   ptr->timing.duration_audio_sec = -1.0;
-  for (auto &box : moov->GetBoxes()) {
+  for (auto& box : moov->GetBoxes()) {
     std::string name = box->GetName();
     if (name.compare("trak") != 0) {
       continue;
@@ -653,10 +653,10 @@ int TimingInformation::parse_keyframe_information(
 //
 // The function will allocate all the N-1 elements.
 void calculate_vector_deltas_int32_t(const std::vector<int32_t> in,
-                                     std::vector<int32_t> &out) {
+                                     std::vector<int32_t>& out) {
   out.clear();
   int32_t last_val = -1;
-  for (const auto &val : in) {
+  for (const auto& val : in) {
     if (last_val != -1) {
       out.push_back(val - last_val);
     }
@@ -664,7 +664,7 @@ void calculate_vector_deltas_int32_t(const std::vector<int32_t> in,
   }
 }
 
-double calculate_median(const std::vector<double> &vec) {
+double calculate_median(const std::vector<double>& vec) {
   if (vec.empty()) {
     fprintf(stderr, "error: calculate_median empty input vector\n");
     return 0.0f;
@@ -679,11 +679,11 @@ double calculate_median(const std::vector<double> &vec) {
   }
 }
 
-double calculate_average(const std::vector<double> &vec) {
+double calculate_average(const std::vector<double>& vec) {
   return std::accumulate(vec.begin(), vec.end(), 0.0f) / vec.size();
 }
 
-double calculate_standard_deviation(const std::vector<double> &vec) {
+double calculate_standard_deviation(const std::vector<double>& vec) {
   if (vec.size() < 2) {
     fprintf(stderr,
             "error: calculate_standard_deviation needs at least 2 "
@@ -693,7 +693,7 @@ double calculate_standard_deviation(const std::vector<double> &vec) {
 
   double mean = calculate_average(vec);
   double sum_squares = 0.0f;
-  for (const double &x : vec) {
+  for (const double& x : vec) {
     sum_squares += (x - mean) * (x - mean);
   }
 
@@ -701,7 +701,7 @@ double calculate_standard_deviation(const std::vector<double> &vec) {
 }
 
 // https://en.wikipedia.org/wiki/Median_absolute_deviation
-double calculate_median_absolute_deviation(const std::vector<double> &vec) {
+double calculate_median_absolute_deviation(const std::vector<double>& vec) {
   // \tilde(X): median(vec)
   double median = calculate_median(vec);
   // |Xi - \tilde(X)|: vector of absolute differences to the median
@@ -726,7 +726,7 @@ int TimingInformation::derive_timing_info(
   if (sort_by_pts) {
     // sort frame_num_orig_list elements based on the values in pts_sec_list
     // TODO(chema): there should be a clear way to access the struct element
-    const auto &pts_sec_list = ptr->timing.pts_sec_list;
+    const auto& pts_sec_list = ptr->timing.pts_sec_list;
     std::stable_sort(ptr->timing.frame_num_orig_list.begin(),
                      ptr->timing.frame_num_orig_list.end(),
                      [&pts_sec_list](int a, int b) {
@@ -868,7 +868,7 @@ int TimingInformation::derive_timing_info(
       ptr->timing.pts_duration_sec_median * FACTOR * 2;
 
   // 8. get the list of all the drops (absolute inter-frame values)
-  for (const auto &pts_duration_sec : ptr->timing.pts_duration_sec_list) {
+  for (const auto& pts_duration_sec : ptr->timing.pts_duration_sec_list) {
     if (pts_duration_sec > pts_duration_sec_threshold) {
       ptr->timing.frame_drop_length_sec_list.push_back(pts_duration_sec);
     }
@@ -879,7 +879,7 @@ int TimingInformation::derive_timing_info(
 
   // 9. sum all the drops, but adding only the length over 1x frame time
   double frame_drop_length_sec_list = 0.0;
-  for (const auto &drop_length_sec : ptr->timing.frame_drop_length_sec_list) {
+  for (const auto& drop_length_sec : ptr->timing.frame_drop_length_sec_list) {
     frame_drop_length_sec_list += drop_length_sec;
   }
   double drop_length_duration_sec =
@@ -890,7 +890,7 @@ int TimingInformation::derive_timing_info(
 
   // 10. get the total duration as the sum of all the inter-frame distances
   double total_duration_sec = 0.0;
-  for (const auto &pts_duration_sec : ptr->timing.pts_duration_sec_list) {
+  for (const auto& pts_duration_sec : ptr->timing.pts_duration_sec_list) {
     total_duration_sec += pts_duration_sec;
   }
 
@@ -917,13 +917,13 @@ int TimingInformation::derive_timing_info(
 
 void TimingInformation::calculate_percentile_list(
     const std::vector<double> percentile_list,
-    std::vector<double> &frame_drop_length_percentile_list, int debug) {
+    std::vector<double>& frame_drop_length_percentile_list, int debug) {
   // calculate percentile list
   frame_drop_length_percentile_list.clear();
   if (frame_drop_length_sec_list.size() > 0) {
     std::sort(frame_drop_length_sec_list.begin(),
               frame_drop_length_sec_list.end());
-    for (const double &percentile : percentile_list) {
+    for (const double& percentile : percentile_list) {
       int position = (percentile / 100.0) * frame_drop_length_sec_list.size();
       double frame_drop_length_percentile =
           frame_drop_length_sec_list[position] /
@@ -937,12 +937,12 @@ void TimingInformation::calculate_percentile_list(
 
 void TimingInformation::calculate_consecutive_list(
     std::vector<int> consecutive_list,
-    std::vector<long int> &frame_drop_length_consecutive, int debug) {
+    std::vector<long int>& frame_drop_length_consecutive, int debug) {
   // calculate consecutive list
   frame_drop_length_consecutive.clear();
   frame_drop_length_consecutive.resize(consecutive_list.size(), 0);
   if (frame_drop_length_sec_list.size() > 0) {
-    for (const auto &frame_drop_length_sec : frame_drop_length_sec_list) {
+    for (const auto& frame_drop_length_sec : frame_drop_length_sec_list) {
       double drop_length =
           frame_drop_length_sec / this->get_pts_duration_sec_median();
       for (unsigned int i = 0; i < consecutive_list.size(); i++) {
@@ -992,7 +992,7 @@ void FrameInformation::parse_avcc(std::shared_ptr<ISOBMFF::AVCC> avcc,
   this->profile_type_str = "";
 
   // extract the SPS NAL Units
-  for (const auto &sps : avcc->GetSequenceParameterSetNALUnits()) {
+  for (const auto& sps : avcc->GetSequenceParameterSetNALUnits()) {
     std::vector<uint8_t> buffer = sps->GetData();
     auto nal_unit = h264nal::H264NalUnitParser::ParseNalUnit(
         buffer.data(), buffer.size(), &bitstream_parser_state, parsing_options);
@@ -1054,10 +1054,10 @@ void FrameInformation::parse_hvcc(std::shared_ptr<ISOBMFF::HVCC> hvcc,
   this->profile_type_str = "";
 
   // extract the NAL Units
-  for (const auto &array : hvcc->GetArrays()) {
+  for (const auto& array : hvcc->GetArrays()) {
     // bool array_completeness = array->GetArrayCompleteness();
     uint8_t nal_unit_type = array->GetNALUnitType();
-    for (const auto &data : array->GetNALUnits()) {
+    for (const auto& data : array->GetNALUnits()) {
       std::vector<uint8_t> buffer = data->GetData();
       auto nal_unit = h265nal::H265NalUnitParser::ParseNalUnit(
           buffer.data(), buffer.size(), &bitstream_parser_state,

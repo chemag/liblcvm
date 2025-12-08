@@ -115,7 +115,8 @@ class ConformanceTest : public ::testing::Test {
               static_cast<int>(std::get<double>(metrics["height"])))
         << "height mismatch for " << video_filename;
 
-    EXPECT_EQ(expected.video_codec_type, std::get<std::string>(metrics["video_codec_type"]))
+    EXPECT_EQ(expected.video_codec_type,
+              std::get<std::string>(metrics["video_codec_type"]))
         << "video_codec_type mismatch for " << video_filename;
   }
 };

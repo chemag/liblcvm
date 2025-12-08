@@ -146,13 +146,13 @@ class TimingInformation {
   // list.
   void calculate_percentile_list(
       const std::vector<double> percentile_list,
-      std::vector<double> &frame_drop_length_percentile_list, int debug);
+      std::vector<double>& frame_drop_length_percentile_list, int debug);
 
   // @param[in] consecutive_list: Consecutive list.
   // @param[out] frame_drop_length_consecutive: Frame drop length consecutive.
   void calculate_consecutive_list(
       std::vector<int> consecutive_list,
-      std::vector<long int> &frame_drop_length_consecutive, int debug);
+      std::vector<long int>& frame_drop_length_consecutive, int debug);
 
   friend class IsobmffFileInformation;
 };
@@ -270,8 +270,8 @@ using LiblcvmTiming = std::tuple<uint32_t, uint32_t, int32_t, double, double,
                                  double, double, double>;
 using LiblcvmTimingList = std::vector<LiblcvmTiming>;
 
-int liblcvmvalue_to_double(const LiblcvmValue &value, double *result);
-int liblcvmvalue_to_string(const LiblcvmValue &value, std::string *result);
+int liblcvmvalue_to_double(const LiblcvmValue& value, double* result);
+int liblcvmvalue_to_string(const LiblcvmValue& value, std::string* result);
 
 class LiblcvmConfig {
  private:
@@ -317,7 +317,7 @@ class IsobmffFileInformation {
   // @brief Get the library version.
   //
   // @param[out] version: Version string.
-  static void get_liblcvm_version(std::string &version);
+  static void get_liblcvm_version(std::string& version);
 
   // @brief Parse an ISOBMFF file.
   //
@@ -325,7 +325,7 @@ class IsobmffFileInformation {
   // @param[in] liblcvm_config: Parsing configuration.
   // @return ptr: Full ISOBMFF information.
   static std::shared_ptr<IsobmffFileInformation> parse(
-      const char *infile, const LiblcvmConfig &liblcvm_config);
+      const char* infile, const LiblcvmConfig& liblcvm_config);
 
   // @brief Converts IsobmffFileInformation to 2 generic lists.
   //
@@ -338,9 +338,9 @@ class IsobmffFileInformation {
   // @param[in] debug: Debug level.
   // @return int: Error code (0 if ok, !=0 otherwise).
   static int LiblcvmConfig_to_lists(
-      std::shared_ptr<IsobmffFileInformation> pobj, LiblcvmKeyList *pkeys,
-      LiblcvmValList *pvals, bool calculate_timestamps,
-      LiblcvmKeyList *pkeys_timing, LiblcvmTimingList *pvals_timing, int debug);
+      std::shared_ptr<IsobmffFileInformation> pobj, LiblcvmKeyList* pkeys,
+      LiblcvmValList* pvals, bool calculate_timestamps,
+      LiblcvmKeyList* pkeys_timing, LiblcvmTimingList* pvals_timing, int debug);
 
   // @brief Parse an ISOBMFF file into 2 lists.
   //
@@ -352,12 +352,12 @@ class IsobmffFileInformation {
   // @param[out] pkeys_timing: List of timing keys (in-order).
   // @param[out] pvals_timing: List of timing values (in-order).
   // @return int: Error code (0 if ok, !=0 otherwise).
-  static int parse_to_lists(const char *infile,
-                            const LiblcvmConfig &liblcvm_config,
-                            std::vector<std::string> *pkeys,
-                            LiblcvmValList *pvals, bool calculate_timestamps,
-                            LiblcvmKeyList *pkeys_timing,
-                            LiblcvmTimingList *pvals_timing);
+  static int parse_to_lists(const char* infile,
+                            const LiblcvmConfig& liblcvm_config,
+                            std::vector<std::string>* pkeys,
+                            LiblcvmValList* pvals, bool calculate_timestamps,
+                            LiblcvmKeyList* pkeys_timing,
+                            LiblcvmTimingList* pvals_timing);
 
   // Private constructor to prevent direct instantiation
   IsobmffFileInformation() = default;
@@ -369,7 +369,7 @@ class IsobmffFileInformation {
 
 #if ADD_POLICY
 // policy runner code
-int policy_runner(const std::string &policy_str, LiblcvmKeyList *pkeys,
-                  LiblcvmValList *pvals, std::list<std::string> *warn_list,
-                  std::list<std::string> *error_list, std::string *version);
+int policy_runner(const std::string& policy_str, LiblcvmKeyList* pkeys,
+                  LiblcvmValList* pvals, std::list<std::string>* warn_list,
+                  std::list<std::string>* error_list, std::string* version);
 #endif

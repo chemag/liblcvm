@@ -26,12 +26,12 @@ extern int optind;
 typedef struct arg_options {
   int debug;
   int nruns;
-  char *outfile;
-  char *outfile_timestamps;
+  char* outfile;
+  char* outfile_timestamps;
   bool outfile_timestamps_sort_pts;
   std::vector<std::string> infile_list;
 #if ADD_POLICY
-  char *policy_file;
+  char* policy_file;
 #endif
 } arg_options;
 
@@ -48,7 +48,7 @@ arg_options DEFAULT_OPTIONS{
 #endif
 };
 
-std::string csv_escape(const std::string &value) {
+std::string csv_escape(const std::string& value) {
   bool must_quote = value.find_first_of(",\"\n") != std::string::npos;
   std::string escaped = value;
   size_t pos = 0;
@@ -62,11 +62,11 @@ std::string csv_escape(const std::string &value) {
   return escaped;
 }
 
-int parse_files(std::vector<std::string> &infile_list, char *outfile,
-                char *outfile_timestamps, bool outfile_timestamps_sort_pts,
-                int debug, const std::string &policy_str) {
+int parse_files(std::vector<std::string>& infile_list, char* outfile,
+                char* outfile_timestamps, bool outfile_timestamps_sort_pts,
+                int debug, const std::string& policy_str) {
   // 1. open outfile
-  FILE *outfp;
+  FILE* outfp;
   if (outfile == nullptr || (strlen(outfile) == 1 && outfile[0] == '-')) {
     outfp = stdout;
   } else {
@@ -88,7 +88,7 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
   LiblcvmKeyList keys_timing;
   std::map<std::string, LiblcvmTimingList> vals_timing_map;
   bool calculate_timestamps = outfile_timestamps != nullptr;
-  for (const auto &infile : infile_list) {
+  for (const auto& infile : infile_list) {
     LiblcvmKeyList keys;
     LiblcvmValList vals;
     LiblcvmKeyList pkeys_timing;
@@ -128,7 +128,7 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
   // 4. dump outfile timestamps
   if (calculate_timestamps) {
     // 3.1. open outfile_timestamps
-    FILE *outtsfp = fopen(outfile_timestamps, "wb");
+    FILE* outtsfp = fopen(outfile_timestamps, "wb");
     if (outtsfp == nullptr) {
       // did not work
       fprintf(stderr, "Could not open output file: \"%s\"\n",
@@ -148,13 +148,13 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
     }
 
     // 3.3. write CSV rows
-    for (const auto &entry : vals_timing_map) {
-      const auto &filename = entry.first;
-      const auto &vals_timing = entry.second;
+    for (const auto& entry : vals_timing_map) {
+      const auto& filename = entry.first;
+      const auto& vals_timing = entry.second;
       for (size_t frame_num = 0; frame_num < vals_timing.size(); ++frame_num) {
         fprintf(outtsfp, "%s", filename.c_str());
         fprintf(outtsfp, ",%zu", frame_num);
-        const LiblcvmTiming &timing = vals_timing[frame_num];
+        const LiblcvmTiming& timing = vals_timing[frame_num];
         // frame_num
         std::string value0 = std::to_string(std::get<0>(timing));
         fprintf(outtsfp, ",%s", csv_escape(value0).c_str());
@@ -190,7 +190,7 @@ int parse_files(std::vector<std::string> &infile_list, char *outfile,
   return 0;
 }
 
-void usage(char *name) {
+void usage(char* name) {
   fprintf(stderr, "usage: %s [options] <infile(s)>\n", name);
   fprintf(stderr, "where options are:\n");
   fprintf(stderr, "\t-d:\t\tIncrease debug verbosity [%i]\n",
@@ -224,7 +224,7 @@ enum {
   VERSION_OPTION,
 };
 
-arg_options *parse_args(int argc, char **argv) {
+arg_options* parse_args(int argc, char** argv) {
   int c;
   static arg_options options;
 
@@ -303,7 +303,7 @@ arg_options *parse_args(int argc, char **argv) {
         break;
 
       case RUNS_OPTION: {
-        char *endptr;
+        char* endptr;
         options.nruns = strtol(optarg, &endptr, 0);
         if (*endptr != '\0') {
           fprintf(stderr, "error: invalid --runs parameter: %s\n", optarg);
@@ -340,8 +340,8 @@ arg_options *parse_args(int argc, char **argv) {
   return &options;
 }
 
-int main(int argc, char **argv) {
-  arg_options *options = parse_args(argc, argv);
+int main(int argc, char** argv) {
+  arg_options* options = parse_args(argc, argv);
   if (!options) {
     usage(argv[0]);
     exit(-1);
@@ -350,7 +350,7 @@ int main(int argc, char **argv) {
   std::string policy_str;
 #if ADD_POLICY
   if (options->policy_file) {
-    FILE *pf = fopen(options->policy_file, "r");
+    FILE* pf = fopen(options->policy_file, "r");
     if (!pf) {
       fprintf(stderr, "Could not open policy file: %s\n", options->policy_file);
       exit(-1);
