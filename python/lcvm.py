@@ -53,6 +53,7 @@ csv_header = [
     "audio_video_ratio",
     "duration_video_sec",
     "duration_audio_sec",
+    "timescale_movie_hz",
     "timescale_video_hz",
     "timescale_audio_hz",
     "pts_duration_sec_average",
@@ -204,6 +205,7 @@ def dump_output(infile, outfp, file_info, debug, policy_str=None):
     audio_video_ratio = timing_info.get_audio_video_ratio()
     duration_video_sec = timing_info.get_duration_video_sec()
     duration_audio_sec = timing_info.get_duration_audio_sec()
+    timescale_movie_hz = timing_info.get_timescale_movie_hz()
     timescale_video_hz = timing_info.get_timescale_video_hz()
     timescale_audio_hz = timing_info.get_timescale_audio_hz()
     pts_duration_sec_average = timing_info.get_pts_duration_sec_average()
@@ -277,6 +279,7 @@ def dump_output(infile, outfp, file_info, debug, policy_str=None):
             "audio_video_ratio",
             "duration_video_sec",
             "duration_audio_sec",
+            "timescale_movie_hz",
             "timescale_video_hz",
             "timescale_audio_hz",
             "pts_duration_sec_average",
@@ -322,6 +325,7 @@ def dump_output(infile, outfp, file_info, debug, policy_str=None):
             audio_video_ratio,
             duration_video_sec,
             duration_audio_sec,
+            timescale_movie_hz,
             timescale_video_hz,
             timescale_audio_hz,
             pts_duration_sec_average,
@@ -380,6 +384,7 @@ def dump_output(infile, outfp, file_info, debug, policy_str=None):
     outfp.write(f",{audio_video_ratio:.6f}")
     outfp.write(f",{duration_video_sec:.6f}")
     outfp.write(f",{duration_audio_sec:.6f}")
+    outfp.write(f",{timescale_movie_hz}")
     outfp.write(f",{timescale_video_hz}")
     outfp.write(f",{timescale_audio_hz}")
     outfp.write(f",{pts_duration_sec_average:.6f}")

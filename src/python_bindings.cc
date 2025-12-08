@@ -35,6 +35,7 @@ namespace py = pybind11;
       .def("get_audio_video_ratio", &class_name::get_audio_video_ratio)       \
       .def("get_duration_video_sec", &class_name::get_duration_video_sec)     \
       .def("get_duration_audio_sec", &class_name::get_duration_audio_sec)     \
+      .def("get_timescale_movie_hz", &class_name::get_timescale_movie_hz)     \
       .def("get_timescale_video_hz", &class_name::get_timescale_video_hz)     \
       .def("get_timescale_audio_hz", &class_name::get_timescale_audio_hz)     \
       .def("get_pts_duration_sec_average",                                    \

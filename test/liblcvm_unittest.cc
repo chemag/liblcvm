@@ -148,6 +148,7 @@ TEST_F(LiblcvmTest, TestParserPolicy) {
       "audio_video_ratio",
       "duration_video_sec",
       "duration_audio_sec",
+      "timescale_movie_hz",
       "timescale_video_hz",
       "timescale_audio_hz",
       "pts_duration_sec_average",
@@ -206,9 +207,10 @@ TEST_F(LiblcvmTest, TestParserPolicy) {
       59.962047518336938,
       0.43256710446899582,
       0,
-      1.0058076193907575,
+      0.999842,
       10.573333333333334,
-      10.634739229024943,
+      10.571667,
+      600u,
       600u,
       44100u,
       0.016677215695381165,
@@ -235,7 +237,7 @@ TEST_F(LiblcvmTest, TestParserPolicy) {
       std::string("Invalid bitrate_bps too low (bitrate_bps: "
                   "13455.737705);Invalid width (width: 1920.000000);Invalid "
                   "height (height: 1080.000000);Invalid "
-                  "audio_video_ratio (audio_video_ratio: 1.005808)"),
+                  "audio_video_ratio (audio_video_ratio: 0.999842)"),
 #endif
   };
   for (unsigned int index = 0; index < expected_vals.size(); index++) {

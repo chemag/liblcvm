@@ -54,6 +54,7 @@ typedef struct {
   int num_video_frames;
   double duration_video_sec;
   double duration_audio_sec;
+  uint32_t timescale_movie_hz;
   uint32_t timescale_video_hz;
   uint32_t timescale_audio_hz;
   int num_video_keyframes;

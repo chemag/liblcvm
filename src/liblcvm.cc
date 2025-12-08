@@ -178,6 +178,8 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
   pvals->push_back(pobj->get_timing().get_duration_video_sec());
   pkeys->push_back("duration_audio_sec");
   pvals->push_back(pobj->get_timing().get_duration_audio_sec());
+  pkeys->push_back("timescale_movie_hz");
+  pvals->push_back(pobj->get_timing().get_timescale_movie_hz());
   pkeys->push_back("timescale_video_hz");
   pvals->push_back(pobj->get_timing().get_timescale_video_hz());
   pkeys->push_back("timescale_audio_hz");
@@ -354,7 +356,19 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     return nullptr;
   }
 
-  // 3. look for trak container boxes
+  // 3. look for a mvhd box
+  std::shared_ptr<ISOBMFF::MVHD> mvhd =
+      moov->GetTypedBox<ISOBMFF::MVHD>("mvhd");
+  if (mvhd == nullptr) {
+    if (liblcvm_config.get_debug() > 0) {
+      fprintf(stderr, "error: no /moov/mvhd in %s\n", ptr->filename.c_str());
+    }
+    return nullptr;
+  }
+  uint32_t timescale_movie_hz = mvhd->GetTimescale();
+  ptr->timing.timescale_movie_hz = timescale_movie_hz;
+
+  // 4. look for trak container boxes
   ptr->timing.duration_video_sec = -1.0;
   ptr->timing.duration_audio_sec = -1.0;
   for (auto& box : moov->GetBoxes()) {
@@ -364,7 +378,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     }
     auto trak = std::dynamic_pointer_cast<ISOBMFF::ContainerBox>(box);
 
-    // 4. look for a mdia container box
+    // 5. look for a mdia container box
     std::shared_ptr<ISOBMFF::ContainerBox> mdia =
         trak->GetTypedBox<ISOBMFF::ContainerBox>("mdia");
     if (mdia == nullptr) {
@@ -375,7 +389,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
       return nullptr;
     }
 
-    // 5. look for a hdlr box
+    // 6. look for a hdlr box
     std::shared_ptr<ISOBMFF::HDLR> hdlr =
         mdia->GetTypedBox<ISOBMFF::HDLR>("hdlr");
     if (hdlr == nullptr) {
@@ -397,21 +411,23 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
       }
       return nullptr;
     }
-    uint32_t timescale_hz = mdhd->GetTimescale();
-    uint64_t duration = mdhd->GetDuration();
-    double duration_sec = ((double)duration) / timescale_hz;
+
+    // mdhd-based track duration
+    uint32_t timescale_track_hz = mdhd->GetTimescale();
+    uint64_t mdhd_duration = mdhd->GetDuration();
+    double mdhd_duration_sec = ((double)mdhd_duration) / timescale_track_hz;
     if (liblcvm_config.get_debug() > 1) {
       fprintf(stdout, "-> handler_type: %s ", handler_type.c_str());
-      fprintf(stdout, "timescale: %u ", timescale_hz);
-      fprintf(stdout, "duration: %" PRIu64 " ", duration);
-      fprintf(stdout, "duration_sec: %f\n", duration_sec);
+      fprintf(stdout, "timescale_track_hz: %u ", timescale_track_hz);
+      fprintf(stdout, "mdhd_duration: %" PRIu64 " ", mdhd_duration);
+      fprintf(stdout, "mdhd_duration_sec: %f\n", mdhd_duration_sec);
     }
     if (handler_type.compare("soun") == 0) {
-      ptr->timing.duration_audio_sec = duration_sec;
-      ptr->timing.timescale_audio_hz = timescale_hz;
+      ptr->timing.duration_audio_sec = mdhd_duration_sec;
+      ptr->timing.timescale_audio_hz = timescale_track_hz;
     } else if (handler_type.compare("vide") == 0) {
-      ptr->timing.duration_video_sec = duration_sec;
-      ptr->timing.timescale_video_hz = timescale_hz;
+      ptr->timing.duration_video_sec = mdhd_duration_sec;
+      ptr->timing.timescale_video_hz = timescale_track_hz;
     }
 
     if (handler_type.compare("vide") != 0 &&
@@ -441,7 +457,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
       return nullptr;
     }
 
-    // 8.1 Audio processing
+    // stbl-based audio processing
     if (handler_type.compare("soun") == 0) {
       if (ptr->audio.parse_mp4a(stbl, ptr, liblcvm_config.get_debug()) < 0) {
         if (liblcvm_config.get_debug() > 0) {
@@ -450,7 +466,6 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
         }
         return nullptr;
       }
-      continue;
     }
 
     // 9. look for a tkhd box
@@ -463,8 +478,34 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
       }
       return nullptr;
     }
-    ptr->frame.width = tkhd->GetWidth();
-    ptr->frame.height = tkhd->GetHeight();
+    if (handler_type.compare("vide") == 0) {
+      ptr->frame.width = tkhd->GetWidth();
+      ptr->frame.height = tkhd->GetHeight();
+    }
+
+    // tkhd-based track duration
+    uint64_t tkhd_duration = tkhd->GetDuration();
+    if (timescale_movie_hz > 0) {
+      double tkhd_duration_sec =
+          static_cast<double>(tkhd_duration) / timescale_movie_hz;
+      if (liblcvm_config.get_debug() > 1) {
+        fprintf(stdout,
+                "-> timescale_movie_hz: %u tkhd_duration: %" PRIu64
+                " tkhd_duration_sec: %f\n",
+                timescale_movie_hz, tkhd_duration, tkhd_duration_sec);
+      }
+      // tkhd duration has priority over mdhd duration
+      if (handler_type.compare("soun") == 0) {
+        ptr->timing.duration_audio_sec = tkhd_duration_sec;
+      } else if (handler_type.compare("vide") == 0) {
+        ptr->timing.duration_video_sec = tkhd_duration_sec;
+      }
+    }
+
+    // stop audio processing here
+    if (handler_type.compare("soun") == 0) {
+      continue;
+    }
 
     // 10. get video timing information
     // init timing info
@@ -478,7 +519,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     ptr->timing.dts_sec_list.push_back(0.0);
     ptr->timing.pts_unit_list.push_back(0);
     ptr->timing.pts_sec_list.push_back(0.0);
-    if (ptr->timing.parse_timing_information(stbl, timescale_hz, ptr,
+    if (ptr->timing.parse_timing_information(stbl, timescale_track_hz, ptr,
                                              liblcvm_config.get_debug()) < 0) {
       if (liblcvm_config.get_debug() > 0) {
         fprintf(stderr, "error: no timing information in %s\n",
@@ -532,7 +573,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
 }
 
 int TimingInformation::parse_timing_information(
-    std::shared_ptr<ISOBMFF::ContainerBox> stbl, uint32_t timescale_hz,
+    std::shared_ptr<ISOBMFF::ContainerBox> stbl, uint32_t timescale_track_hz,
     std::shared_ptr<IsobmffFileInformation> ptr, int debug) {
   // 1. look for a stts box
   std::shared_ptr<ISOBMFF::STTS> stts =
@@ -559,7 +600,7 @@ int TimingInformation::parse_timing_information(
       ptr->timing.stts_unit_list.push_back(sample_offset);
       // set the dts value of the next frame
       uint32_t dts_unit = last_dts_unit + sample_offset;
-      double dts_sec = ((double)dts_unit) / timescale_hz;
+      double dts_sec = ((double)dts_unit) / timescale_track_hz;
       ptr->timing.dts_sec_list.push_back(dts_sec);
       // init the pts value of the next frame
       ptr->timing.pts_unit_list.push_back(dts_unit);
@@ -600,7 +641,8 @@ int TimingInformation::parse_timing_information(
         // update the pts value
         ptr->timing.pts_unit_list[cur_video_frame] += sample_offset;
         ptr->timing.pts_sec_list[cur_video_frame] =
-            ((double)ptr->timing.pts_unit_list[cur_video_frame]) / timescale_hz;
+            ((double)ptr->timing.pts_unit_list[cur_video_frame]) /
+            timescale_track_hz;
         ++cur_video_frame;
       }
       if (debug > 2) {
@@ -615,7 +657,8 @@ int TimingInformation::parse_timing_information(
       ptr->timing.pts_unit_list[cur_video_frame] +=
           last_ctts_sample_offset_unit;
       ptr->timing.pts_sec_list[cur_video_frame] =
-          ((double)ptr->timing.pts_unit_list[cur_video_frame]) / timescale_hz;
+          ((double)ptr->timing.pts_unit_list[cur_video_frame]) /
+          timescale_track_hz;
       ++cur_video_frame;
     }
     if (debug > 2) {

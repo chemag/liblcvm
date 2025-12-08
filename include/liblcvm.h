@@ -40,6 +40,8 @@ class TimingInformation {
   uint32_t timescale_video_hz;
   // timescale_audio_hz: Audio length (Hz).
   uint32_t timescale_audio_hz;
+  // timescale_movie_hz: Movie timescale (Hz) from mvhd box.
+  uint32_t timescale_movie_hz;
   // frame_num_orig_list: original frame numbers (unitless).
   std::vector<uint32_t> frame_num_orig_list;
   // stts_unit_list: STTS values (units).
@@ -102,6 +104,7 @@ class TimingInformation {
   DECL_GETTER(duration_audio_sec, double)
   DECL_GETTER(timescale_video_hz, uint32_t)
   DECL_GETTER(timescale_audio_hz, uint32_t)
+  DECL_GETTER(timescale_movie_hz, uint32_t)
   DECL_GETTER(frame_num_orig_list, std::vector<uint32_t>)
   DECL_GETTER(stts_unit_list, std::vector<uint32_t>)
   DECL_GETTER(ctts_unit_list, std::vector<int32_t>)
@@ -131,7 +134,7 @@ class TimingInformation {
   DECL_GETTER(normalized_frame_drop_average_length, double)
 
   static int parse_timing_information(
-      std::shared_ptr<ISOBMFF::ContainerBox> stbl, uint32_t timescale_hz,
+      std::shared_ptr<ISOBMFF::ContainerBox> stbl, uint32_t timescale_track_hz,
       std::shared_ptr<IsobmffFileInformation> ptr, int debug);
 
   static int parse_keyframe_information(

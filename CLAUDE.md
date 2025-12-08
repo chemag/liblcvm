@@ -116,8 +116,12 @@ config->set_debug(debug_level);
 config->set_policy(policy_string);
 
 auto file_info = IsobmffFileInformation::parse(filename, *config);
-uint32_t timescale = file_info->get_timing()->get_timescale_video_hz();
+uint32_t timescale_movie_hz = file_info->get_timing()->get_timescale_movie_hz();
+uint32_t timescale_video_hz = file_info->get_timing()->get_timescale_video_hz();
 ```
+
+Note: `timescale_movie_hz` is the movie-level timescale from the mvhd box,
+while `timescale_video_hz` is the track-level timescale from the mdhd box.
 
 ### Command Line Usage
 ```bash

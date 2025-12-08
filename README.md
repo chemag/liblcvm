@@ -100,8 +100,12 @@ getters. For example, to get the video timescale, use the getter under the
 TimingInformation class:
 
 ```
+uint32_t timescale_movie_hz = pts->get_timing()->get_timescale_movie_hz();
 uint32_t timescale_video_hz = pts->get_timing()->get_timescale_video_hz();
 ```
+
+Note: `timescale_movie_hz` is the movie-level timescale from the mvhd box,
+while `timescale_video_hz` is the track-level timescale from the mdhd box.
 
 As an alternative, and to keep backwards compatibility, we will keep for
 a while the old API that returned a set of variables at the same time. These
