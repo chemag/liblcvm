@@ -8,8 +8,8 @@ include_directories(PUBLIC ../src)
 include_directories(PUBLIC /usr/local/include)
 link_directories(/usr/local/lib)
 
-# define the root directory variable
-set(TEST_MEDIA_DIR ${CMAKE_SOURCE_DIR}/lib/isobmff/media)
+# Define test directories
+set(TEST_MEDIA_DIR ${CMAKE_SOURCE_DIR}/media)
 set(TEST_POLICY_DIR ${CMAKE_SOURCE_DIR}/policy)
 set(TEST_CONFORMANCE_DIR ${CMAKE_SOURCE_DIR}/test)
 
