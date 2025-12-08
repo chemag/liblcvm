@@ -571,6 +571,9 @@ int TimingInformation::parse_timing_information(
       fprintf(stdout, "stts::sample_offset: %u ", sample_offset);
     }
   }
+  if (debug > 2) {
+    fprintf(stdout, "\n");
+  }
   // we need to remove the last element of the dts and pts lists, as we
   // set them pointing at the start of the next frame (inexistent)
   ptr->timing.dts_sec_list.pop_back();
