@@ -431,7 +431,7 @@ def capture_timestamps(
     dts_sec_list = timing_info.get_dts_sec_list()
     pts_sec_list = timing_info.get_pts_sec_list()
     pts_duration_sec_list = timing_info.get_pts_duration_sec_list()
-    pts_duration_delta_sec_list = timing_info.get_pts_duration_sec_list()
+    pts_duration_delta_sec_list = timing_info.get_pts_duration_delta_sec_list()
     pts_framerate_list = timing_info.get_pts_framerate_list()
 
     # Store the values in dictionaries
