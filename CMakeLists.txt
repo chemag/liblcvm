@@ -43,8 +43,6 @@ if(ADD_POLICY)
 endif()
 
 # ---- Dependencies ------------------------------------------------------------
-find_package(absl REQUIRED)
-
 if(ADD_POLICY)
 # Download Protocol Buffers to build dir if missing
 set(PROTOBUF_DIR ${CMAKE_BINARY_DIR}/protobuf)
@@ -435,19 +433,6 @@ if(ADD_POLICY)
     -Wno-overloaded-virtual
   )
 endif()
-
-# Also link public deps so tools/tests get them transitively
-target_link_libraries(liblcvm
-  PUBLIC
-    absl::strings
-    absl::base
-    absl::log
-    absl::log_internal_check_op
-    absl::log_internal_message
-    absl::log_internal_log_sink_set
-    absl::log_internal_globals
-    absl::log_severity
-)
 
 if(ADD_POLICY)
   target_link_libraries(liblcvm
