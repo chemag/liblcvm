@@ -336,9 +336,9 @@ if(ADD_POLICY)
 endif()
 
 # ---- Third-party subprojects -------------------------------------------------
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff)
-
 set(BUILD_CLANG_FUZZER OFF)
+
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/lib/h265nal)
 if(BUILD_PYBINDINGS)
