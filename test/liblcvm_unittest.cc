@@ -321,4 +321,22 @@ TEST_F(LiblcvmTest, TestParserOpus) {
                           {"sample_size", 16},
                       });
 }
+
+TEST_F(LiblcvmTest, TestParserAac) {
+  check_parsed_values("hevc_aac.mp4",
+                      {
+                          {"video_codec_type", std::string("hvc1")},
+                          {"width", 320.0},
+                          {"height", 240.0},
+                          {"num_video_frames", 60},
+                          {"frame_rate_fps_median", 30.0},
+                          {"duration_video_sec", 2.0},
+                          {"duration_audio_sec", 2.0},
+                          {"timescale_audio_hz", 48000u},
+                          {"audio_type", std::string("mp4a")},
+                          {"channel_count", 2},
+                          {"sample_rate", 48000},
+                          {"sample_size", 16},
+                      });
+}
 }  // namespace liblcvm
