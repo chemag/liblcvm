@@ -45,6 +45,7 @@ typedef struct liblcvm_file_info* liblcvm_file_info_t;
 // Configuration structure
 typedef struct {
   bool sort_by_pts;
+  bool skip_audio_parsing;
   int debug;
   char policy[256];
 } liblcvm_config_t;

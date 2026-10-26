@@ -281,6 +281,10 @@ class LiblcvmConfig {
  private:
   // sort_by_pts: Whether to sort the frames by PTS values.
   bool sort_by_pts;
+  // skip_audio_parsing: Whether to skip parsing the audio sample entry
+  // (codec, channel count, sample size, sample rate). The audio duration
+  // and timescale are still read from the track's mdhd box.
+  bool skip_audio_parsing;
   // policy: Warn/Error policy.
   std::string policy;
   // debug: Debug level.
@@ -289,12 +293,15 @@ class LiblcvmConfig {
  public:
   LiblcvmConfig() {
     sort_by_pts = true;
+    skip_audio_parsing = false;
     policy = "";
     debug = 0;
   }
 
   DECL_GETTER(sort_by_pts, bool)
   DECL_SETTER(sort_by_pts, bool)
+  DECL_GETTER(skip_audio_parsing, bool)
+  DECL_SETTER(skip_audio_parsing, bool)
   DECL_GETTER(policy, std::string)
   DECL_SETTER(policy, std::string)
   DECL_GETTER(debug, int)

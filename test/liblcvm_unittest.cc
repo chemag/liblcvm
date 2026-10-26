@@ -339,4 +339,31 @@ TEST_F(LiblcvmTest, TestParserAac) {
                           {"sample_size", 16},
                       });
 }
+
+TEST_F(LiblcvmTest, TestSkipAudioParsing) {
+  std::string infile = std::string(TEST_MEDIA_DIR) + "/MOV1.MOV";
+  LiblcvmConfig liblcvm_config;
+  liblcvm_config.set_skip_audio_parsing(true);
+
+  std::shared_ptr<IsobmffFileInformation> ptr =
+      IsobmffFileInformation::parse(infile.c_str(), liblcvm_config);
+  ASSERT_NE(nullptr, ptr) << "error: IsobmffFileInformation::parse() in "
+                          << infile;
+
+  // audio timing still comes from the audio track's mdhd box
+  const TimingInformation &timing = ptr->get_timing();
+  EXPECT_EQ(634, timing.get_num_video_frames());
+  EXPECT_TRUE(doubles_are_close(10.634739229024943,
+                                timing.get_duration_audio_sec()));
+  EXPECT_EQ(44100u, timing.get_timescale_audio_hz());
+  EXPECT_TRUE(
+      doubles_are_close(1.0058076193907575, timing.get_audio_video_ratio()));
+
+  // the audio sample entry is not parsed
+  const AudioInformation &audio = ptr->get_audio();
+  EXPECT_EQ("", audio.get_audio_type());
+  EXPECT_EQ(0, audio.get_channel_count());
+  EXPECT_EQ(0, audio.get_sample_rate());
+  EXPECT_EQ(0, audio.get_sample_size());
+}
 }  // namespace liblcvm
