@@ -735,12 +735,13 @@ int TimingInformation::parse_keyframe_information(
 void calculate_vector_deltas_int32_t(const std::vector<int32_t> in,
                                      std::vector<int32_t>& out) {
   out.clear();
-  int32_t last_val = -1;
-  for (const auto& val : in) {
-    if (last_val != -1) {
-      out.push_back(val - last_val);
-    }
-    last_val = val;
+  // Use the index (not a -1 "no previous value" sentinel, which is also a
+  // valid pts), and subtract with two's-complement wraparound, as the
+  // int32_t pts values can be far apart (signed overflow is undefined
+  // behavior). See add_int32_wraparound().
+  for (size_t i = 1; i < in.size(); ++i) {
+    out.push_back(static_cast<int32_t>(static_cast<uint32_t>(in[i]) -
+                                       static_cast<uint32_t>(in[i - 1])));
   }
 }
 

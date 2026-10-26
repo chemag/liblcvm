@@ -123,3 +123,23 @@ TEST_F(LiblcvmRegressionTest, TestFrameDropRatioNan) {
     }
   }
 }
+
+// Consecutive pts values far apart in the int32_t range: the pts delta
+// overflowed (signed integer overflow, undefined behavior). Only
+// observable with UBSan.
+TEST_F(LiblcvmRegressionTest, TestPtsDeltaInt32Overflow) {
+  for (bool sort_by_pts : {true, false}) {
+    for (bool skip_audio_parsing : {true, false}) {
+      auto ptr = parse("pts_delta_int32_overflow.mov", sort_by_pts,
+                       skip_audio_parsing);
+      ASSERT_NE(nullptr, ptr);
+      const auto timing = ptr->get_timing();
+      // one inter-frame duration per pair of consecutive frames
+      ASSERT_GT(timing.get_pts_unit_list().size(), 0u);
+      EXPECT_EQ(timing.get_pts_duration_sec_list().size(),
+                timing.get_pts_unit_list().size() - 1);
+      parse_to_lists("pts_delta_int32_overflow.mov", sort_by_pts,
+                     skip_audio_parsing);
+    }
+  }
+}
