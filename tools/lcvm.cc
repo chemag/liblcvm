@@ -84,6 +84,7 @@ int parse_files(std::vector<std::string>& infile_list, char* outfile,
   liblcvm_config->set_debug(debug);
 
   // 3. parse the input files
+  int ret = 0;
   bool printed_csv_header = false;
   LiblcvmKeyList keys_timing;
   std::map<std::string, LiblcvmTimingList> vals_timing_map;
@@ -98,6 +99,8 @@ int parse_files(std::vector<std::string>& infile_list, char* outfile,
             &keys_timing, &vals_timing)) {
       fprintf(stderr, "error: IsobmffFileInformation::parse_to_map() in %s\n",
               infile.c_str());
+      // keep processing the remaining files, but report the error
+      ret = -1;
       continue;
     }
     // write CSV header
@@ -187,7 +190,7 @@ int parse_files(std::vector<std::string>& infile_list, char* outfile,
   if (outfp != stdout) {
     fclose(outfp);
   }
-  return 0;
+  return ret;
 }
 
 void usage(char* name) {
@@ -367,10 +370,14 @@ int main(int argc, char** argv) {
   }
 #endif
 
+  int ret = 0;
   for (int i = 0; i < options->nruns; ++i) {
-    parse_files(
-        options->infile_list, options->outfile, options->outfile_timestamps,
-        options->outfile_timestamps_sort_pts, options->debug, policy_str);
+    if (parse_files(options->infile_list, options->outfile,
+                    options->outfile_timestamps,
+                    options->outfile_timestamps_sort_pts, options->debug,
+                    policy_str) != 0) {
+      ret = -1;
+    }
   }
-  return 0;
+  return ret;
 }
