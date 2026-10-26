@@ -982,8 +982,17 @@ int TimingInformation::derive_timing_info(
 
   // 11. calculate frame drop ratio as extra drop length over total duration
   ptr->timing.frame_drop_ratio = drop_length_duration_sec / total_duration_sec;
+  // The ratio is NaN or infinite when there is no usable inter-frame
+  // duration (e.g. a single frame, all frames with the same pts, or a zero
+  // timescale), and converting NaN, infinity, or an out-of-range value to
+  // int is undefined behavior. Report 0 frame drops in that case.
+  double frame_drop_count =
+      ptr->timing.frame_drop_ratio * ptr->timing.num_video_frames;
   ptr->timing.frame_drop_count =
-      int((ptr->timing.frame_drop_ratio) * (ptr->timing.num_video_frames));
+      (std::isfinite(frame_drop_count) && frame_drop_count > INT_MIN &&
+       frame_drop_count < INT_MAX)
+          ? static_cast<int>(frame_drop_count)
+          : 0;
 
   // 12. calculate average drop length, normalized to framerate. Note that
   // a single frame drop is a normalized frame drop length of 2. When

@@ -105,3 +105,21 @@ TEST_F(LiblcvmRegressionTest, TestCttsFewerSamplesThanStts) {
     }
   }
 }
+
+// No usable inter-frame duration: frame_drop_ratio is 0/0 (NaN), and
+// frame_drop_count converted it to int (undefined behavior; INT_MIN on
+// x86). frame_drop_count is now 0 when the ratio is not finite.
+TEST_F(LiblcvmRegressionTest, TestFrameDropRatioNan) {
+  for (bool sort_by_pts : {true, false}) {
+    for (bool skip_audio_parsing : {true, false}) {
+      auto ptr =
+          parse("frame_drop_ratio_nan.mov", sort_by_pts, skip_audio_parsing);
+      ASSERT_NE(nullptr, ptr);
+      const auto timing = ptr->get_timing();
+      EXPECT_FALSE(std::isfinite(timing.get_frame_drop_ratio()));
+      EXPECT_EQ(timing.get_frame_drop_count(), 0);
+      parse_to_lists("frame_drop_ratio_nan.mov", sort_by_pts,
+                     skip_audio_parsing);
+    }
+  }
+}
