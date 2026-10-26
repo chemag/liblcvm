@@ -29,6 +29,7 @@ typedef struct arg_options {
   char* outfile;
   char* outfile_timestamps;
   bool outfile_timestamps_sort_pts;
+  bool skip_audio_parsing;
   std::vector<std::string> infile_list;
 #if ADD_POLICY
   char* policy_file;
@@ -42,6 +43,7 @@ arg_options DEFAULT_OPTIONS{
     .outfile = nullptr,
     .outfile_timestamps = nullptr,
     .outfile_timestamps_sort_pts = true,
+    .skip_audio_parsing = false,
     .infile_list = {},
 #if ADD_POLICY
     .policy_file = nullptr,
@@ -64,7 +66,8 @@ std::string csv_escape(const std::string& value) {
 
 int parse_files(std::vector<std::string>& infile_list, char* outfile,
                 char* outfile_timestamps, bool outfile_timestamps_sort_pts,
-                int debug, const std::string& policy_str) {
+                bool skip_audio_parsing, int debug,
+                const std::string& policy_str) {
   // 1. open outfile
   FILE* outfp;
   if (outfile == nullptr || (strlen(outfile) == 1 && outfile[0] == '-')) {
@@ -80,6 +83,7 @@ int parse_files(std::vector<std::string>& infile_list, char* outfile,
   // 2. set parsing parameters
   auto liblcvm_config = std::make_unique<LiblcvmConfig>();
   liblcvm_config->set_sort_by_pts(outfile_timestamps_sort_pts);
+  liblcvm_config->set_skip_audio_parsing(skip_audio_parsing);
   liblcvm_config->set_policy(policy_str);
   liblcvm_config->set_debug(debug);
 
@@ -212,6 +216,12 @@ void usage(char* name) {
           "dump timestamps\n");
   fprintf(stderr, "\t--sort-pts:\t\tSort outfile timestamps by PTS\n");
   fprintf(stderr, "\t--no-sort-pts:\t\tDo not outfile timestamps by PTS\n");
+  fprintf(stderr,
+          "\t--skip-audio-parsing:\tSkip the audio sample entry (codec "
+          "details)\n");
+  fprintf(stderr,
+          "\t--no-skip-audio-parsing:\tParse the audio sample entry "
+          "(default)\n");
   fprintf(stderr, "\t-h:\t\tHelp\n");
   exit(-1);
 }
@@ -223,6 +233,8 @@ enum {
   OUTFILE_TIMESTAMPS_OPTION,
   SORT_PTS_OPTION,
   NO_SORT_PTS_OPTION,
+  SKIP_AUDIO_PARSING_OPTION,
+  NO_SKIP_AUDIO_PARSING_OPTION,
   RUNS_OPTION,
   VERSION_OPTION,
 };
@@ -249,6 +261,9 @@ arg_options* parse_args(int argc, char** argv) {
        OUTFILE_TIMESTAMPS_OPTION},
       {"sort-pts", no_argument, nullptr, SORT_PTS_OPTION},
       {"no-sort-pts", no_argument, nullptr, NO_SORT_PTS_OPTION},
+      {"skip-audio-parsing", no_argument, nullptr, SKIP_AUDIO_PARSING_OPTION},
+      {"no-skip-audio-parsing", no_argument, nullptr,
+       NO_SKIP_AUDIO_PARSING_OPTION},
       // options without a short option
       {"runs", required_argument, nullptr, RUNS_OPTION},
       {"quiet", no_argument, nullptr, QUIET_OPTION},
@@ -299,6 +314,14 @@ arg_options* parse_args(int argc, char** argv) {
 
       case NO_SORT_PTS_OPTION:
         options.outfile_timestamps_sort_pts = false;
+        break;
+
+      case SKIP_AUDIO_PARSING_OPTION:
+        options.skip_audio_parsing = true;
+        break;
+
+      case NO_SKIP_AUDIO_PARSING_OPTION:
+        options.skip_audio_parsing = false;
         break;
 
       case QUIET_OPTION:
@@ -372,10 +395,10 @@ int main(int argc, char** argv) {
 
   int ret = 0;
   for (int i = 0; i < options->nruns; ++i) {
-    if (parse_files(options->infile_list, options->outfile,
-                    options->outfile_timestamps,
-                    options->outfile_timestamps_sort_pts, options->debug,
-                    policy_str) != 0) {
+    if (parse_files(
+            options->infile_list, options->outfile, options->outfile_timestamps,
+            options->outfile_timestamps_sort_pts, options->skip_audio_parsing,
+            options->debug, policy_str) != 0) {
       ret = -1;
     }
   }

@@ -435,6 +435,12 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
       continue;
     }
 
+    // audio duration is already set: skip the audio sample entry if requested
+    if (handler_type.compare("soun") == 0 &&
+        liblcvm_config.get_skip_audio_parsing()) {
+      continue;
+    }
+
     // 7. look for a minf container box
     std::shared_ptr<ISOBMFF::ContainerBox> minf =
         mdia->GetTypedBox<ISOBMFF::ContainerBox>("minf");

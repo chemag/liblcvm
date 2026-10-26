@@ -81,6 +81,7 @@ void liblcvm_config_init(liblcvm_config_t* config) {
     return;
 
   config->sort_by_pts = true;
+  config->skip_audio_parsing = false;
   config->debug = 0;
   config->policy[0] = '\0';
 }
@@ -106,6 +107,7 @@ liblcvm_error_t liblcvm_parse_file(
     LiblcvmConfig cpp_config;
     if (config) {
       cpp_config.set_sort_by_pts(config->sort_by_pts);
+      cpp_config.set_skip_audio_parsing(config->skip_audio_parsing);
       cpp_config.set_debug(config->debug);
       if (strlen(config->policy) > 0) {
         cpp_config.set_policy(std::string(config->policy));
