@@ -82,16 +82,12 @@ class MemoryUsageTest : public ::testing::Test {
 #elif defined(__linux__)
     // Linux: Read RSS from /proc/self/statm
     // Second field is RSS in pages, multiply by page size for bytes
+    std::ifstream statm("/proc/self/statm");
+    long size = 0L;
     long rss = 0L;
-    FILE* fp = nullptr;
-    if ((fp = fopen("/proc/self/statm", "r")) == nullptr) {
+    if (!(statm >> size >> rss)) {
       return 0;
     }
-    if (fscanf(fp, "%*s%ld", &rss) != 1) {
-      fclose(fp);
-      return 0;
-    }
-    fclose(fp);
     return rss * sysconf(_SC_PAGESIZE);
 #else
     return 0;
