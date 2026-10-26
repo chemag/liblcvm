@@ -1173,7 +1173,8 @@ int AudioInformation::parse_audio_information(
     ptr->audio.audio_type = "mp4a";
     ptr->audio.channel_count = mp4a->GetChannelCount();
     ptr->audio.sample_size = mp4a->GetSampleSize();
-    ptr->audio.sample_rate = mp4a->GetSampleRate();
+    // samplerate is a 16.16 fixed-point value: keep the integer part
+    ptr->audio.sample_rate = static_cast<int>(mp4a->GetSampleRateRaw() >> 16);
     return 0;
   }
 
@@ -1183,7 +1184,7 @@ int AudioInformation::parse_audio_information(
     ptr->audio.audio_type = "Opus";
     ptr->audio.channel_count = opus->GetChannelCount();
     ptr->audio.sample_size = opus->GetSampleSize();
-    ptr->audio.sample_rate = opus->GetSampleRate();
+    ptr->audio.sample_rate = static_cast<int>(opus->GetSampleRateRaw() >> 16);
     return 0;
   }
 
