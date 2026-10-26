@@ -683,6 +683,9 @@ int TimingInformation::parse_timing_information(
     // standard suggests that, if there are less ctts than actual samples,
     // the decoder reuses the latest ctts sample offset again and again
     while (cur_video_frame < num_frames) {
+      // store the (reused) ctts value, so ctts_unit_list keeps one entry
+      // per frame, like the other per-frame lists
+      ptr->timing.ctts_unit_list.push_back(last_ctts_sample_offset_unit);
       // update the pts value
       ptr->timing.pts_unit_list[cur_video_frame] =
           add_int32_wraparound(ptr->timing.pts_unit_list[cur_video_frame],
@@ -792,6 +795,26 @@ double calculate_median_absolute_deviation(const std::vector<double>& vec) {
   return mad;
 }
 
+// Reorder a per-frame list so that list[i] becomes list[order[i]]. Returns
+// -1 (and leaves the list as is) when the list does not have one entry per
+// frame. An empty list (e.g. ctts_unit_list without a ctts box) is valid.
+template <typename T>
+static int reorder_by_index(std::vector<T>& list,
+                            const std::vector<uint32_t>& order) {
+  if (list.empty()) {
+    return 0;
+  }
+  if (list.size() != order.size()) {
+    return -1;
+  }
+  std::vector<T> list_alt(list.size());
+  for (size_t i = 0; i < order.size(); ++i) {
+    list_alt[i] = list[order[i]];
+  }
+  list = std::move(list_alt);
+  return 0;
+}
+
 int TimingInformation::derive_timing_info(
     std::shared_ptr<IsobmffFileInformation> ptr, bool sort_by_pts, int debug) {
   // 1. set the frame_num_orig_list vector
@@ -811,41 +834,26 @@ int TimingInformation::derive_timing_info(
                        return pts_sec_list[a] < pts_sec_list[b];
                      });
     // sort all the others based in the new order
-    // 2.1. stts_unit_list
-    std::vector<uint32_t> stts_unit_list_alt(ptr->timing.stts_unit_list.size());
-    for (uint32_t i = 0; i < ptr->timing.stts_unit_list.size(); ++i) {
-      stts_unit_list_alt[i] =
-          ptr->timing.stts_unit_list[ptr->timing.frame_num_orig_list[i]];
+    // All the per-frame lists must have one entry per frame (ctts_unit_list
+    // may also be empty, when there is no ctts box): indexing a shorter list
+    // with frame_num_orig_list would read past its end.
+    if (reorder_by_index(ptr->timing.stts_unit_list,
+                         ptr->timing.frame_num_orig_list) < 0 ||
+        reorder_by_index(ptr->timing.ctts_unit_list,
+                         ptr->timing.frame_num_orig_list) < 0 ||
+        reorder_by_index(ptr->timing.dts_sec_list,
+                         ptr->timing.frame_num_orig_list) < 0 ||
+        reorder_by_index(ptr->timing.pts_unit_list,
+                         ptr->timing.frame_num_orig_list) < 0 ||
+        reorder_by_index(ptr->timing.pts_sec_list,
+                         ptr->timing.frame_num_orig_list) < 0) {
+      if (debug > 0) {
+        fprintf(stderr,
+                "error: inconsistent per-frame timing list sizes in %s\n",
+                ptr->filename.c_str());
+      }
+      return -1;
     }
-    ptr->timing.stts_unit_list = stts_unit_list_alt;
-    // 2.2. ctts_unit_list
-    std::vector<int32_t> ctts_unit_list_alt(ptr->timing.ctts_unit_list.size());
-    for (uint32_t i = 0; i < ptr->timing.ctts_unit_list.size(); ++i) {
-      ctts_unit_list_alt[i] =
-          ptr->timing.ctts_unit_list[ptr->timing.frame_num_orig_list[i]];
-    }
-    ptr->timing.ctts_unit_list = ctts_unit_list_alt;
-    // 2.3. dts_sec_list
-    std::vector<double> dts_sec_list_alt(ptr->timing.dts_sec_list.size());
-    for (uint32_t i = 0; i < ptr->timing.dts_sec_list.size(); ++i) {
-      dts_sec_list_alt[i] =
-          ptr->timing.dts_sec_list[ptr->timing.frame_num_orig_list[i]];
-    }
-    ptr->timing.dts_sec_list = dts_sec_list_alt;
-    // 2.4. pts_unit_list
-    std::vector<int32_t> pts_unit_list_alt(ptr->timing.pts_unit_list.size());
-    for (uint32_t i = 0; i < ptr->timing.pts_unit_list.size(); ++i) {
-      pts_unit_list_alt[i] =
-          ptr->timing.pts_unit_list[ptr->timing.frame_num_orig_list[i]];
-    }
-    ptr->timing.pts_unit_list = pts_unit_list_alt;
-    // 2.5. pts_sec_list
-    std::vector<double> pts_sec_list_alt(ptr->timing.pts_sec_list.size());
-    for (uint32_t i = 0; i < ptr->timing.pts_sec_list.size(); ++i) {
-      pts_sec_list_alt[i] =
-          ptr->timing.pts_sec_list[ptr->timing.frame_num_orig_list[i]];
-    }
-    ptr->timing.pts_sec_list = pts_sec_list_alt;
   }
 
   // 3. derived timing values

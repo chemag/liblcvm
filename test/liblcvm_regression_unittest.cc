@@ -80,3 +80,28 @@ TEST_F(LiblcvmRegressionTest, TestCttsPtsInt32Overflow) {
     }
   }
 }
+
+// The ctts box describes fewer samples than the stts box (the last ctts
+// offset applies to the remaining frames). ctts_unit_list only got the
+// explicit entries, and sorting by pts indexed it with the (larger) frame
+// numbers, reading past its end (heap-buffer-overflow). ctts_unit_list now
+// has one entry per frame.
+TEST_F(LiblcvmRegressionTest, TestCttsFewerSamplesThanStts) {
+  for (bool sort_by_pts : {true, false}) {
+    for (bool skip_audio_parsing : {true, false}) {
+      auto ptr = parse("ctts_fewer_samples_than_stts.mov", sort_by_pts,
+                       skip_audio_parsing);
+      ASSERT_NE(nullptr, ptr);
+      const auto timing = ptr->get_timing();
+      const size_t num_frames = timing.get_pts_unit_list().size();
+      EXPECT_EQ(num_frames, static_cast<size_t>(timing.get_num_video_frames()));
+      EXPECT_EQ(timing.get_ctts_unit_list().size(), num_frames);
+      EXPECT_EQ(timing.get_stts_unit_list().size(), num_frames);
+      EXPECT_EQ(timing.get_dts_sec_list().size(), num_frames);
+      EXPECT_EQ(timing.get_pts_sec_list().size(), num_frames);
+      EXPECT_EQ(timing.get_frame_num_orig_list().size(), num_frames);
+      parse_to_lists("ctts_fewer_samples_than_stts.mov", sort_by_pts,
+                     skip_audio_parsing);
+    }
+  }
+}
