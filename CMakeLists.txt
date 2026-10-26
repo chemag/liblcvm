@@ -336,6 +336,10 @@ if(ADD_POLICY)
 endif()
 
 # ---- Third-party subprojects -------------------------------------------------
+# Make option() in the subprojects honor normal variables set here (policy
+# CMP0077). isobmff requires CMake 3.12, so it gets the OLD behavior by
+# default, where its option(BUILD_CLANG_FUZZER ... ON) ignores the value below.
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 set(BUILD_CLANG_FUZZER OFF)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff)
