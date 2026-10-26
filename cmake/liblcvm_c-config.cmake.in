@@ -1,0 +1,11 @@
+# CMake package config for the liblcvm C interface library.
+#
+# Usage:
+#   find_package(liblcvm_c REQUIRED)
+#   target_link_libraries(myapp PRIVATE liblcvm::liblcvm_c)
+
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/liblcvm_c_targets.cmake")
+
+check_required_components(liblcvm_c)

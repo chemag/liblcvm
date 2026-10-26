@@ -513,20 +513,20 @@ if(ADD_C_INTERFACE)
   # Create config file
   include(CMakePackageConfigHelpers)
   write_basic_package_version_file(
-    "${CMAKE_CURRENT_BINARY_DIR}/liblcvm_c_config_version.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/liblcvm_c-config-version.cmake"
     VERSION ${PROJECT_VERSION}
     COMPATIBILITY AnyNewerVersion
   )
 
   configure_package_config_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/liblcvm_c_config.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/liblcvm_c_config.cmake"
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/liblcvm_c-config.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/liblcvm_c-config.cmake"
     INSTALL_DESTINATION lib/cmake/liblcvm_c
   )
 
   install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/liblcvm_c_config.cmake"
-    "${CMAKE_CURRENT_BINARY_DIR}/liblcvm_c_config_version.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/liblcvm_c-config.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/liblcvm_c-config-version.cmake"
     DESTINATION lib/cmake/liblcvm_c
   )
 endif()
