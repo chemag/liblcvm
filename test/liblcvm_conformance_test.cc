@@ -126,7 +126,7 @@ TEST_F(ConformanceTest, MOV1_Conformance) {
   expected.infile = "MOV1.MOV";
   expected.num_video_frames = 634;
   expected.frame_rate_fps_median = 60.0;
-  expected.frame_rate_fps_average = 59.965530395507812;
+  expected.frame_rate_fps_average = 59.965532098233531;
   expected.video_freeze = 0;
   expected.frame_drop_ratio = 0.0;
   expected.num_video_keyframes = 11;

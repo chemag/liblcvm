@@ -727,7 +727,8 @@ double calculate_median(const std::vector<double>& vec) {
 }
 
 double calculate_average(const std::vector<double>& vec) {
-  return std::accumulate(vec.begin(), vec.end(), 0.0f) / vec.size();
+  return std::accumulate(vec.begin(), vec.end(), 0.0) /
+         static_cast<double>(vec.size());
 }
 
 double calculate_standard_deviation(const std::vector<double>& vec) {
