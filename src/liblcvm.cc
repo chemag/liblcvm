@@ -579,6 +579,15 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
   return ptr;
 }
 
+// Add two int32_t timestamps (units) with two's-complement wraparound.
+// pts values are stored as int32_t, starting from the uint32_t dts, so a
+// large dts plus a ctts offset can exceed the int32_t range. Signed
+// overflow is undefined behavior, so add as uint32_t instead.
+static int32_t add_int32_wraparound(int32_t a, int32_t b) {
+  return static_cast<int32_t>(static_cast<uint32_t>(a) +
+                              static_cast<uint32_t>(b));
+}
+
 int TimingInformation::parse_timing_information(
     std::shared_ptr<ISOBMFF::ContainerBox> stbl, uint32_t timescale_track_hz,
     std::shared_ptr<IsobmffFileInformation> ptr, int debug) {
@@ -634,19 +643,26 @@ int TimingInformation::parse_timing_information(
   if (ctts != nullptr) {
     int32_t last_ctts_sample_offset_unit = 0;
     // 10.1. adjust pts list using ctts timestamp durations
-    uint32_t ctts_sample_count = 0;
-    uint32_t cur_video_frame = 0;
+    // pts_unit_list has one entry per stts sample. The ctts box should
+    // describe the same samples, but a malformed file can describe more:
+    // ignore the extra ctts samples instead of writing past the end of
+    // the pts lists.
+    const size_t num_frames = ptr->timing.pts_unit_list.size();
+    uint64_t ctts_sample_count = 0;
+    size_t cur_video_frame = 0;
     for (unsigned int i = 0; i < ctts->GetEntryCount(); i++) {
       uint32_t sample_count = ctts->GetSampleCount(i);
       ctts_sample_count += sample_count;
       // update pts_sec_list
       int32_t sample_offset = ctts->GetSampleOffset(i);
       last_ctts_sample_offset_unit = sample_offset;
-      for (uint32_t sample = 0; sample < sample_count; sample++) {
+      for (uint32_t sample = 0;
+           sample < sample_count && cur_video_frame < num_frames; sample++) {
         // store the new ctts value
         ptr->timing.ctts_unit_list.push_back(sample_offset);
         // update the pts value
-        ptr->timing.pts_unit_list[cur_video_frame] += sample_offset;
+        ptr->timing.pts_unit_list[cur_video_frame] = add_int32_wraparound(
+            ptr->timing.pts_unit_list[cur_video_frame], sample_offset);
         ptr->timing.pts_sec_list[cur_video_frame] =
             ((double)ptr->timing.pts_unit_list[cur_video_frame]) /
             timescale_track_hz;
@@ -657,21 +673,29 @@ int TimingInformation::parse_timing_information(
         fprintf(stdout, "ctts::sample_offset: %i ", sample_offset);
       }
     }
+    if (ctts_sample_count > num_frames && debug > 0) {
+      fprintf(stderr,
+              "warning: ctts describes %" PRIu64
+              " samples, but stts only %zu in %s: ignoring the extra ctts "
+              "samples\n",
+              ctts_sample_count, num_frames, ptr->filename.c_str());
+    }
     // standard suggests that, if there are less ctts than actual samples,
     // the decoder reuses the latest ctts sample offset again and again
-    while (cur_video_frame < stts_sample_count) {
+    while (cur_video_frame < num_frames) {
       // update the pts value
-      ptr->timing.pts_unit_list[cur_video_frame] +=
-          last_ctts_sample_offset_unit;
+      ptr->timing.pts_unit_list[cur_video_frame] =
+          add_int32_wraparound(ptr->timing.pts_unit_list[cur_video_frame],
+                               last_ctts_sample_offset_unit);
       ptr->timing.pts_sec_list[cur_video_frame] =
           ((double)ptr->timing.pts_unit_list[cur_video_frame]) /
           timescale_track_hz;
       ++cur_video_frame;
     }
     if (debug > 2) {
-      printf("cur_video_frame: %u\n", cur_video_frame);
+      printf("cur_video_frame: %zu\n", cur_video_frame);
       printf("stts_sample_count: %u\n", stts_sample_count);
-      printf("ctts_sample_count: %u\n", ctts_sample_count);
+      printf("ctts_sample_count: %" PRIu64 "\n", ctts_sample_count);
     }
   }
 

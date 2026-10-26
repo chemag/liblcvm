@@ -12,6 +12,7 @@ link_directories(/usr/local/lib)
 set(TEST_MEDIA_DIR ${CMAKE_SOURCE_DIR}/media)
 set(TEST_POLICY_DIR ${CMAKE_SOURCE_DIR}/policy)
 set(TEST_CONFORMANCE_DIR ${CMAKE_SOURCE_DIR}/test)
+set(TEST_REGRESSION_DIR ${CMAKE_SOURCE_DIR}/test/regression)
 
 # Function to add a test executable
 function(add_liblcvm_test test_name)
@@ -29,6 +30,9 @@ function(add_liblcvm_test test_name)
   )
   target_compile_definitions(${test_name}
     PRIVATE TEST_CONFORMANCE_DIR="${TEST_CONFORMANCE_DIR}"
+  )
+  target_compile_definitions(${test_name}
+    PRIVATE TEST_REGRESSION_DIR="${TEST_REGRESSION_DIR}"
   )
 
   target_link_libraries(${test_name}
