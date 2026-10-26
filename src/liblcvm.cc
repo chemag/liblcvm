@@ -459,7 +459,8 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
 
     // stbl-based audio processing
     if (handler_type.compare("soun") == 0) {
-      if (ptr->audio.parse_mp4a(stbl, ptr, liblcvm_config.get_debug()) < 0) {
+      if (ptr->audio.parse_audio_information(stbl, ptr,
+                                             liblcvm_config.get_debug()) < 0) {
         if (liblcvm_config.get_debug() > 0) {
           fprintf(stderr, "error: in getting audio information in %s\n",
                   ptr->filename.c_str());
@@ -1150,9 +1151,9 @@ void FrameInformation::parse_hvcc(std::shared_ptr<ISOBMFF::HVCC> hvcc,
   }
 }
 
-int AudioInformation::parse_mp4a(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
-                                 std::shared_ptr<IsobmffFileInformation> ptr,
-                                 int debug) {
+int AudioInformation::parse_audio_information(
+    std::shared_ptr<ISOBMFF::ContainerBox> stbl,
+    std::shared_ptr<IsobmffFileInformation> ptr, int debug) {
   // 1. look for a stsd container box
   std::shared_ptr<ISOBMFF::STSD> stsd =
       stbl->GetTypedBox<ISOBMFF::STSD>("stsd");
@@ -1164,21 +1165,33 @@ int AudioInformation::parse_mp4a(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
     return -1;
   }
 
-  // 2. look for a MP4A container box
+  // 2. look for mp4a or Opus (container) boxes
   std::shared_ptr<ISOBMFF::MP4A> mp4a =
       stsd->GetTypedBox<ISOBMFF::MP4A>("mp4a");
-  if (mp4a == nullptr) {
-    if (debug > 0) {
-      fprintf(stderr, "error: no /moov/trak2/mdia/minf/stbl/stsd/mp4a in %s\n",
-              ptr->filename.c_str());
-    }
-    return -1;
+  if (mp4a != nullptr) {
+    ptr->audio.audio_type = "mp4a";
+    ptr->audio.channel_count = mp4a->GetChannelCount();
+    ptr->audio.sample_size = mp4a->GetSampleSize();
+    ptr->audio.sample_rate = mp4a->GetSampleRate();
+    return 0;
   }
-  ptr->audio.audio_type = "mp4a";
-  ptr->audio.channel_count = mp4a->GetChannelCount();
-  ptr->audio.sample_size = mp4a->GetSampleSize();
-  ptr->audio.sample_rate = mp4a->GetSampleRate();
-  return 0;
+
+  std::shared_ptr<ISOBMFF::OPUS> opus =
+      stsd->GetTypedBox<ISOBMFF::OPUS>("Opus");
+  if (opus != nullptr) {
+    ptr->audio.audio_type = "Opus";
+    ptr->audio.channel_count = opus->GetChannelCount();
+    ptr->audio.sample_size = opus->GetSampleSize();
+    ptr->audio.sample_rate = opus->GetSampleRate();
+    return 0;
+  }
+
+  if (debug > 0) {
+    fprintf(stderr,
+            "error: no /moov/trak/mdia/minf/stbl/stsd/{mp4a,Opus} in %s\n",
+            ptr->filename.c_str());
+  }
+  return -1;
 }
 
 int FrameInformation::parse_frame_information(

@@ -83,6 +83,53 @@ class LiblcvmTest : public ::testing::Test {
  public:
   LiblcvmTest() {}
   ~LiblcvmTest() override {}
+
+  // Parse a media file and check a subset of its output values.
+  void check_parsed_values(
+      const std::string& input_filename,
+      const std::map<std::string, LiblcvmValue>& expected_metrics) {
+    // 1. set input files
+    std::string infile = std::string(TEST_MEDIA_DIR) + "/" + input_filename;
+
+    // 2. set parsing parameters
+    LiblcvmConfig liblcvm_config;
+    liblcvm_config.set_sort_by_pts(true);
+    liblcvm_config.set_debug(1);
+
+    // 3. parse the input files
+    LiblcvmKeyList keys;
+    LiblcvmValList vals;
+    LiblcvmKeyList keys_timing;
+    LiblcvmTimingList vals_timing;
+    bool calculate_timestamps = true;
+    ASSERT_EQ(0, IsobmffFileInformation::parse_to_lists(
+                     infile.c_str(), liblcvm_config, &keys, &vals,
+                     calculate_timestamps, &keys_timing, &vals_timing))
+        << "error: IsobmffFileInformation::parse_to_lists() in " << infile;
+
+    // 4. check the expected values
+    std::map<std::string, LiblcvmValue> metrics;
+    for (size_t i = 0; i < keys.size(); i++) {
+      metrics[keys[i]] = vals[i];
+    }
+    for (const auto& item : expected_metrics) {
+      const std::string& key = item.first;
+      const LiblcvmValue& expected = item.second;
+      ASSERT_TRUE(metrics.count(key) > 0) << "missing key: " << key;
+      EXPECT_TRUE(values_are_close(metrics[key], expected))
+          << "infile: " << input_filename << " key: " << key << " expected: " <<
+          [&]() {
+            std::string s;
+            liblcvmvalue_to_string(expected, &s);
+            return s;
+          }()
+          << " actual: " << [&]() {
+               std::string s;
+               liblcvmvalue_to_string(metrics[key], &s);
+               return s;
+             }();
+    }
+  }
 };
 
 TEST_F(LiblcvmTest, TestParserPolicy) {
@@ -255,5 +302,23 @@ TEST_F(LiblcvmTest, TestParserPolicy) {
              return s;
            }();
   }
+}
+
+TEST_F(LiblcvmTest, TestParserOpus) {
+  check_parsed_values("hevc_opus.mp4",
+                      {
+                          {"video_codec_type", std::string("hvc1")},
+                          {"width", 320.0},
+                          {"height", 240.0},
+                          {"num_video_frames", 60},
+                          {"frame_rate_fps_median", 30.0},
+                          {"duration_video_sec", 2.0},
+                          {"duration_audio_sec", 2.0},
+                          {"timescale_audio_hz", 48000u},
+                          {"audio_type", std::string("Opus")},
+                          {"channel_count", 2},
+                          {"sample_rate", 48000},
+                          {"sample_size", 16},
+                      });
 }
 }  // namespace liblcvm

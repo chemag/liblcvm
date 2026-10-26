@@ -97,7 +97,7 @@ typedef struct {
 
 // Audio information structure
 typedef struct {
-  char audio_type[8];  // "mp4a" or "mp4s"
+  char audio_type[8];  // "mp4a" or "Opus"
   int channel_count;
   int sample_rate;
   int sample_size;
