@@ -526,8 +526,9 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     ptr->timing.dts_sec_list.push_back(0.0);
     ptr->timing.pts_unit_list.push_back(0);
     ptr->timing.pts_sec_list.push_back(0.0);
-    if (ptr->timing.parse_timing_information(stbl, timescale_track_hz, ptr,
-                                             liblcvm_config.get_debug()) < 0) {
+    if (ptr->timing.parse_timing_information(
+            stbl, timescale_track_hz, liblcvm_config.get_max_num_frames(), ptr,
+            liblcvm_config.get_debug()) < 0) {
       if (liblcvm_config.get_debug() > 0) {
         fprintf(stderr, "error: no timing information in %s\n",
                 ptr->filename.c_str());
@@ -590,7 +591,8 @@ static int32_t add_int32_wraparound(int32_t a, int32_t b) {
 
 int TimingInformation::parse_timing_information(
     std::shared_ptr<ISOBMFF::ContainerBox> stbl, uint32_t timescale_track_hz,
-    std::shared_ptr<IsobmffFileInformation> ptr, int debug) {
+    uint32_t max_num_frames, std::shared_ptr<IsobmffFileInformation> ptr,
+    int debug) {
   // 1. look for a stts box
   std::shared_ptr<ISOBMFF::STTS> stts =
       stbl->GetTypedBox<ISOBMFF::STTS>("stts");
@@ -603,7 +605,25 @@ int TimingInformation::parse_timing_information(
   }
 
   // 2. gather the stts timestamp durations
-  // run all through the stts table
+  // 2.1. check the total number of frames first: every frame adds an entry
+  // to several per-frame lists, and the sample counts come from the file
+  // (up to 2^32 - 1 per entry), so a small file can declare billions of
+  // frames. num_video_frames is an int, so cap the total there too.
+  uint64_t total_sample_count = 0;
+  for (unsigned int i = 0; i < stts->GetEntryCount(); i++) {
+    total_sample_count += stts->GetSampleCount(i);
+  }
+  if (total_sample_count > max_num_frames ||
+      total_sample_count > static_cast<uint64_t>(INT_MAX)) {
+    if (debug > 0) {
+      fprintf(stderr,
+              "error: stts declares %" PRIu64
+              " frames (more than max_num_frames: %u) in %s\n",
+              total_sample_count, max_num_frames, ptr->filename.c_str());
+    }
+    return -1;
+  }
+  // 2.2. run all through the stts table
   uint32_t stts_sample_count = 0;
   uint32_t last_dts_unit = 0.0;
   for (unsigned int i = 0; i < stts->GetEntryCount(); i++) {

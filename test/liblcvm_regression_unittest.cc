@@ -8,6 +8,7 @@
 
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <cmath>
 #include <memory>
 #include <string>
@@ -140,6 +141,26 @@ TEST_F(LiblcvmRegressionTest, TestPtsDeltaInt32Overflow) {
                 timing.get_pts_unit_list().size() - 1);
       parse_to_lists("pts_delta_int32_overflow.mov", sort_by_pts,
                      skip_audio_parsing);
+    }
+  }
+}
+
+// The stts box declares billions of frames in a 17 KB file. Every frame
+// adds an entry to several per-frame lists, so parsing used to allocate
+// until it ran out of memory. Files declaring more than max_num_frames
+// frames (default 2^20) are now rejected before any allocation.
+TEST_F(LiblcvmRegressionTest, TestSttsHugeSampleCount) {
+  for (bool sort_by_pts : {true, false}) {
+    for (bool skip_audio_parsing : {true, false}) {
+      auto start = std::chrono::steady_clock::now();
+      auto ptr =
+          parse("stts_huge_sample_count.mov", sort_by_pts, skip_audio_parsing);
+      EXPECT_EQ(nullptr, ptr);
+      EXPECT_NE(0, parse_to_lists("stts_huge_sample_count.mov", sort_by_pts,
+                                  skip_audio_parsing));
+      auto elapsed = std::chrono::steady_clock::now() - start;
+      EXPECT_LT(
+          std::chrono::duration_cast<std::chrono::seconds>(elapsed).count(), 5);
     }
   }
 }

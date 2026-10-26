@@ -366,4 +366,29 @@ TEST_F(LiblcvmTest, TestSkipAudioParsing) {
   EXPECT_EQ(0, audio.get_sample_rate());
   EXPECT_EQ(0, audio.get_sample_size());
 }
+
+TEST_F(LiblcvmTest, TestMaxNumFrames) {
+  std::string infile = std::string(TEST_MEDIA_DIR) + "/MOV1.MOV";
+
+  // the default limit accepts the file (634 frames)
+  LiblcvmConfig liblcvm_config;
+  EXPECT_EQ(LiblcvmConfig::kDefaultMaxNumFrames,
+            liblcvm_config.get_max_num_frames());
+  std::shared_ptr<IsobmffFileInformation> ptr =
+      IsobmffFileInformation::parse(infile.c_str(), liblcvm_config);
+  ASSERT_NE(nullptr, ptr) << "error: IsobmffFileInformation::parse() in "
+                          << infile;
+  EXPECT_EQ(634, ptr->get_timing().get_num_video_frames());
+
+  // a limit equal to the number of frames accepts the file
+  liblcvm_config.set_max_num_frames(634);
+  ptr = IsobmffFileInformation::parse(infile.c_str(), liblcvm_config);
+  ASSERT_NE(nullptr, ptr);
+  EXPECT_EQ(634, ptr->get_timing().get_num_video_frames());
+
+  // a lower limit rejects it
+  liblcvm_config.set_max_num_frames(633);
+  ptr = IsobmffFileInformation::parse(infile.c_str(), liblcvm_config);
+  EXPECT_EQ(nullptr, ptr);
+}
 }  // namespace liblcvm

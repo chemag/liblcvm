@@ -30,6 +30,7 @@ typedef struct arg_options {
   char* outfile_timestamps;
   bool outfile_timestamps_sort_pts;
   bool skip_audio_parsing;
+  uint32_t max_num_frames;
   std::vector<std::string> infile_list;
 #if ADD_POLICY
   char* policy_file;
@@ -44,6 +45,7 @@ arg_options DEFAULT_OPTIONS{
     .outfile_timestamps = nullptr,
     .outfile_timestamps_sort_pts = true,
     .skip_audio_parsing = false,
+    .max_num_frames = LiblcvmConfig::kDefaultMaxNumFrames,
     .infile_list = {},
 #if ADD_POLICY
     .policy_file = nullptr,
@@ -66,7 +68,7 @@ std::string csv_escape(const std::string& value) {
 
 int parse_files(std::vector<std::string>& infile_list, char* outfile,
                 char* outfile_timestamps, bool outfile_timestamps_sort_pts,
-                bool skip_audio_parsing, int debug,
+                bool skip_audio_parsing, uint32_t max_num_frames, int debug,
                 const std::string& policy_str) {
   // 1. open outfile
   FILE* outfp;
@@ -84,6 +86,7 @@ int parse_files(std::vector<std::string>& infile_list, char* outfile,
   auto liblcvm_config = std::make_unique<LiblcvmConfig>();
   liblcvm_config->set_sort_by_pts(outfile_timestamps_sort_pts);
   liblcvm_config->set_skip_audio_parsing(skip_audio_parsing);
+  liblcvm_config->set_max_num_frames(max_num_frames);
   liblcvm_config->set_policy(policy_str);
   liblcvm_config->set_debug(debug);
 
@@ -222,6 +225,10 @@ void usage(char* name) {
   fprintf(stderr,
           "\t--no-skip-audio-parsing:\tParse the audio sample entry "
           "(default)\n");
+  fprintf(stderr,
+          "\t--max-num-frames <num>:\tReject files with more video frames "
+          "[%u]\n",
+          DEFAULT_OPTIONS.max_num_frames);
   fprintf(stderr, "\t-h:\t\tHelp\n");
   exit(-1);
 }
@@ -235,6 +242,7 @@ enum {
   NO_SORT_PTS_OPTION,
   SKIP_AUDIO_PARSING_OPTION,
   NO_SKIP_AUDIO_PARSING_OPTION,
+  MAX_NUM_FRAMES_OPTION,
   RUNS_OPTION,
   VERSION_OPTION,
 };
@@ -265,6 +273,7 @@ arg_options* parse_args(int argc, char** argv) {
       {"no-skip-audio-parsing", no_argument, nullptr,
        NO_SKIP_AUDIO_PARSING_OPTION},
       // options without a short option
+      {"max-num-frames", required_argument, nullptr, MAX_NUM_FRAMES_OPTION},
       {"runs", required_argument, nullptr, RUNS_OPTION},
       {"quiet", no_argument, nullptr, QUIET_OPTION},
       {"version", no_argument, NULL, VERSION_OPTION},
@@ -323,6 +332,17 @@ arg_options* parse_args(int argc, char** argv) {
       case NO_SKIP_AUDIO_PARSING_OPTION:
         options.skip_audio_parsing = false;
         break;
+
+      case MAX_NUM_FRAMES_OPTION: {
+        char* endptr;
+        unsigned long val = strtoul(optarg, &endptr, 0);
+        if (*endptr != '\0' || val == 0 || val > UINT32_MAX) {
+          fprintf(stderr, "error: invalid --max-num-frames parameter: %s\n",
+                  optarg);
+          exit(-1);
+        }
+        options.max_num_frames = static_cast<uint32_t>(val);
+      } break;
 
       case QUIET_OPTION:
         options.debug = 0;
@@ -398,7 +418,7 @@ int main(int argc, char** argv) {
     if (parse_files(
             options->infile_list, options->outfile, options->outfile_timestamps,
             options->outfile_timestamps_sort_pts, options->skip_audio_parsing,
-            options->debug, policy_str) != 0) {
+            options->max_num_frames, options->debug, policy_str) != 0) {
       ret = -1;
     }
   }

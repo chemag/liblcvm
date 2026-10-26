@@ -48,6 +48,8 @@ typedef struct {
   bool skip_audio_parsing;
   int debug;
   char policy[256];
+  // maximum number of video frames to accept (0: use the library default)
+  uint32_t max_num_frames;
 } liblcvm_config_t;
 
 // Timing information structure

@@ -84,6 +84,7 @@ void liblcvm_config_init(liblcvm_config_t* config) {
   config->skip_audio_parsing = false;
   config->debug = 0;
   config->policy[0] = '\0';
+  config->max_num_frames = LiblcvmConfig::kDefaultMaxNumFrames;
 }
 
 // ====================
@@ -108,6 +109,9 @@ liblcvm_error_t liblcvm_parse_file(
     if (config) {
       cpp_config.set_sort_by_pts(config->sort_by_pts);
       cpp_config.set_skip_audio_parsing(config->skip_audio_parsing);
+      if (config->max_num_frames > 0) {
+        cpp_config.set_max_num_frames(config->max_num_frames);
+      }
       cpp_config.set_debug(config->debug);
       if (strlen(config->policy) > 0) {
         cpp_config.set_policy(std::string(config->policy));

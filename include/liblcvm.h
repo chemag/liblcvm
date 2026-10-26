@@ -135,7 +135,8 @@ class TimingInformation {
 
   static int parse_timing_information(
       std::shared_ptr<ISOBMFF::ContainerBox> stbl, uint32_t timescale_track_hz,
-      std::shared_ptr<IsobmffFileInformation> ptr, int debug);
+      uint32_t max_num_frames, std::shared_ptr<IsobmffFileInformation> ptr,
+      int debug);
 
   static int parse_keyframe_information(
       std::shared_ptr<ISOBMFF::ContainerBox> stbl,
@@ -285,15 +286,28 @@ class LiblcvmConfig {
   // (codec, channel count, sample size, sample rate). The audio duration
   // and timescale are still read from the track's mdhd box.
   bool skip_audio_parsing;
+  // max_num_frames: Maximum number of video frames (stts samples) to
+  // accept. liblcvm keeps several per-frame lists, and the sample counts
+  // come straight from the file (32 bits each), so a small malformed file
+  // can otherwise declare billions of frames and exhaust memory. Files
+  // declaring more frames fail to parse.
+  uint32_t max_num_frames;
   // policy: Warn/Error policy.
   std::string policy;
   // debug: Debug level.
   int debug;
 
  public:
+  // Default max_num_frames: 2^20 frames (about 9.7 hours at 30 fps, or 73
+  // minutes at 240 fps). Each frame costs about 130 bytes and 1.5 us of
+  // parsing (x86-64, release build), so the default bounds a malformed
+  // file to about 130 MB and 1.5 seconds.
+  static constexpr uint32_t kDefaultMaxNumFrames = 1 << 20;
+
   LiblcvmConfig() {
     sort_by_pts = true;
     skip_audio_parsing = false;
+    max_num_frames = kDefaultMaxNumFrames;
     policy = "";
     debug = 0;
   }
@@ -302,6 +316,8 @@ class LiblcvmConfig {
   DECL_SETTER(sort_by_pts, bool)
   DECL_GETTER(skip_audio_parsing, bool)
   DECL_SETTER(skip_audio_parsing, bool)
+  DECL_GETTER(max_num_frames, uint32_t)
+  DECL_SETTER(max_num_frames, uint32_t)
   DECL_GETTER(policy, std::string)
   DECL_SETTER(policy, std::string)
   DECL_GETTER(debug, int)
