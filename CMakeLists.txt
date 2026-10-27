@@ -11,6 +11,10 @@ endif()
 option(BUILD_PYBINDINGS "Build Python bindings for liblcvm" OFF)
 option(ADD_POLICY "Build policy system with ANTLR and protobuf support" OFF)
 option(ADD_C_INTERFACE "Build C interface library for Android/exception-disabled environments" OFF)
+option(BUILD_CLANG_FUZZER "Build the liblcvm clang fuzzer (sanitized, instrumented)" OFF)
+# BUILD_CLANG_FUZZER is forced OFF below for the third-party subprojects, so
+# keep liblcvm's own value under a separate name.
+set(LIBLCVM_BUILD_CLANG_FUZZER ${BUILD_CLANG_FUZZER})
 
 # ---- Language / flags --------------------------------------------------------
 set(CMAKE_CXX_STANDARD 17)
@@ -335,6 +339,23 @@ if(ADD_POLICY)
   )
 endif()
 
+# ---- Fuzzer instrumentation --------------------------------------------------
+# Set before the subprojects and the library are added: add_compile_options()
+# only reaches targets in this directory and in subdirectories added after it.
+# Otherwise the fuzzer links an uninstrumented liblcvm/isobmff/h264nal/h265nal,
+# libFuzzer gets no coverage feedback, and memory errors go unreported.
+# UBSan findings are fatal so that libFuzzer records them as crashes.
+if(LIBLCVM_BUILD_CLANG_FUZZER)
+  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    message(FATAL_ERROR "BUILD_CLANG_FUZZER requires Clang (found ${CMAKE_CXX_COMPILER_ID})")
+  endif()
+  set(LIBLCVM_SAN_FLAGS
+      -fsanitize=address,undefined
+      -fno-sanitize-recover=undefined)
+  add_compile_options(${LIBLCVM_SAN_FLAGS} -fsanitize=fuzzer-no-link)
+  add_link_options(${LIBLCVM_SAN_FLAGS})
+endif()
+
 # ---- Third-party subprojects -------------------------------------------------
 # Make option() in the subprojects honor normal variables set here (policy
 # CMP0077). isobmff requires CMake 3.12, so it gets the OLD behavior by
@@ -559,6 +580,11 @@ if(BUILD_TESTS)
   add_subdirectory(test)
 endif()
 
+# ---- Fuzzer ------------------------------------------------------------------
+if(LIBLCVM_BUILD_CLANG_FUZZER)
+  add_subdirectory(fuzz)
+endif()
+
 # Quick local commands
 add_custom_target(test2
   COMMAND ${CMAKE_COMMAND} -E echo "Running: ${CMAKE_BINARY_DIR}/lcvm ${CMAKE_CURRENT_SOURCE_DIR}/lib/isobmff/media/*MOV -o /tmp/full.csv"
@@ -572,6 +598,7 @@ add_custom_target(lint
   COMMAND clang-format -i -style=google ${CMAKE_CURRENT_SOURCE_DIR}/src/*cc
   COMMAND clang-format -i -style=google ${CMAKE_CURRENT_SOURCE_DIR}/test/*cc
   COMMAND clang-format -i -style=google ${CMAKE_CURRENT_SOURCE_DIR}/tools/*cc
+  COMMAND clang-format -i -style=google ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/*cc
 )
 
 # ---- Fuzz harness convenience target -----------------------------------------
