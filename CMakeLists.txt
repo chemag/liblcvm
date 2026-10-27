@@ -624,6 +624,30 @@ foreach(FUZZER_EXECUTABLE IN LISTS FUZZER_EXECUTABLES)
   )
 endforeach()
 
+# liblcvm's own fuzzer runs on the fuzz/corpus submodule. The submodule is not
+# checked out by default (see fuzz/README.md); without it, the fuzzer starts
+# from an empty corpus in the build directory.
+if(LIBLCVM_BUILD_CLANG_FUZZER)
+  set(LIBLCVM_CORPUS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/corpus/liblcvm_parse_fuzzer)
+  if(NOT EXISTS ${LIBLCVM_CORPUS_DIR})
+    message(STATUS "fuzz/corpus not checked out: the fuzz target starts from an empty corpus")
+    set(LIBLCVM_CORPUS_DIR ${CMAKE_BINARY_DIR}/fuzz/corpus/liblcvm_parse_fuzzer)
+  endif()
+  set(LIBLCVM_ARTIFACTS_DIR ${CMAKE_BINARY_DIR}/fuzz/artifacts/liblcvm_parse_fuzzer)
+  add_dependencies(fuzz liblcvm_parse_fuzzer)
+  add_custom_command(
+    TARGET fuzz POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${LIBLCVM_CORPUS_DIR} ${LIBLCVM_ARTIFACTS_DIR}
+  )
+  add_custom_command(
+    TARGET fuzz POST_BUILD
+    COMMAND $<TARGET_FILE:liblcvm_parse_fuzzer>
+            -artifact_prefix=${LIBLCVM_ARTIFACTS_DIR}/
+            ${LIBLCVM_CORPUS_DIR}/
+            -runs=${RUNS}
+  )
+endif()
+
 # ---- Cleanup helpers ---------------------------------------------------------
 add_custom_target(clean-gen
   COMMENT "Cleaning generated files"

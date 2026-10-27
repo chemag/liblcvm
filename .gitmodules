@@ -7,3 +7,8 @@
 [submodule "lib/h264nal"]
 	path = lib/h264nal
 	url = https://github.com/chemag/h264nal
+[submodule "fuzz/corpus"]
+	path = fuzz/corpus
+	url = https://github.com/chemag/liblcvm-fuzzcorpus
+	update = none   # do NOT populate on default/recursive updates
+	active = false  # exclude from default submodule ops

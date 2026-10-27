@@ -25,7 +25,26 @@ Input layout:
 
 # 2. Operation
 
-## 2.1. Build
+## 2.1. Get the Corpus
+
+The corpus lives in the
+[liblcvm-fuzzcorpus](https://github.com/chemag/liblcvm-fuzzcorpus) repo, as
+the `fuzz/corpus` submodule. The submodule is not checked out by default, not
+even by `git clone --recursive`, which gets the isobmff, h264nal, and h265nal
+libraries but skips every corpus. Request it explicitly:
+
+```
+$ cd liblcvm
+$ git submodule update --init --checkout --depth 1 -- fuzz/corpus
+```
+
+The libraries' corpora work the same way, for example:
+
+```
+$ git -C lib/h265nal submodule update --init --checkout --depth 1 -- fuzz/corpus
+```
+
+## 2.2. Build
 
 `BUILD_CLANG_FUZZER` requires clang. It instruments liblcvm and the isobmff,
 h264nal, and h265nal libraries with ASan, UBSan (fatal), and libFuzzer
@@ -38,11 +57,25 @@ $ CC=clang CXX=clang++ cmake -DBUILD_CLANG_FUZZER=ON -DBUILD_TESTS=OFF \
 $ make liblcvm_parse_fuzzer
 ```
 
-## 2.2. Run
+## 2.3. Run
+
+`make fuzz` runs the fuzzer for `RUNS` executions (a CMake cache variable,
+default 100) on `fuzz/corpus/liblcvm_parse_fuzzer/`, adds the new
+coverage-increasing inputs there, and writes failing inputs to
+`fuzz/artifacts/liblcvm_parse_fuzzer/` in the build directory. Without the
+submodule, it starts from an empty corpus in the build directory.
 
 ```
-$ mkdir -p corpus artifacts
-$ ./fuzz/liblcvm_parse_fuzzer -artifact_prefix=artifacts/ corpus/
+$ cmake -DRUNS=1000000 ..
+$ make fuzz
+```
+
+To run the fuzzer directly:
+
+```
+$ mkdir -p artifacts
+$ ./fuzz/liblcvm_parse_fuzzer -artifact_prefix=artifacts/ \
+    ../fuzz/corpus/liblcvm_parse_fuzzer/
 ```
 
 Keep failing inputs (`artifacts/`) apart from the corpus: libFuzzer replays
