@@ -17,6 +17,7 @@
 #include <map>
 #include <numeric>
 #include <tuple>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -307,12 +308,14 @@ class LiblcvmConfig {
   // (codec, channel count, sample size, sample rate). The audio duration
   // and timescale are still read from the track's mdhd box.
   bool skip_audio_parsing;
-  // max_num_frames: Maximum number of video frames (stts samples) to
-  // accept. liblcvm keeps several per-frame lists, and the sample counts
-  // come straight from the file (32 bits each), so a small malformed file
-  // can otherwise declare billions of frames and exhaust memory. Files
-  // declaring more frames fail to parse.
+  // max_num_frames: Maximum total number of video frames (stts samples)
+  // across all video tracks to accept. liblcvm keeps several per-frame lists,
+  // and the sample counts come straight from the file (32 bits each), so a
+  // small malformed file can otherwise declare billions of frames and exhaust
+  // memory. Files declaring more frames fail to parse.
   uint32_t max_num_frames;
+  // Export video selector: -1 selects the first video in container order.
+  int64_t video_track_id = -1;
   // Export selection: -1 means the first audio track in container order.
   // Explicit IDs are stored uint32 tkhd values, represented without narrowing.
   int64_t audio_track_id = -1;
@@ -346,6 +349,8 @@ class LiblcvmConfig {
   DECL_SETTER(skip_audio_parsing, bool)
   DECL_GETTER(max_num_frames, uint32_t)
   DECL_SETTER(max_num_frames, uint32_t)
+  DECL_GETTER(video_track_id, int64_t)
+  DECL_SETTER(video_track_id, int64_t)
   DECL_GETTER(audio_track_id, int64_t)
   DECL_SETTER(audio_track_id, int64_t)
   DECL_GETTER(include_track_keys, bool)
@@ -368,6 +373,17 @@ class IsobmffFileInformation {
   // Keep all audio tracks in container order. The default audio/timing view
   // uses the FIRST audio track, independently of its stored tkhd ID.
   std::vector<AudioInformation> audio_tracks;
+  // The first video's analysis lives in frame/timing for legacy helper
+  // compatibility. Store only additional analyses, avoiding a duplicate copy
+  // of the first video's per-frame lists.
+  struct VideoAnalysis {
+    FrameInformation frame;
+    TimingInformation timing;
+  };
+  bool has_video_track = false;
+  std::vector<VideoAnalysis> additional_video_tracks;
+  std::pair<const FrameInformation*, const TimingInformation*> video_view(
+      int64_t video_track_id) const;
 
  public:
   DECL_GETTER(filename, std::string)
@@ -376,10 +392,17 @@ class IsobmffFileInformation {
   // empty/default audio view; an invalid explicit selector throws out_of_range.
   // The int64_t selector can represent -1 and every uint32 tkhd ID.
   AudioInformation get_audio(int64_t audio_track_id = -1) const;
-  // Video timing is unchanged; audio duration, timescale, AV ratio, and freeze
-  // are derived consistently for the selected audio track.
-  TimingInformation get_timing(int64_t audio_track_id = -1) const;
-  DECL_GETTER(frame, FrameInformation)
+  // -1 selects the first video. Audio remains the first argument so existing
+  // get_timing(audio_id) calls keep their meaning.
+  TimingInformation get_timing(int64_t audio_track_id = -1,
+                               int64_t video_track_id = -1) const;
+  FrameInformation get_frame(int64_t video_track_id = -1) const;
+  std::vector<uint32_t> get_video_track_ids() const;
+  std::vector<uint32_t> get_audio_track_ids() const;
+  size_t get_num_video_tracks() const {
+    return (has_video_track ? 1u : 0u) + additional_video_tracks.size();
+  }
+  size_t get_num_audio_tracks() const { return audio_tracks.size(); }
   DECL_GETTER(audio_tracks, std::vector<AudioInformation>)
 
   // @brief Get the library version.
@@ -409,7 +432,8 @@ class IsobmffFileInformation {
       std::shared_ptr<IsobmffFileInformation> pobj, LiblcvmKeyList* pkeys,
       LiblcvmValList* pvals, bool calculate_timestamps,
       LiblcvmKeyList* pkeys_timing, LiblcvmTimingList* pvals_timing, int debug,
-      int64_t audio_track_id = -1, bool include_track_keys = false);
+      int64_t audio_track_id = -1, bool include_track_keys = false,
+      int64_t video_track_id = -1);
 
   // @brief Parse an ISOBMFF file into 2 lists.
   //

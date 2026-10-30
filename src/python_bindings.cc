@@ -113,11 +113,18 @@ PYBIND11_MODULE(liblcvm, m) {
       // Expose all getter methods
       .def("get_filename", &IsobmffFileInformation::get_filename)
       .def("get_timing", &IsobmffFileInformation::get_timing,
-           py::arg("audio_track_id") = -1)
-      .def("get_frame", &IsobmffFileInformation::get_frame)
+           py::arg("audio_track_id") = -1, py::arg("video_track_id") = -1)
+      .def("get_frame", &IsobmffFileInformation::get_frame,
+           py::arg("video_track_id") = -1)
       .def("get_audio", &IsobmffFileInformation::get_audio,
            py::arg("audio_track_id") = -1)
-      .def("get_audio_tracks", &IsobmffFileInformation::get_audio_tracks);
+      .def("get_audio_tracks", &IsobmffFileInformation::get_audio_tracks)
+      .def("get_video_track_ids", &IsobmffFileInformation::get_video_track_ids)
+      .def("get_audio_track_ids", &IsobmffFileInformation::get_audio_track_ids)
+      .def("get_num_video_tracks",
+           &IsobmffFileInformation::get_num_video_tracks)
+      .def("get_num_audio_tracks",
+           &IsobmffFileInformation::get_num_audio_tracks);
 
   // Expose the parse method as a standalone function
   m.def("parse", &IsobmffFileInformation::parse, py::arg("infile"),

@@ -67,11 +67,47 @@ AudioInformation IsobmffFileInformation::get_audio(
                           std::to_string(audio_track_id));
 }
 
+std::pair<const FrameInformation*, const TimingInformation*>
+IsobmffFileInformation::video_view(int64_t video_track_id) const {
+  if (video_track_id == -1) return {&frame, &timing};
+  if (video_track_id < 0 ||
+      static_cast<uint64_t>(video_track_id) > UINT32_MAX) {
+    throw std::out_of_range("invalid video track selector: " +
+                            std::to_string(video_track_id));
+  }
+  const auto id = static_cast<uint32_t>(video_track_id);
+  if (has_video_track && frame.get_track_id() == id) return {&frame, &timing};
+  for (const auto& track : additional_video_tracks) {
+    if (track.frame.get_track_id() == id) return {&track.frame, &track.timing};
+  }
+  throw std::out_of_range("video track ID not found: " +
+                          std::to_string(video_track_id));
+}
+
+FrameInformation IsobmffFileInformation::get_frame(
+    int64_t video_track_id) const {
+  return *video_view(video_track_id).first;
+}
+
+std::vector<uint32_t> IsobmffFileInformation::get_video_track_ids() const {
+  std::vector<uint32_t> ids;
+  if (has_video_track) ids.push_back(frame.get_track_id());
+  for (const auto& track : additional_video_tracks)
+    ids.push_back(track.frame.get_track_id());
+  return ids;
+}
+
+std::vector<uint32_t> IsobmffFileInformation::get_audio_track_ids() const {
+  std::vector<uint32_t> ids;
+  for (const auto& track : audio_tracks) ids.push_back(track.get_track_id());
+  return ids;
+}
+
 TimingInformation IsobmffFileInformation::get_timing(
-    int64_t audio_track_id) const {
-  if (audio_track_id == -1) return timing;
+    int64_t audio_track_id, int64_t video_track_id) const {
+  if (audio_track_id == -1 && video_track_id == -1) return timing;
   const auto selected = get_audio(audio_track_id);
-  auto result = timing;
+  auto result = *video_view(video_track_id).second;
   result.duration_audio_sec = selected.get_duration_sec();
   result.timescale_audio_hz = selected.get_timescale_hz();
   derive_audio_video_metrics(result.duration_video_sec,
@@ -152,68 +188,53 @@ int IsobmffFileInformation::parse_to_lists(const char* infile,
   return IsobmffFileInformation::LiblcvmConfig_to_lists(
       pobj, pkeys, pvals, calculate_timestamps, pkeys_timing, pvals_timing,
       debug, liblcvm_config.get_audio_track_id(),
-      liblcvm_config.get_include_track_keys());
+      liblcvm_config.get_include_track_keys(),
+      liblcvm_config.get_video_track_id());
 }
 
-int IsobmffFileInformation::LiblcvmConfig_to_lists(
-    std::shared_ptr<IsobmffFileInformation> pobj, LiblcvmKeyList* pkeys,
-    LiblcvmValList* pvals, bool calculate_timestamps,
-    LiblcvmKeyList* pkeys_timing, LiblcvmTimingList* pvals_timing, int debug,
-    int64_t audio_track_id, bool include_track_keys) {
-  // 0. reset outputs, including on a failed explicit selection.
-  pkeys->clear();
-  pvals->clear();
-  pkeys_timing->clear();
-  pvals_timing->clear();
-  AudioInformation selected_audio;
-  TimingInformation selected_timing;
-  try {
-    selected_audio = pobj->get_audio(audio_track_id);
-    selected_timing = pobj->get_timing(audio_track_id);
-  } catch (const std::out_of_range& error) {
-    fprintf(stderr, "error: %s\n", error.what());
-    return -1;
-  }
-
-  // 1. fill up the main keys/vals
+static void fill_base_fields(
+    const std::shared_ptr<IsobmffFileInformation>& pobj,
+    const FrameInformation& selected_frame, TimingInformation& selected_timing,
+    const AudioInformation& selected_audio, LiblcvmKeyList* pkeys,
+    LiblcvmValList* pvals, int debug) {
   pkeys->push_back("infile");
   pvals->push_back(pobj->get_filename());
   pkeys->push_back("filesize");
-  pvals->push_back(pobj->get_frame().get_filesize());
+  pvals->push_back(selected_frame.get_filesize());
   pkeys->push_back("bitrate_bps");
-  pvals->push_back(pobj->get_frame().get_bitrate_bps());
+  pvals->push_back(selected_frame.get_bitrate_bps());
   pkeys->push_back("width");
-  pvals->push_back(pobj->get_frame().get_width());
+  pvals->push_back(selected_frame.get_width());
   pkeys->push_back("height");
-  pvals->push_back(pobj->get_frame().get_height());
+  pvals->push_back(selected_frame.get_height());
   pkeys->push_back("video_codec_type");
-  pvals->push_back(std::string(pobj->get_frame().get_video_codec_type()));
+  pvals->push_back(selected_frame.get_video_codec_type());
   pkeys->push_back("horizresolution");
-  pvals->push_back(pobj->get_frame().get_horizresolution());
+  pvals->push_back(selected_frame.get_horizresolution());
   pkeys->push_back("vertresolution");
-  pvals->push_back(pobj->get_frame().get_vertresolution());
+  pvals->push_back(selected_frame.get_vertresolution());
   pkeys->push_back("depth");
-  pvals->push_back(pobj->get_frame().get_depth());
+  pvals->push_back(selected_frame.get_depth());
   pkeys->push_back("chroma_format");
-  pvals->push_back(pobj->get_frame().get_chroma_format());
+  pvals->push_back(selected_frame.get_chroma_format());
   pkeys->push_back("bit_depth_luma");
-  pvals->push_back(pobj->get_frame().get_bit_depth_luma());
+  pvals->push_back(selected_frame.get_bit_depth_luma());
   pkeys->push_back("bit_depth_chroma");
-  pvals->push_back(pobj->get_frame().get_bit_depth_chroma());
+  pvals->push_back(selected_frame.get_bit_depth_chroma());
   pkeys->push_back("video_full_range_flag");
-  pvals->push_back(pobj->get_frame().get_video_full_range_flag());
+  pvals->push_back(selected_frame.get_video_full_range_flag());
   pkeys->push_back("colour_primaries");
-  pvals->push_back(pobj->get_frame().get_colour_primaries());
+  pvals->push_back(selected_frame.get_colour_primaries());
   pkeys->push_back("transfer_characteristics");
-  pvals->push_back(pobj->get_frame().get_transfer_characteristics());
+  pvals->push_back(selected_frame.get_transfer_characteristics());
   pkeys->push_back("matrix_coeffs");
-  pvals->push_back(pobj->get_frame().get_matrix_coeffs());
+  pvals->push_back(selected_frame.get_matrix_coeffs());
   pkeys->push_back("profile_idc");
-  pvals->push_back(pobj->get_frame().get_profile_idc());
+  pvals->push_back(selected_frame.get_profile_idc());
   pkeys->push_back("level_idc");
-  pvals->push_back(pobj->get_frame().get_level_idc());
+  pvals->push_back(selected_frame.get_level_idc());
   pkeys->push_back("profile_type_str");
-  pvals->push_back(pobj->get_frame().get_profile_type_str());
+  pvals->push_back(selected_frame.get_profile_type_str());
   pkeys->push_back("num_video_frames");
   pvals->push_back(selected_timing.get_num_video_frames());
   pkeys->push_back("frame_rate_fps_median");
@@ -252,71 +273,96 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
   pvals->push_back(selected_timing.get_frame_drop_ratio());
   pkeys->push_back("normalized_frame_drop_average_length");
   pvals->push_back(selected_timing.get_normalized_frame_drop_average_length());
-
-  // Percentiles
-  std::vector<double> percentile_list = {50, 90};
-  std::vector<double> frame_drop_length_percentile_list;
-  selected_timing.calculate_percentile_list(
-      percentile_list, frame_drop_length_percentile_list, debug);
+  std::vector<double> percentiles;
+  selected_timing.calculate_percentile_list({50, 90}, percentiles, debug);
   pkeys->push_back("frame_drop_length_percentile_50");
-  pvals->push_back(frame_drop_length_percentile_list.size() > 0
-                       ? frame_drop_length_percentile_list[0]
-                       : 0.0);
+  pvals->push_back(percentiles.size() > 0 ? percentiles[0] : 0.0);
   pkeys->push_back("frame_drop_length_percentile_90");
-  pvals->push_back(frame_drop_length_percentile_list.size() > 1
-                       ? frame_drop_length_percentile_list[1]
-                       : 0.0);
-
-  // Consecutive frame drop lists
-  std::vector<int> consecutive_list = {2, 5};
-  std::vector<long int> frame_drop_length_consecutive;
-  selected_timing.calculate_consecutive_list(
-      consecutive_list, frame_drop_length_consecutive, debug);
+  pvals->push_back(percentiles.size() > 1 ? percentiles[1] : 0.0);
+  std::vector<long int> consecutive;
+  selected_timing.calculate_consecutive_list({2, 5}, consecutive, debug);
   pkeys->push_back("frame_drop_length_consecutive_2");
-  pvals->push_back(frame_drop_length_consecutive.size() > 0
-                       ? frame_drop_length_consecutive[0]
-                       : 0L);
+  pvals->push_back(consecutive.size() > 0 ? consecutive[0] : 0L);
   pkeys->push_back("frame_drop_length_consecutive_5");
-  pvals->push_back(frame_drop_length_consecutive.size() > 1
-                       ? frame_drop_length_consecutive[1]
-                       : 0L);
+  pvals->push_back(consecutive.size() > 1 ? consecutive[1] : 0L);
   pkeys->push_back("num_video_keyframes");
   pvals->push_back(selected_timing.get_num_video_keyframes());
   pkeys->push_back("key_frame_ratio");
   pvals->push_back(selected_timing.get_key_frame_ratio());
-  // audio values
   pkeys->push_back("audio_type");
-  pvals->push_back(std::string(selected_audio.get_audio_type()));
+  pvals->push_back(selected_audio.get_audio_type());
   pkeys->push_back("channel_count");
   pvals->push_back(selected_audio.get_channel_count());
   pkeys->push_back("sample_rate");
   pvals->push_back(selected_audio.get_sample_rate());
   pkeys->push_back("sample_size");
   pvals->push_back(selected_audio.get_sample_size());
+}
+
+int IsobmffFileInformation::LiblcvmConfig_to_lists(
+    std::shared_ptr<IsobmffFileInformation> pobj, LiblcvmKeyList* pkeys,
+    LiblcvmValList* pvals, bool calculate_timestamps,
+    LiblcvmKeyList* pkeys_timing, LiblcvmTimingList* pvals_timing, int debug,
+    int64_t audio_track_id, bool include_track_keys, int64_t video_track_id) {
+  // 0. reset outputs, including on a failed explicit selection.
+  pkeys->clear();
+  pvals->clear();
+  pkeys_timing->clear();
+  pvals_timing->clear();
+  AudioInformation selected_audio;
+  FrameInformation selected_frame;
+  TimingInformation selected_timing;
+  try {
+    selected_audio = pobj->get_audio(audio_track_id);
+    selected_frame = pobj->get_frame(video_track_id);
+    selected_timing = pobj->get_timing(audio_track_id, video_track_id);
+  } catch (const std::out_of_range& error) {
+    fprintf(stderr, "error: %s\n", error.what());
+    return -1;
+  }
+
+  // Preserve the existing flat key order for the selected/default view.
+  fill_base_fields(pobj, selected_frame, selected_timing, selected_audio, pkeys,
+                   pvals, debug);
 
   if (include_track_keys) {
-    // Preserve the unsuffixed schema as selected-track aliases, then append
-    // actual-ID-qualified fields. File-wide fields are never track-qualified.
+    // Fully qualified library keys remain stable regardless of cardinality.
+    // Singleton elision belongs only to the CLI presentation layer.
     const size_t base_size = pkeys->size();
     const std::vector<std::string> file_keys = {
         "infile", "filesize", "bitrate_bps", "timescale_movie_hz"};
     const std::vector<std::string> audio_keys = {
         "audio_type",  "channel_count",      "sample_rate",
         "sample_size", "duration_audio_sec", "timescale_audio_hz"};
-    const auto video_suffix =
-        "_v" + std::to_string(pobj->get_frame().get_track_id());
-    for (size_t i = 0; i < base_size; ++i) {
-      const auto key = (*pkeys)[i];
-      if (std::find(file_keys.begin(), file_keys.end(), key) !=
-              file_keys.end() ||
-          std::find(audio_keys.begin(), audio_keys.end(), key) !=
-              audio_keys.end() ||
-          key == "audio_video_ratio" || key == "video_freeze") {
-        continue;
+    const auto video_ids = pobj->get_video_track_ids();
+    for (const auto id : video_ids) {
+      LiblcvmKeyList video_keys;
+      LiblcvmValList video_values;
+      if (id == selected_frame.get_track_id()) {
+        // Reuse the original selected view rather than copy its frame arrays
+        // again.
+        video_keys.assign(pkeys->begin(),
+                          pkeys->begin() + static_cast<ptrdiff_t>(base_size));
+        video_values.assign(pvals->begin(),
+                            pvals->begin() + static_cast<ptrdiff_t>(base_size));
+      } else {
+        const auto video_frame = pobj->get_frame(id);
+        auto video_timing = pobj->get_timing(audio_track_id, id);
+        fill_base_fields(pobj, video_frame, video_timing, selected_audio,
+                         &video_keys, &video_values, debug);
       }
-      const auto value = (*pvals)[i];
-      pkeys->push_back(key + video_suffix);
-      pvals->push_back(value);
+      const auto suffix = "_v" + std::to_string(id);
+      for (size_t i = 0; i < video_keys.size(); ++i) {
+        const auto& key = video_keys[i];
+        if (std::find(file_keys.begin(), file_keys.end(), key) !=
+                file_keys.end() ||
+            std::find(audio_keys.begin(), audio_keys.end(), key) !=
+                audio_keys.end() ||
+            key == "audio_video_ratio" || key == "video_freeze")
+          continue;
+        pkeys->push_back(key + suffix);
+        pvals->push_back(video_values[i]);
+      }
     }
     const auto tracks = pobj->get_audio_tracks();
     pkeys->push_back("audio_track_id");
@@ -324,7 +370,9 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
                          ? LiblcvmValue(-1)
                          : LiblcvmValue(selected_audio.get_track_id()));
     pkeys->push_back("video_track_id");
-    pvals->push_back(pobj->get_frame().get_track_id());
+    pvals->push_back(video_ids.empty()
+                         ? LiblcvmValue(-1)
+                         : LiblcvmValue(selected_frame.get_track_id()));
     for (const auto& audio : tracks) {
       const auto suffix = "_a" + std::to_string(audio.get_track_id());
       const LiblcvmValList values = {
@@ -335,14 +383,18 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
         pkeys->push_back(audio_keys[i] + suffix);
         pvals->push_back(values[i]);
       }
-      double ratio;
-      bool freeze;
-      derive_audio_video_metrics(selected_timing.get_duration_video_sec(),
-                                 audio.get_duration_sec(), ratio, freeze);
-      pkeys->push_back("audio_video_ratio" + video_suffix + suffix);
-      pvals->push_back(ratio);
-      pkeys->push_back("video_freeze" + video_suffix + suffix);
-      pvals->push_back(freeze ? 1 : 0);
+      for (const auto video_id : video_ids) {
+        const auto& pair_timing = *pobj->video_view(video_id).second;
+        double ratio;
+        bool freeze;
+        derive_audio_video_metrics(pair_timing.get_duration_video_sec(),
+                                   audio.get_duration_sec(), ratio, freeze);
+        const auto pair = "_v" + std::to_string(video_id) + suffix;
+        pkeys->push_back("audio_video_ratio" + pair);
+        pvals->push_back(ratio);
+        pkeys->push_back("video_freeze" + pair);
+        pvals->push_back(freeze ? 1 : 0);
+      }
     }
   }
 
@@ -475,6 +527,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
   ptr->timing.duration_video_sec = -1.0;
   ptr->timing.duration_audio_sec = -1.0;
   ptr->timing.timescale_audio_hz = 0;
+  uint64_t total_video_frames = 0;
   for (auto& box : moov->GetBoxes()) {
     std::string name = box->GetName();
     if (name.compare("trak") != 0) {
@@ -526,9 +579,20 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
       fprintf(stdout, "mdhd_duration: %" PRIu64 " ", mdhd_duration);
       fprintf(stdout, "mdhd_duration_sec: %f\n", mdhd_duration_sec);
     }
+    std::shared_ptr<IsobmffFileInformation> video_ptr;
     if (handler_type.compare("vide") == 0) {
-      ptr->timing.duration_video_sec = mdhd_duration_sec;
-      ptr->timing.timescale_video_hz = timescale_track_hz;
+      video_ptr = ptr->has_video_track
+                      ? std::make_shared<IsobmffFileInformation>()
+                      : ptr;
+      video_ptr->filename = ptr->filename;
+      // Every video gets independent frame/timing state, including drop and
+      // keyframe lists. Keep the first analysis in the legacy default members.
+      video_ptr->frame = FrameInformation{};
+      video_ptr->timing = TimingInformation{};
+      video_ptr->timing.timescale_movie_hz = timescale_movie_hz;
+      video_ptr->timing.duration_audio_sec = -1.0;
+      video_ptr->timing.duration_video_sec = mdhd_duration_sec;
+      video_ptr->timing.timescale_video_hz = timescale_track_hz;
     }
 
     if (handler_type.compare("vide") != 0 &&
@@ -608,9 +672,22 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
       return nullptr;
     }
     if (handler_type.compare("vide") == 0) {
-      ptr->frame.track_id = tkhd->GetTrackID();
-      ptr->frame.width = tkhd->GetWidth();
-      ptr->frame.height = tkhd->GetHeight();
+      const auto id = tkhd->GetTrackID();
+      if (ptr->has_video_track) {
+        bool duplicate = ptr->frame.get_track_id() == id;
+        for (const auto& video : ptr->additional_video_tracks) {
+          duplicate = duplicate || video.frame.get_track_id() == id;
+        }
+        if (duplicate) {
+          if (liblcvm_config.get_debug() > 0) {
+            fprintf(stderr, "error: duplicate video track ID %u\n", id);
+          }
+          return nullptr;
+        }
+      }
+      video_ptr->frame.track_id = id;
+      video_ptr->frame.width = tkhd->GetWidth();
+      video_ptr->frame.height = tkhd->GetHeight();
     }
 
     // tkhd-based track duration
@@ -628,7 +705,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
       if (handler_type.compare("soun") == 0) {
         ptr->timing.duration_audio_sec = tkhd_duration_sec;
       } else if (handler_type.compare("vide") == 0) {
-        ptr->timing.duration_video_sec = tkhd_duration_sec;
+        video_ptr->timing.duration_video_sec = tkhd_duration_sec;
       }
     }
 
@@ -653,18 +730,22 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
 
     // 10. get video timing information
     // init timing info
-    ptr->timing.num_video_frames = 0;
-    ptr->timing.dts_sec_list.clear();
-    ptr->timing.pts_unit_list.clear();
-    ptr->timing.pts_sec_list.clear();
-    ptr->timing.stts_unit_list.clear();
-    ptr->timing.ctts_unit_list.clear();
+    video_ptr->timing.num_video_frames = 0;
+    video_ptr->timing.dts_sec_list.clear();
+    video_ptr->timing.pts_unit_list.clear();
+    video_ptr->timing.pts_sec_list.clear();
+    video_ptr->timing.stts_unit_list.clear();
+    video_ptr->timing.ctts_unit_list.clear();
     // first frame starts at 0.0
-    ptr->timing.dts_sec_list.push_back(0.0);
-    ptr->timing.pts_unit_list.push_back(0);
-    ptr->timing.pts_sec_list.push_back(0.0);
-    if (ptr->timing.parse_timing_information(
-            stbl, timescale_track_hz, liblcvm_config.get_max_num_frames(), ptr,
+    video_ptr->timing.dts_sec_list.push_back(0.0);
+    video_ptr->timing.pts_unit_list.push_back(0);
+    video_ptr->timing.pts_sec_list.push_back(0.0);
+    // max_num_frames is a FILE-wide allocation budget, not one budget per
+    // video.
+    const auto remaining = static_cast<uint32_t>(
+        liblcvm_config.get_max_num_frames() - total_video_frames);
+    if (video_ptr->timing.parse_timing_information(
+            stbl, timescale_track_hz, remaining, video_ptr,
             liblcvm_config.get_debug()) < 0) {
       if (liblcvm_config.get_debug() > 0) {
         fprintf(stderr, "error: no timing information in %s\n",
@@ -674,8 +755,8 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     }
 
     // 11. get video keyframe information
-    if (ptr->timing.parse_keyframe_information(
-            stbl, ptr, liblcvm_config.get_debug()) < 0) {
+    if (video_ptr->timing.parse_keyframe_information(
+            stbl, video_ptr, liblcvm_config.get_debug()) < 0) {
       if (liblcvm_config.get_debug() > 0) {
         fprintf(stderr, "error: no keyframe information in %s\n",
                 ptr->filename.c_str());
@@ -684,13 +765,29 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     }
 
     // 12. get video frame information
-    if (ptr->frame.parse_frame_information(stbl, ptr,
-                                           liblcvm_config.get_debug()) < 0) {
+    if (video_ptr->frame.parse_frame_information(
+            stbl, video_ptr, liblcvm_config.get_debug()) < 0) {
       if (liblcvm_config.get_debug() > 0) {
         fprintf(stderr, "error: no frame information in %s\n",
                 ptr->filename.c_str());
       }
       return nullptr;
+    }
+    if (video_ptr->timing.derive_timing_info(video_ptr,
+                                             liblcvm_config.get_sort_by_pts(),
+                                             liblcvm_config.get_debug()) < 0 ||
+        video_ptr->frame.derive_frame_info(video_ptr,
+                                           liblcvm_config.get_sort_by_pts(),
+                                           liblcvm_config.get_debug()) < 0) {
+      return nullptr;
+    }
+    total_video_frames +=
+        static_cast<uint64_t>(video_ptr->timing.num_video_frames);
+    if (!ptr->has_video_track) {
+      ptr->has_video_track = true;
+    } else {
+      ptr->additional_video_tracks.push_back(
+          {std::move(video_ptr->frame), std::move(video_ptr->timing)});
     }
   }
 
@@ -702,24 +799,20 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     ptr->timing.timescale_audio_hz = ptr->audio.get_timescale_hz();
   }
 
-  // 13. derive timing info
-  if (ptr->timing.derive_timing_info(ptr, liblcvm_config.get_sort_by_pts(),
+  // For files without video, preserve the legacy empty/default analysis.
+  if (!ptr->has_video_track) {
+    if (ptr->timing.derive_timing_info(ptr, liblcvm_config.get_sort_by_pts(),
+                                       liblcvm_config.get_debug()) < 0 ||
+        ptr->frame.derive_frame_info(ptr, liblcvm_config.get_sort_by_pts(),
                                      liblcvm_config.get_debug()) < 0) {
-    if (liblcvm_config.get_debug() > 0) {
-      fprintf(stderr, "error: cannot derive timing information in %s\n",
-              ptr->filename.c_str());
+      return nullptr;
     }
-    return nullptr;
-  }
-
-  // 14. derive frame info
-  if (ptr->frame.derive_frame_info(ptr, liblcvm_config.get_sort_by_pts(),
-                                   liblcvm_config.get_debug()) < 0) {
-    if (liblcvm_config.get_debug() > 0) {
-      fprintf(stderr, "error: cannot derive frame information in %s\n",
-              ptr->filename.c_str());
-    }
-    return nullptr;
+  } else {
+    // Video-derived lists are already finalized independently. Only refresh
+    // the first/default AV relationship after all audio records are known.
+    derive_audio_video_metrics(
+        ptr->timing.duration_video_sec, ptr->timing.duration_audio_sec,
+        ptr->timing.audio_video_ratio, ptr->timing.video_freeze);
   }
 
   return ptr;
