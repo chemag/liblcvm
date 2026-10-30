@@ -307,22 +307,60 @@ TEST(LiblcvmMultiAudioTest, MdhdFallbackPreservedForEverySelectedTrack) {
   EXPECT_DOUBLE_EQ(5.0, file->get_timing(23).get_duration_audio_sec());
 }
 
-TEST(LiblcvmMultiAudioCliTest, DefaultsAndExplicitSelection) {
+TEST(LiblcvmMultiAudioCliTest, QualifiedOutputHasNoTrackAliases) {
   auto result = Cli({"multi_audio_max_id.mp4"});
   ASSERT_EQ(0, result.status);
   auto rows = Rows(result.output);
   ASSERT_EQ(1u, rows.size());
-  EXPECT_EQ("ec-3", rows[0]["audio_type"]);
-  EXPECT_EQ("mp4a", rows[0]["audio_type_a23"]);
+  const auto first = rows[0];
+  const auto library = Fields(Parse("multi_audio_max_id.mp4"));
+  const std::set<std::string> file_keys = {
+      "infile",         "filesize",  "bitrate_bps", "timescale_movie_hz",
+      "policy_version", "warn_list", "error_list"};
+  for (const auto& entry : library) {
+    const auto suffix = entry.first.find_last_not_of("0123456789");
+    const bool qualified =
+        suffix != std::string::npos && suffix > 0 &&
+        suffix + 1 < entry.first.size() && entry.first[suffix - 1] == '_' &&
+        (entry.first[suffix] == 'a' || entry.first[suffix] == 'v');
+    if (qualified || file_keys.count(entry.first)) {
+      ASSERT_NE(0u, first.count(entry.first)) << entry.first;
+      EXPECT_EQ(Text(entry.second), first.at(entry.first)) << entry.first;
+    } else {
+      EXPECT_EQ(0u, first.count(entry.first)) << entry.first;
+    }
+  }
+  EXPECT_EQ("ec-3", first.at("audio_type_a4294967295"));
+  EXPECT_EQ("mp4a", first.at("audio_type_a23"));
+  EXPECT_EQ(0u, first.count("audio_track_id"));
+  EXPECT_EQ(0u, first.count("video_track_id"));
   result = Cli({"multi_audio_max_id.mp4"}, "--audio-track-id 23");
   ASSERT_EQ(0, result.status);
   rows = Rows(result.output);
   ASSERT_EQ(1u, rows.size());
-  EXPECT_EQ("mp4a", rows[0]["audio_type"]);
-  EXPECT_EQ("44100", rows[0]["sample_rate"]);
-  EXPECT_EQ("ec-3", rows[0]["audio_type_a4294967295"]);
-  EXPECT_EQ("1", rows[0]["video_freeze_v1_a4294967295"]);
-  EXPECT_EQ("0", rows[0]["video_freeze_v1_a23"]);
+  EXPECT_EQ(first, rows[0]);  // Selection never hides qualified track results.
+  EXPECT_EQ("1", rows[0].at("video_freeze_v1_a4294967295"));
+  EXPECT_EQ("0", rows[0].at("video_freeze_v1_a23"));
+}
+
+TEST(LiblcvmMultiAudioCliTest, NoAudioAndSkippedAudioHaveNoUnqualifiedAliases) {
+  for (const auto& name :
+       {"multi_audio_no_audio.mp4", "multi_audio_max_id.mp4"}) {
+    auto result = Cli({name}, "--skip-audio-parsing");
+    ASSERT_EQ(0, result.status);
+    auto rows = Rows(result.output);
+    ASSERT_EQ(1u, rows.size());
+    for (const auto& key :
+         {"audio_type", "sample_rate", "sample_size", "channel_count",
+          "duration_audio_sec", "timescale_audio_hz", "audio_video_ratio",
+          "video_freeze", "video_codec_type", "chroma_format",
+          "duration_video_sec", "audio_track_id", "video_track_id"}) {
+      EXPECT_EQ(0u, rows[0].count(key)) << key;
+    }
+    EXPECT_NE(0u, rows[0].count("infile"));
+    EXPECT_NE(0u, rows[0].count("timescale_movie_hz"));
+    EXPECT_NE(0u, rows[0].count("chroma_format_v1"));
+  }
 }
 
 TEST(LiblcvmMultiAudioCliTest, BatchUnionHeaderKeepsRowsAligned) {
@@ -383,6 +421,6 @@ TEST(LiblcvmMultiAudioCliTest, PartialFailuresDoNotMisalignSuccessfulRows) {
   EXPECT_NE(0, result.status);
   auto rows = Rows(result.output);
   ASSERT_EQ(2u, rows.size());
-  EXPECT_EQ("ec-3", rows[0]["audio_type"]);
-  EXPECT_EQ("", rows[1]["audio_type_a4294967295"]);
+  EXPECT_EQ("ec-3", rows[0].at("audio_type_a4294967295"));
+  EXPECT_EQ("", rows[1].at("audio_type_a4294967295"));
 }

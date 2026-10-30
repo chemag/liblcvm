@@ -102,6 +102,11 @@ int parse_files(std::vector<std::string>& infile_list, char* outfile,
   // union header before emitting rows; absent fields are empty, not fabricated.
   LiblcvmKeyList csv_keys;
   std::set<std::string> seen_csv_keys;
+  // The library keeps selected-track aliases for API/policy compatibility.
+  // CLI CSV publishes only qualified track fields and file-wide metadata.
+  const std::set<std::string> file_keys = {
+      "infile",         "filesize",  "bitrate_bps", "timescale_movie_hz",
+      "policy_version", "warn_list", "error_list"};
   std::vector<std::map<std::string, std::string>> csv_rows;
   LiblcvmKeyList keys_timing;
   std::map<std::string, LiblcvmTimingList> vals_timing_map;
@@ -122,10 +127,17 @@ int parse_files(std::vector<std::string>& infile_list, char* outfile,
     }
     std::map<std::string, std::string> row;
     for (size_t i = 0; i < keys.size(); ++i) {
-      if (seen_csv_keys.insert(keys[i]).second) csv_keys.push_back(keys[i]);
+      const auto& key = keys[i];
+      const auto suffix = key.find_last_not_of("0123456789");
+      const bool qualified = suffix != std::string::npos && suffix > 0 &&
+                             suffix + 1 < key.size() &&
+                             key[suffix - 1] == '_' &&
+                             (key[suffix] == 'a' || key[suffix] == 'v');
+      if (!qualified && file_keys.count(key) == 0) continue;
+      if (seen_csv_keys.insert(key).second) csv_keys.push_back(key);
       std::string value;
       if (liblcvmvalue_to_string(vals[i], &value) != 0) value = "ERROR";
-      row.emplace(keys[i], std::move(value));
+      row.emplace(key, std::move(value));
     }
     csv_rows.push_back(std::move(row));
 
@@ -246,11 +258,11 @@ void usage(char* name) {
           "[%u]\n",
           DEFAULT_OPTIONS.max_num_frames);
   fprintf(stderr,
-          "\t--audio-track-id <id>:\tSelect unsuffixed audio/AV aliases; "
+          "\t--audio-track-id <id>:\tSelect audio for policy/default view; "
           "-1 selects the first audio track (default)\n");
   fprintf(stderr,
-          "\tCSV includes _a<ID>, _v<ID>, and _v<ID>_a<ID> fields "
-          "plus unsuffixed aliases\n");
+          "\tCSV contains file-wide metadata and _a<ID>, _v<ID>, "
+          "_v<ID>_a<ID> track fields; no unsuffixed track aliases\n");
   fprintf(stderr, "\t-h:\t\tHelp\n");
   exit(-1);
 }
