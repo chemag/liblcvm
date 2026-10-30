@@ -55,3 +55,10 @@ foreach(test_file IN LISTS TEST_FILES)
   get_filename_component(test_name ${test_file} NAME_WE)
   add_liblcvm_test(${test_name})
 endforeach()
+
+# The multi-audio regressions exercise the CLI's union-header serialization too.
+if(TARGET liblcvm_multi_audio_unittest)
+  target_compile_definitions(liblcvm_multi_audio_unittest PRIVATE
+    LCVM_TOOL_PATH="$<TARGET_FILE:lcvm>")
+  add_dependencies(liblcvm_multi_audio_unittest lcvm)
+endif()

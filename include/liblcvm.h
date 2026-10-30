@@ -178,17 +178,24 @@ class AudioInformation {
   double mdhd_duration_sec = -1.0;
   double duration_sec = -1.0;
 
+  int parse_sample_entry(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
+                         const std::string& filename, int debug);
+
  public:
   DECL_GETTER(audio_type, std::string)
   DECL_GETTER(channel_count, int)
   DECL_GETTER(sample_rate, int)
   DECL_GETTER(sample_size, int)
+  // Track identity and durations are retained even when codec parsing is
+  // skipped.
   DECL_GETTER(eac3_configuration, std::shared_ptr<const ISOBMFF::DEC3>)
   DECL_GETTER(track_id, uint32_t)
   DECL_GETTER(timescale_hz, uint32_t)
   DECL_GETTER(mdhd_duration_sec, double)
   DECL_GETTER(duration_sec, double)
 
+  // Refresh the owner's first/default audio metadata. Registered track IDs
+  // and durations are preserved, and the per-track/default views stay aligned.
   int parse_audio_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
                               std::shared_ptr<IsobmffFileInformation> ptr,
                               int debug);
@@ -197,6 +204,8 @@ class AudioInformation {
 
 class FrameInformation {
  private:
+  // track_id: Stored tkhd ID of the analyzed video track, not its index.
+  uint32_t track_id = 0;
   // filesize: Video file size (bytes).
   int filesize;
   // bitrate_bps: Video bitrate (bps).
@@ -244,6 +253,7 @@ class FrameInformation {
   void parse_avcc(std::shared_ptr<ISOBMFF::AVCC> avcc, int debug);
 
  public:
+  DECL_GETTER(track_id, uint32_t)
   DECL_GETTER(filesize, int)
   DECL_GETTER(bitrate_bps, double)
   DECL_GETTER(width, double)
@@ -303,6 +313,13 @@ class LiblcvmConfig {
   // can otherwise declare billions of frames and exhaust memory. Files
   // declaring more frames fail to parse.
   uint32_t max_num_frames;
+  // Export selection: -1 means the first audio track in container order.
+  // Explicit IDs are stored uint32 tkhd values, represented without narrowing.
+  int64_t audio_track_id = -1;
+  // Expanded exports add typed per-track keys alongside the unsuffixed aliases.
+  // Default OFF preserves the existing library export schema; the CLI enables
+  // it.
+  bool include_track_keys = false;
   // policy: Warn/Error policy.
   std::string policy;
   // debug: Debug level.
@@ -329,6 +346,10 @@ class LiblcvmConfig {
   DECL_SETTER(skip_audio_parsing, bool)
   DECL_GETTER(max_num_frames, uint32_t)
   DECL_SETTER(max_num_frames, uint32_t)
+  DECL_GETTER(audio_track_id, int64_t)
+  DECL_SETTER(audio_track_id, int64_t)
+  DECL_GETTER(include_track_keys, bool)
+  DECL_SETTER(include_track_keys, bool)
   DECL_GETTER(policy, std::string)
   DECL_SETTER(policy, std::string)
   DECL_GETTER(debug, int)
@@ -344,17 +365,21 @@ class IsobmffFileInformation {
   TimingInformation timing;
   FrameInformation frame;
   AudioInformation audio;
-  // Retain every fully parsed audio track in container order. Legacy audio
-  // and timing accessors still describe the last audio track; this list does
-  // not select a different track for AV ratio, freeze, or app policy.
+  // Keep all audio tracks in container order. The default audio/timing view
+  // uses the FIRST audio track, independently of its stored tkhd ID.
   std::vector<AudioInformation> audio_tracks;
 
  public:
   DECL_GETTER(filename, std::string)
   DECL_GETTER(policy, std::string)
-  DECL_GETTER(timing, TimingInformation)
+  // -1 selects the first audio track. No audio with -1 returns the legacy
+  // empty/default audio view; an invalid explicit selector throws out_of_range.
+  // The int64_t selector can represent -1 and every uint32 tkhd ID.
+  AudioInformation get_audio(int64_t audio_track_id = -1) const;
+  // Video timing is unchanged; audio duration, timescale, AV ratio, and freeze
+  // are derived consistently for the selected audio track.
+  TimingInformation get_timing(int64_t audio_track_id = -1) const;
   DECL_GETTER(frame, FrameInformation)
-  DECL_GETTER(audio, AudioInformation)
   DECL_GETTER(audio_tracks, std::vector<AudioInformation>)
 
   // @brief Get the library version.
@@ -383,7 +408,8 @@ class IsobmffFileInformation {
   static int LiblcvmConfig_to_lists(
       std::shared_ptr<IsobmffFileInformation> pobj, LiblcvmKeyList* pkeys,
       LiblcvmValList* pvals, bool calculate_timestamps,
-      LiblcvmKeyList* pkeys_timing, LiblcvmTimingList* pvals_timing, int debug);
+      LiblcvmKeyList* pkeys_timing, LiblcvmTimingList* pvals_timing, int debug,
+      int64_t audio_track_id = -1, bool include_track_keys = false);
 
   // @brief Parse an ISOBMFF file into 2 lists.
   //

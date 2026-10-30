@@ -11,7 +11,8 @@ namespace py = pybind11;
 
 // Define the macro to bind frame getters
 #define FRAME_GETTERS(class_name)                                     \
-  .def("get_filesize", &class_name::get_filesize)                     \
+  .def("get_track_id", &class_name::get_track_id)                     \
+      .def("get_filesize", &class_name::get_filesize)                 \
       .def("get_bitrate_bps", &class_name::get_bitrate_bps)           \
       .def("get_width", &class_name::get_width)                       \
       .def("get_height", &class_name::get_height)                     \
@@ -92,11 +93,15 @@ namespace py = pybind11;
       .def("get_pts_framerate_list", &class_name::get_pts_framerate_list)
 
 // Define the macro to bind audio getters
-#define AUDIO_GETTERS(class_name)                               \
-  .def("get_audio_type", &class_name::get_audio_type)           \
-      .def("get_channel_count", &class_name::get_channel_count) \
-      .def("get_sample_rate", &class_name::get_sample_rate)     \
-      .def("get_sample_size", &class_name::get_sample_size)
+#define AUDIO_GETTERS(class_name)                                       \
+  .def("get_audio_type", &class_name::get_audio_type)                   \
+      .def("get_channel_count", &class_name::get_channel_count)         \
+      .def("get_sample_rate", &class_name::get_sample_rate)             \
+      .def("get_sample_size", &class_name::get_sample_size)             \
+      .def("get_track_id", &class_name::get_track_id)                   \
+      .def("get_duration_sec", &class_name::get_duration_sec)           \
+      .def("get_mdhd_duration_sec", &class_name::get_mdhd_duration_sec) \
+      .def("get_timescale_hz", &class_name::get_timescale_hz)
 
 PYBIND11_MODULE(liblcvm, m) {
   m.doc() = "Pybind11 interface for liblcvm shared library";
@@ -107,9 +112,12 @@ PYBIND11_MODULE(liblcvm, m) {
       .def(py::init<>())
       // Expose all getter methods
       .def("get_filename", &IsobmffFileInformation::get_filename)
-      .def("get_timing", &IsobmffFileInformation::get_timing)
+      .def("get_timing", &IsobmffFileInformation::get_timing,
+           py::arg("audio_track_id") = -1)
       .def("get_frame", &IsobmffFileInformation::get_frame)
-      .def("get_audio", &IsobmffFileInformation::get_audio);
+      .def("get_audio", &IsobmffFileInformation::get_audio,
+           py::arg("audio_track_id") = -1)
+      .def("get_audio_tracks", &IsobmffFileInformation::get_audio_tracks);
 
   // Expose the parse method as a standalone function
   m.def("parse", &IsobmffFileInformation::parse, py::arg("infile"),

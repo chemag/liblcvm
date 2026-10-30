@@ -26,6 +26,7 @@
 #include <memory>       // for shared_ptr, operator==, __shared...
 #include <numeric>      // for accumulate
 #include <sstream>      // for ostringstream
+#include <stdexcept>    // for out_of_range
 #include <string>       // for basic_string, string
 #include <vector>       // for vector
 
@@ -36,6 +37,48 @@
 #endif
 
 #define MAX_AUDIO_VIDEO_RATIO 1.05
+
+// The existing duration-mismatch heuristic, shared by default and selected
+// audio views. This is not pixel-based freeze detection.
+static void derive_audio_video_metrics(double video_sec, double audio_sec,
+                                       double& ratio, bool& freeze) {
+  ratio = -1.0;
+  freeze = false;
+  if (video_sec != -1.0 && audio_sec != -1.0 && video_sec >= 2.0) {
+    ratio = audio_sec / video_sec;
+    freeze = ratio > MAX_AUDIO_VIDEO_RATIO;
+  }
+}
+
+AudioInformation IsobmffFileInformation::get_audio(
+    int64_t audio_track_id) const {
+  if (audio_track_id == -1) return audio;
+  if (audio_track_id < 0 ||
+      static_cast<uint64_t>(audio_track_id) > UINT32_MAX) {
+    throw std::out_of_range("invalid audio track selector: " +
+                            std::to_string(audio_track_id));
+  }
+  for (const auto& track : audio_tracks) {
+    if (track.get_track_id() == static_cast<uint32_t>(audio_track_id)) {
+      return track;
+    }
+  }
+  throw std::out_of_range("audio track ID not found: " +
+                          std::to_string(audio_track_id));
+}
+
+TimingInformation IsobmffFileInformation::get_timing(
+    int64_t audio_track_id) const {
+  if (audio_track_id == -1) return timing;
+  const auto selected = get_audio(audio_track_id);
+  auto result = timing;
+  result.duration_audio_sec = selected.get_duration_sec();
+  result.timescale_audio_hz = selected.get_timescale_hz();
+  derive_audio_video_metrics(result.duration_video_sec,
+                             result.duration_audio_sec,
+                             result.audio_video_ratio, result.video_freeze);
+  return result;
+}
 
 void IsobmffFileInformation::get_liblcvm_version(std::string& version) {
   version = PROJECT_VER;
@@ -108,18 +151,29 @@ int IsobmffFileInformation::parse_to_lists(const char* infile,
   int debug = liblcvm_config.get_debug();
   return IsobmffFileInformation::LiblcvmConfig_to_lists(
       pobj, pkeys, pvals, calculate_timestamps, pkeys_timing, pvals_timing,
-      debug);
+      debug, liblcvm_config.get_audio_track_id(),
+      liblcvm_config.get_include_track_keys());
 }
 
 int IsobmffFileInformation::LiblcvmConfig_to_lists(
     std::shared_ptr<IsobmffFileInformation> pobj, LiblcvmKeyList* pkeys,
     LiblcvmValList* pvals, bool calculate_timestamps,
-    LiblcvmKeyList* pkeys_timing, LiblcvmTimingList* pvals_timing, int debug) {
-  // 0. reset all vectors
+    LiblcvmKeyList* pkeys_timing, LiblcvmTimingList* pvals_timing, int debug,
+    int64_t audio_track_id, bool include_track_keys) {
+  // 0. reset outputs, including on a failed explicit selection.
   pkeys->clear();
   pvals->clear();
   pkeys_timing->clear();
   pvals_timing->clear();
+  AudioInformation selected_audio;
+  TimingInformation selected_timing;
+  try {
+    selected_audio = pobj->get_audio(audio_track_id);
+    selected_timing = pobj->get_timing(audio_track_id);
+  } catch (const std::out_of_range& error) {
+    fprintf(stderr, "error: %s\n", error.what());
+    return -1;
+  }
 
   // 1. fill up the main keys/vals
   pkeys->push_back("infile");
@@ -161,49 +215,48 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
   pkeys->push_back("profile_type_str");
   pvals->push_back(pobj->get_frame().get_profile_type_str());
   pkeys->push_back("num_video_frames");
-  pvals->push_back(pobj->get_timing().get_num_video_frames());
+  pvals->push_back(selected_timing.get_num_video_frames());
   pkeys->push_back("frame_rate_fps_median");
-  pvals->push_back(pobj->get_timing().get_frame_rate_fps_median());
+  pvals->push_back(selected_timing.get_frame_rate_fps_median());
   pkeys->push_back("frame_rate_fps_average");
-  pvals->push_back(pobj->get_timing().get_frame_rate_fps_average());
+  pvals->push_back(selected_timing.get_frame_rate_fps_average());
   pkeys->push_back("frame_rate_fps_reverse_average");
-  pvals->push_back(pobj->get_timing().get_frame_rate_fps_reverse_average());
+  pvals->push_back(selected_timing.get_frame_rate_fps_reverse_average());
   pkeys->push_back("frame_rate_fps_stddev");
-  pvals->push_back(pobj->get_timing().get_frame_rate_fps_stddev());
+  pvals->push_back(selected_timing.get_frame_rate_fps_stddev());
   pkeys->push_back("video_freeze");
-  pvals->push_back(pobj->get_timing().get_video_freeze() ? 1 : 0);
+  pvals->push_back(selected_timing.get_video_freeze() ? 1 : 0);
   pkeys->push_back("audio_video_ratio");
-  pvals->push_back(pobj->get_timing().get_audio_video_ratio());
+  pvals->push_back(selected_timing.get_audio_video_ratio());
   pkeys->push_back("duration_video_sec");
-  pvals->push_back(pobj->get_timing().get_duration_video_sec());
+  pvals->push_back(selected_timing.get_duration_video_sec());
   pkeys->push_back("duration_audio_sec");
-  pvals->push_back(pobj->get_timing().get_duration_audio_sec());
+  pvals->push_back(selected_timing.get_duration_audio_sec());
   pkeys->push_back("timescale_movie_hz");
-  pvals->push_back(pobj->get_timing().get_timescale_movie_hz());
+  pvals->push_back(selected_timing.get_timescale_movie_hz());
   pkeys->push_back("timescale_video_hz");
-  pvals->push_back(pobj->get_timing().get_timescale_video_hz());
+  pvals->push_back(selected_timing.get_timescale_video_hz());
   pkeys->push_back("timescale_audio_hz");
-  pvals->push_back(pobj->get_timing().get_timescale_audio_hz());
+  pvals->push_back(selected_timing.get_timescale_audio_hz());
   pkeys->push_back("pts_duration_sec_average");
-  pvals->push_back(pobj->get_timing().get_pts_duration_sec_average());
+  pvals->push_back(selected_timing.get_pts_duration_sec_average());
   pkeys->push_back("pts_duration_sec_median");
-  pvals->push_back(pobj->get_timing().get_pts_duration_sec_median());
+  pvals->push_back(selected_timing.get_pts_duration_sec_median());
   pkeys->push_back("pts_duration_sec_stddev");
-  pvals->push_back(pobj->get_timing().get_pts_duration_sec_stddev());
+  pvals->push_back(selected_timing.get_pts_duration_sec_stddev());
   pkeys->push_back("pts_duration_sec_mad");
-  pvals->push_back(pobj->get_timing().get_pts_duration_sec_mad());
+  pvals->push_back(selected_timing.get_pts_duration_sec_mad());
   pkeys->push_back("frame_drop_count");
-  pvals->push_back(pobj->get_timing().get_frame_drop_count());
+  pvals->push_back(selected_timing.get_frame_drop_count());
   pkeys->push_back("frame_drop_ratio");
-  pvals->push_back(pobj->get_timing().get_frame_drop_ratio());
+  pvals->push_back(selected_timing.get_frame_drop_ratio());
   pkeys->push_back("normalized_frame_drop_average_length");
-  pvals->push_back(
-      pobj->get_timing().get_normalized_frame_drop_average_length());
+  pvals->push_back(selected_timing.get_normalized_frame_drop_average_length());
 
   // Percentiles
   std::vector<double> percentile_list = {50, 90};
   std::vector<double> frame_drop_length_percentile_list;
-  pobj->get_timing().calculate_percentile_list(
+  selected_timing.calculate_percentile_list(
       percentile_list, frame_drop_length_percentile_list, debug);
   pkeys->push_back("frame_drop_length_percentile_50");
   pvals->push_back(frame_drop_length_percentile_list.size() > 0
@@ -217,7 +270,7 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
   // Consecutive frame drop lists
   std::vector<int> consecutive_list = {2, 5};
   std::vector<long int> frame_drop_length_consecutive;
-  pobj->get_timing().calculate_consecutive_list(
+  selected_timing.calculate_consecutive_list(
       consecutive_list, frame_drop_length_consecutive, debug);
   pkeys->push_back("frame_drop_length_consecutive_2");
   pvals->push_back(frame_drop_length_consecutive.size() > 0
@@ -228,18 +281,70 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
                        ? frame_drop_length_consecutive[1]
                        : 0L);
   pkeys->push_back("num_video_keyframes");
-  pvals->push_back(pobj->get_timing().get_num_video_keyframes());
+  pvals->push_back(selected_timing.get_num_video_keyframes());
   pkeys->push_back("key_frame_ratio");
-  pvals->push_back(pobj->get_timing().get_key_frame_ratio());
+  pvals->push_back(selected_timing.get_key_frame_ratio());
   // audio values
   pkeys->push_back("audio_type");
-  pvals->push_back(std::string(pobj->get_audio().get_audio_type()));
+  pvals->push_back(std::string(selected_audio.get_audio_type()));
   pkeys->push_back("channel_count");
-  pvals->push_back(pobj->get_audio().get_channel_count());
+  pvals->push_back(selected_audio.get_channel_count());
   pkeys->push_back("sample_rate");
-  pvals->push_back(pobj->get_audio().get_sample_rate());
+  pvals->push_back(selected_audio.get_sample_rate());
   pkeys->push_back("sample_size");
-  pvals->push_back(pobj->get_audio().get_sample_size());
+  pvals->push_back(selected_audio.get_sample_size());
+
+  if (include_track_keys) {
+    // Preserve the unsuffixed schema as selected-track aliases, then append
+    // actual-ID-qualified fields. File-wide fields are never track-qualified.
+    const size_t base_size = pkeys->size();
+    const std::vector<std::string> file_keys = {
+        "infile", "filesize", "bitrate_bps", "timescale_movie_hz"};
+    const std::vector<std::string> audio_keys = {
+        "audio_type",  "channel_count",      "sample_rate",
+        "sample_size", "duration_audio_sec", "timescale_audio_hz"};
+    const auto video_suffix =
+        "_v" + std::to_string(pobj->get_frame().get_track_id());
+    for (size_t i = 0; i < base_size; ++i) {
+      const auto key = (*pkeys)[i];
+      if (std::find(file_keys.begin(), file_keys.end(), key) !=
+              file_keys.end() ||
+          std::find(audio_keys.begin(), audio_keys.end(), key) !=
+              audio_keys.end() ||
+          key == "audio_video_ratio" || key == "video_freeze") {
+        continue;
+      }
+      const auto value = (*pvals)[i];
+      pkeys->push_back(key + video_suffix);
+      pvals->push_back(value);
+    }
+    const auto tracks = pobj->get_audio_tracks();
+    pkeys->push_back("audio_track_id");
+    pvals->push_back(tracks.empty()
+                         ? LiblcvmValue(-1)
+                         : LiblcvmValue(selected_audio.get_track_id()));
+    pkeys->push_back("video_track_id");
+    pvals->push_back(pobj->get_frame().get_track_id());
+    for (const auto& audio : tracks) {
+      const auto suffix = "_a" + std::to_string(audio.get_track_id());
+      const LiblcvmValList values = {
+          audio.get_audio_type(),   audio.get_channel_count(),
+          audio.get_sample_rate(),  audio.get_sample_size(),
+          audio.get_duration_sec(), audio.get_timescale_hz()};
+      for (size_t i = 0; i < audio_keys.size(); ++i) {
+        pkeys->push_back(audio_keys[i] + suffix);
+        pvals->push_back(values[i]);
+      }
+      double ratio;
+      bool freeze;
+      derive_audio_video_metrics(selected_timing.get_duration_video_sec(),
+                                 audio.get_duration_sec(), ratio, freeze);
+      pkeys->push_back("audio_video_ratio" + video_suffix + suffix);
+      pvals->push_back(ratio);
+      pkeys->push_back("video_freeze" + video_suffix + suffix);
+      pvals->push_back(freeze ? 1 : 0);
+    }
+  }
 
   // 2. run the policy
 #if ADD_POLICY
@@ -281,19 +386,17 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
          "pts_duration_delta", "pts_framerate"});
 
     std::vector<uint32_t> frame_num_orig_list =
-        pobj->get_timing().get_frame_num_orig_list();
-    std::vector<uint32_t> stts_unit_list =
-        pobj->get_timing().get_stts_unit_list();
-    std::vector<int32_t> ctts_unit_list =
-        pobj->get_timing().get_ctts_unit_list();
-    std::vector<double> dts_sec_list = pobj->get_timing().get_dts_sec_list();
-    std::vector<double> pts_sec_list = pobj->get_timing().get_pts_sec_list();
+        selected_timing.get_frame_num_orig_list();
+    std::vector<uint32_t> stts_unit_list = selected_timing.get_stts_unit_list();
+    std::vector<int32_t> ctts_unit_list = selected_timing.get_ctts_unit_list();
+    std::vector<double> dts_sec_list = selected_timing.get_dts_sec_list();
+    std::vector<double> pts_sec_list = selected_timing.get_pts_sec_list();
     std::vector<double> pts_duration_sec_list =
-        pobj->get_timing().get_pts_duration_sec_list();
+        selected_timing.get_pts_duration_sec_list();
     std::vector<double> pts_duration_delta_sec_list =
-        pobj->get_timing().get_pts_duration_delta_sec_list();
+        selected_timing.get_pts_duration_delta_sec_list();
     std::vector<double> pts_framerate_list =
-        pobj->get_timing().get_pts_framerate_list();
+        selected_timing.get_pts_framerate_list();
     // zip them
     size_t n = frame_num_orig_list.size();
     pvals_timing->reserve(n);
@@ -371,6 +474,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
   // 4. look for trak container boxes
   ptr->timing.duration_video_sec = -1.0;
   ptr->timing.duration_audio_sec = -1.0;
+  ptr->timing.timescale_audio_hz = 0;
   for (auto& box : moov->GetBoxes()) {
     std::string name = box->GetName();
     if (name.compare("trak") != 0) {
@@ -422,10 +526,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
       fprintf(stdout, "mdhd_duration: %" PRIu64 " ", mdhd_duration);
       fprintf(stdout, "mdhd_duration_sec: %f\n", mdhd_duration_sec);
     }
-    if (handler_type.compare("soun") == 0) {
-      ptr->timing.duration_audio_sec = mdhd_duration_sec;
-      ptr->timing.timescale_audio_hz = timescale_track_hz;
-    } else if (handler_type.compare("vide") == 0) {
+    if (handler_type.compare("vide") == 0) {
       ptr->timing.duration_video_sec = mdhd_duration_sec;
       ptr->timing.timescale_video_hz = timescale_track_hz;
     }
@@ -438,6 +539,24 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     // audio duration is already set: skip the audio sample entry if requested
     if (handler_type.compare("soun") == 0 &&
         liblcvm_config.get_skip_audio_parsing()) {
+      auto tkhd = trak->GetTypedBox<ISOBMFF::TKHD>("tkhd");
+      if (!tkhd) return nullptr;
+      AudioInformation skipped;
+      skipped.track_id = tkhd->GetTrackID();
+      skipped.timescale_hz = timescale_track_hz;
+      skipped.mdhd_duration_sec = mdhd_duration_sec;
+      // Preserve the skip option's mdhd-only duration semantics.
+      skipped.duration_sec = mdhd_duration_sec;
+      for (const auto& audio : ptr->audio_tracks) {
+        if (audio.get_track_id() == skipped.track_id) {
+          if (liblcvm_config.get_debug() > 0) {
+            fprintf(stderr, "error: duplicate audio track ID %u\n",
+                    skipped.track_id);
+          }
+          return nullptr;
+        }
+      }
+      ptr->audio_tracks.push_back(skipped);
       continue;
     }
 
@@ -465,14 +584,17 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
 
     // stbl-based audio processing
     if (handler_type.compare("soun") == 0) {
-      if (ptr->audio.parse_audio_information(stbl, ptr,
-                                             liblcvm_config.get_debug()) < 0) {
+      if (ptr->audio.parse_sample_entry(stbl, ptr->filename,
+                                        liblcvm_config.get_debug()) < 0) {
         if (liblcvm_config.get_debug() > 0) {
           fprintf(stderr, "error: in getting audio information in %s\n",
                   ptr->filename.c_str());
         }
         return nullptr;
       }
+      // Preserve mdhd fallback when movie timescale is unavailable.
+      ptr->timing.duration_audio_sec = mdhd_duration_sec;
+      ptr->timing.timescale_audio_hz = timescale_track_hz;
     }
 
     // 9. look for a tkhd box
@@ -486,6 +608,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
       return nullptr;
     }
     if (handler_type.compare("vide") == 0) {
+      ptr->frame.track_id = tkhd->GetTrackID();
       ptr->frame.width = tkhd->GetWidth();
       ptr->frame.height = tkhd->GetHeight();
     }
@@ -509,13 +632,21 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
       }
     }
 
-    // Retain per-track metadata without changing the legacy last-track
-    // duration/codec selection or deriving app acceptance from codec support.
+    // Retain every audio record before choosing the first-track default.
     if (handler_type.compare("soun") == 0) {
       ptr->audio.track_id = tkhd->GetTrackID();
       ptr->audio.timescale_hz = timescale_track_hz;
       ptr->audio.mdhd_duration_sec = mdhd_duration_sec;
       ptr->audio.duration_sec = ptr->timing.duration_audio_sec;
+      for (const auto& audio : ptr->audio_tracks) {
+        if (audio.get_track_id() == ptr->audio.track_id) {
+          if (liblcvm_config.get_debug() > 0) {
+            fprintf(stderr, "error: duplicate audio track ID %u\n",
+                    ptr->audio.track_id);
+          }
+          return nullptr;
+        }
+      }
       ptr->audio_tracks.push_back(ptr->audio);
       continue;
     }
@@ -561,6 +692,14 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
       }
       return nullptr;
     }
+  }
+
+  // Choose the first audio record in container order, not the lowest tkhd ID.
+  // This intentionally replaces the previous last-audio default.
+  if (!ptr->audio_tracks.empty()) {
+    ptr->audio = ptr->audio_tracks.front();
+    ptr->timing.duration_audio_sec = ptr->audio.get_duration_sec();
+    ptr->timing.timescale_audio_hz = ptr->audio.get_timescale_hz();
   }
 
   // 13. derive timing info
@@ -930,17 +1069,9 @@ int TimingInformation::derive_timing_info(
                                     : 0.0;
 
   // 5. audio/video ratio and video freeze info
-  // use a default invalid value for audio video ratio
-  ptr->timing.audio_video_ratio = -1.0;
-  ptr->timing.video_freeze = false;
-  if ((ptr->timing.duration_video_sec != -1.0) &&
-      (ptr->timing.duration_audio_sec != -1.0) &&
-      (ptr->timing.duration_video_sec >= 2.0)) {
-    ptr->timing.audio_video_ratio =
-        ptr->timing.duration_audio_sec / ptr->timing.duration_video_sec;
-    ptr->timing.video_freeze =
-        ptr->timing.audio_video_ratio > MAX_AUDIO_VIDEO_RATIO;
-  }
+  derive_audio_video_metrics(
+      ptr->timing.duration_video_sec, ptr->timing.duration_audio_sec,
+      ptr->timing.audio_video_ratio, ptr->timing.video_freeze);
 
   // 6. calculate framerate statistics
   // 6.1. get the framerate series
@@ -1229,71 +1360,74 @@ void FrameInformation::parse_hvcc(std::shared_ptr<ISOBMFF::HVCC> hvcc,
 int AudioInformation::parse_audio_information(
     std::shared_ptr<ISOBMFF::ContainerBox> stbl,
     std::shared_ptr<IsobmffFileInformation> ptr, int debug) {
-  // Preserve this public helper's owner-update semantics, even when called
-  // through a separate AudioInformation object or the copy from get_audio().
-  // Reset per-track state so E-AC-3/JOC cannot leak into an AAC/Opus sibling.
-  ptr->audio = AudioInformation();
+  if (!ptr || !stbl) return -1;
+  AudioInformation parsed;
+  if (parsed.parse_sample_entry(stbl, ptr->filename, debug) < 0) return -1;
+  // Preserve the legacy owner-update helper, now consistently refreshing the
+  // first/default registered track. A failed refresh leaves the owner intact.
+  if (!ptr->audio_tracks.empty()) {
+    const auto& first = ptr->audio_tracks.front();
+    parsed.track_id = first.track_id;
+    parsed.timescale_hz = first.timescale_hz;
+    parsed.mdhd_duration_sec = first.mdhd_duration_sec;
+    parsed.duration_sec = first.duration_sec;
+    ptr->audio_tracks.front() = parsed;
+  }
+  ptr->audio = parsed;
+  return 0;
+}
 
-  // 1. look for a stsd container box
-  std::shared_ptr<ISOBMFF::STSD> stsd =
-      stbl->GetTypedBox<ISOBMFF::STSD>("stsd");
-  if (stsd == nullptr) {
+int AudioInformation::parse_sample_entry(
+    std::shared_ptr<ISOBMFF::ContainerBox> stbl, const std::string& filename,
+    int debug) {
+  *this = AudioInformation();
+  auto stsd = stbl->GetTypedBox<ISOBMFF::STSD>("stsd");
+  if (!stsd) {
     if (debug > 0) {
       fprintf(stderr, "error: no /moov/trak/mdia/minf/stbl/stsd in %s\n",
-              ptr->filename.c_str());
+              filename.c_str());
     }
     return -1;
   }
-
-  // 2. look for mp4a, Opus, or ec-3 (container) boxes
-  std::shared_ptr<ISOBMFF::MP4A> mp4a =
-      stsd->GetTypedBox<ISOBMFF::MP4A>("mp4a");
-  if (mp4a != nullptr) {
-    ptr->audio.audio_type = "mp4a";
-    ptr->audio.channel_count = mp4a->GetChannelCount();
-    ptr->audio.sample_size = mp4a->GetSampleSize();
-    // samplerate is a 16.16 fixed-point value: keep the integer part
-    ptr->audio.sample_rate = static_cast<int>(mp4a->GetSampleRateRaw() >> 16);
+  auto mp4a = stsd->GetTypedBox<ISOBMFF::MP4A>("mp4a");
+  if (mp4a) {
+    audio_type = "mp4a";
+    channel_count = mp4a->GetChannelCount();
+    sample_size = mp4a->GetSampleSize();
+    sample_rate = static_cast<int>(mp4a->GetSampleRateRaw() >> 16);
     return 0;
   }
-
-  std::shared_ptr<ISOBMFF::OPUS> opus =
-      stsd->GetTypedBox<ISOBMFF::OPUS>("Opus");
-  if (opus != nullptr) {
-    ptr->audio.audio_type = "Opus";
-    ptr->audio.channel_count = opus->GetChannelCount();
-    ptr->audio.sample_size = opus->GetSampleSize();
-    ptr->audio.sample_rate = static_cast<int>(opus->GetSampleRateRaw() >> 16);
+  auto opus = stsd->GetTypedBox<ISOBMFF::OPUS>("Opus");
+  if (opus) {
+    audio_type = "Opus";
+    channel_count = opus->GetChannelCount();
+    sample_size = opus->GetSampleSize();
+    sample_rate = static_cast<int>(opus->GetSampleRateRaw() >> 16);
     return 0;
   }
-
   auto ec3 = stsd->GetTypedBox<ISOBMFF::EC3>("ec-3");
-  if (ec3 != nullptr) {
+  if (ec3) {
     auto dec3 = ec3->GetTypedBox<ISOBMFF::DEC3>("dec3");
-    if (!dec3 || dec3->GetIndependentSubstreams().empty()) {
-      return -1;
-    }
-    ptr->audio.audio_type = "ec-3";
-    ptr->audio.eac3_configuration = dec3;
-    // Annex F.5.2 requires ignoring ChannelCount and SampleSize in the
-    // sample entry. Describe independent service I0 (not the sum of
-    // independent services), including its unique dependent channels.
+    if (!dec3 || dec3->GetIndependentSubstreams().empty()) return -1;
+    audio_type = "ec-3";
+    eac3_configuration = dec3;
+    // Annex F.5.2 requires ignoring sample-entry ChannelCount and SampleSize.
+    // Describe I0, including its unique dependent channels, not a sum of
+    // services.
     const auto service = dec3->GetIndependentSubstreams().front();
-    ptr->audio.channel_count = service.GetChannelCount();
+    channel_count = service.GetChannelCount();
     uint32_t rate = service.GetSampleRate();
-    // For fscod == 3 the half-rate selector fscod2 is only in the bitstream;
-    // retain the declared sample-entry rate if available, otherwise unknown.
+    // fscod2 is bitstream-only when fscod == 3: use the declared entry rate
+    // if available; otherwise report unknown rather than inventing a rate.
     if (rate == 0) rate = ec3->GetSampleRateRaw() >> 16;
-    ptr->audio.sample_rate = rate == 0 ? -1 : static_cast<int>(rate);
-    // Compressed E-AC-3 does not declare PCM precision in dec3.
-    ptr->audio.sample_size = -1;
+    sample_rate = rate == 0 ? -1 : static_cast<int>(rate);
+    sample_size = -1;  // No compressed PCM precision is declared by dec3.
     return 0;
   }
-
   if (debug > 0) {
     fprintf(stderr,
             "error: no /moov/trak/mdia/minf/stbl/stsd/{mp4a,Opus,ec-3} in %s\n",
-            ptr->filename.c_str());
+            filename.c_str());
   }
   return -1;
 }

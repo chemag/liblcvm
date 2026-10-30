@@ -66,17 +66,16 @@ TEST(LiblcvmEac3Test, RealTrackIdsAndAllAudioRetainedInBothOrders) {
     EXPECT_DOUBLE_EQ(4.5, ec3.get_mdhd_duration_sec());
     EXPECT_DOUBLE_EQ(4.0, aac.get_duration_sec());
     EXPECT_DOUBLE_EQ(4.125, aac.get_mdhd_duration_sec());
-    // Document and preserve the existing last-audio-track selection limitation.
-    // This patch neither chooses AAC nor normalizes differing track durations.
-    EXPECT_EQ(tracks.back().get_track_id(), file->get_audio().get_track_id());
-    EXPECT_EQ(ec3_first ? "mp4a" : "ec-3", file->get_audio().get_audio_type());
-    EXPECT_DOUBLE_EQ(ec3_first ? 4.0 : 4.5,
+    // Select consistently: -1 means the first audio in container order,
+    // even when its actual ID is much larger than the second audio ID.
+    EXPECT_EQ(tracks.front().get_track_id(), file->get_audio().get_track_id());
+    EXPECT_EQ(ec3_first ? "ec-3" : "mp4a", file->get_audio().get_audio_type());
+    EXPECT_DOUBLE_EQ(ec3_first ? 4.5 : 4.0,
                      file->get_timing().get_duration_audio_sec());
-    EXPECT_DOUBLE_EQ(ec3_first ? 1.0 : 1.125,
+    EXPECT_DOUBLE_EQ(ec3_first ? 1.125 : 1.0,
                      file->get_timing().get_audio_video_ratio());
-    EXPECT_EQ(!ec3_first, file->get_timing().get_video_freeze());
-    // Legacy flat output remains last-track based too, with its existing
-    // schema.
+    EXPECT_EQ(ec3_first, file->get_timing().get_video_freeze());
+    // Unsuffixed library output describes the same first-track default.
     LiblcvmKeyList keys, timing_keys;
     LiblcvmValList values;
     LiblcvmTimingList timing_values;
@@ -85,9 +84,9 @@ TEST(LiblcvmEac3Test, RealTrackIdsAndAllAudioRetainedInBothOrders) {
                file, &keys, &values, false, &timing_keys, &timing_values, 0));
     std::map<std::string, LiblcvmValue> fields;
     for (size_t i = 0; i < keys.size(); ++i) fields[keys[i]] = values[i];
-    EXPECT_EQ(tracks.back().get_audio_type(),
+    EXPECT_EQ(tracks.front().get_audio_type(),
               std::get<std::string>(fields["audio_type"]));
-    EXPECT_EQ(tracks.back().get_channel_count(),
+    EXPECT_EQ(tracks.front().get_channel_count(),
               std::get<int>(fields["channel_count"]));
   }
 }
@@ -121,18 +120,20 @@ TEST(LiblcvmEac3Test, HalfRateFallbackAndUnknownRate) {
   EXPECT_EQ(-1, unknown->get_audio().get_sample_rate());
 }
 
-TEST(LiblcvmEac3Test, SkipSemanticsAndDefaultAudioAreUnchanged) {
+TEST(LiblcvmEac3Test, SkipRetainsIdentityButSuppressesCodecDetails) {
   auto file = ParseEac3("eac3_then_aac.mp4", true);
   ASSERT_NE(nullptr, file);
-  EXPECT_TRUE(file->get_audio_tracks().empty());
+  ASSERT_EQ(2u, file->get_audio_tracks().size());
+  EXPECT_EQ(0xf1234567u, file->get_audio().get_track_id());
   EXPECT_EQ("", file->get_audio().get_audio_type());
   EXPECT_EQ(0, file->get_audio().get_channel_count());
   EXPECT_EQ(0, file->get_audio().get_sample_rate());
   EXPECT_EQ(0, file->get_audio().get_sample_size());
   EXPECT_EQ(nullptr, file->get_audio().get_eac3_configuration());
-  // Skip still uses last mdhd duration; full parsing still gives tkhd priority.
-  EXPECT_DOUBLE_EQ(4.125, file->get_timing().get_duration_audio_sec());
-  EXPECT_DOUBLE_EQ(4.125 / 4.0, file->get_timing().get_audio_video_ratio());
+  // Skip still uses mdhd duration for whichever track is selected.
+  EXPECT_DOUBLE_EQ(4.5, file->get_timing().get_duration_audio_sec());
+  EXPECT_DOUBLE_EQ(1.125, file->get_timing().get_audio_video_ratio());
+  EXPECT_DOUBLE_EQ(4.125, file->get_timing(23).get_duration_audio_sec());
 }
 
 TEST(LiblcvmEac3Test, MalformedConfigurationNeverHiddenByAacSibling) {
