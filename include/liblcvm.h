@@ -163,20 +163,31 @@ class TimingInformation {
 
 class AudioInformation {
  private:
-  // audio_type: Audio sample entry type ("mp4a" or "Opus").
+  // audio_type: Exact audio sample entry type ("mp4a", "Opus", or "ec-3").
   std::string audio_type;
-  // channel_count: Number of audio channels.
-  int channel_count;
-  // audio_sample_rate: Audio sample rate (Hz).
-  int sample_rate;
-  // audio_sample_size:
-  int sample_size;
+  // E-AC-3 values that cannot be resolved from metadata are -1. Keep the
+  // legacy zero defaults for skipped audio and files without audio.
+  int channel_count = 0;
+  int sample_rate = 0;
+  int sample_size = 0;
+  // All independent E-AC-3 services and optional container JOC signalling.
+  // This is not elementary-stream validation or decoder configuration.
+  std::shared_ptr<const ISOBMFF::DEC3> eac3_configuration;
+  uint32_t track_id = 0;
+  uint32_t timescale_hz = 0;
+  double mdhd_duration_sec = -1.0;
+  double duration_sec = -1.0;
 
  public:
   DECL_GETTER(audio_type, std::string)
   DECL_GETTER(channel_count, int)
   DECL_GETTER(sample_rate, int)
   DECL_GETTER(sample_size, int)
+  DECL_GETTER(eac3_configuration, std::shared_ptr<const ISOBMFF::DEC3>)
+  DECL_GETTER(track_id, uint32_t)
+  DECL_GETTER(timescale_hz, uint32_t)
+  DECL_GETTER(mdhd_duration_sec, double)
+  DECL_GETTER(duration_sec, double)
 
   int parse_audio_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
                               std::shared_ptr<IsobmffFileInformation> ptr,
@@ -333,6 +344,10 @@ class IsobmffFileInformation {
   TimingInformation timing;
   FrameInformation frame;
   AudioInformation audio;
+  // Retain every fully parsed audio track in container order. Legacy audio
+  // and timing accessors still describe the last audio track; this list does
+  // not select a different track for AV ratio, freeze, or app policy.
+  std::vector<AudioInformation> audio_tracks;
 
  public:
   DECL_GETTER(filename, std::string)
@@ -340,6 +355,7 @@ class IsobmffFileInformation {
   DECL_GETTER(timing, TimingInformation)
   DECL_GETTER(frame, FrameInformation)
   DECL_GETTER(audio, AudioInformation)
+  DECL_GETTER(audio_tracks, std::vector<AudioInformation>)
 
   // @brief Get the library version.
   //

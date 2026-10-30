@@ -509,8 +509,14 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
       }
     }
 
-    // stop audio processing here
+    // Retain per-track metadata without changing the legacy last-track
+    // duration/codec selection or deriving app acceptance from codec support.
     if (handler_type.compare("soun") == 0) {
+      ptr->audio.track_id = tkhd->GetTrackID();
+      ptr->audio.timescale_hz = timescale_track_hz;
+      ptr->audio.mdhd_duration_sec = mdhd_duration_sec;
+      ptr->audio.duration_sec = ptr->timing.duration_audio_sec;
+      ptr->audio_tracks.push_back(ptr->audio);
       continue;
     }
 
@@ -1223,6 +1229,11 @@ void FrameInformation::parse_hvcc(std::shared_ptr<ISOBMFF::HVCC> hvcc,
 int AudioInformation::parse_audio_information(
     std::shared_ptr<ISOBMFF::ContainerBox> stbl,
     std::shared_ptr<IsobmffFileInformation> ptr, int debug) {
+  // Preserve this public helper's owner-update semantics, even when called
+  // through a separate AudioInformation object or the copy from get_audio().
+  // Reset per-track state so E-AC-3/JOC cannot leak into an AAC/Opus sibling.
+  ptr->audio = AudioInformation();
+
   // 1. look for a stsd container box
   std::shared_ptr<ISOBMFF::STSD> stsd =
       stbl->GetTypedBox<ISOBMFF::STSD>("stsd");
@@ -1234,7 +1245,7 @@ int AudioInformation::parse_audio_information(
     return -1;
   }
 
-  // 2. look for mp4a or Opus (container) boxes
+  // 2. look for mp4a, Opus, or ec-3 (container) boxes
   std::shared_ptr<ISOBMFF::MP4A> mp4a =
       stsd->GetTypedBox<ISOBMFF::MP4A>("mp4a");
   if (mp4a != nullptr) {
@@ -1256,9 +1267,32 @@ int AudioInformation::parse_audio_information(
     return 0;
   }
 
+  auto ec3 = stsd->GetTypedBox<ISOBMFF::EC3>("ec-3");
+  if (ec3 != nullptr) {
+    auto dec3 = ec3->GetTypedBox<ISOBMFF::DEC3>("dec3");
+    if (!dec3 || dec3->GetIndependentSubstreams().empty()) {
+      return -1;
+    }
+    ptr->audio.audio_type = "ec-3";
+    ptr->audio.eac3_configuration = dec3;
+    // Annex F.5.2 requires ignoring ChannelCount and SampleSize in the
+    // sample entry. Describe independent service I0 (not the sum of
+    // independent services), including its unique dependent channels.
+    const auto service = dec3->GetIndependentSubstreams().front();
+    ptr->audio.channel_count = service.GetChannelCount();
+    uint32_t rate = service.GetSampleRate();
+    // For fscod == 3 the half-rate selector fscod2 is only in the bitstream;
+    // retain the declared sample-entry rate if available, otherwise unknown.
+    if (rate == 0) rate = ec3->GetSampleRateRaw() >> 16;
+    ptr->audio.sample_rate = rate == 0 ? -1 : static_cast<int>(rate);
+    // Compressed E-AC-3 does not declare PCM precision in dec3.
+    ptr->audio.sample_size = -1;
+    return 0;
+  }
+
   if (debug > 0) {
     fprintf(stderr,
-            "error: no /moov/trak/mdia/minf/stbl/stsd/{mp4a,Opus} in %s\n",
+            "error: no /moov/trak/mdia/minf/stbl/stsd/{mp4a,Opus,ec-3} in %s\n",
             ptr->filename.c_str());
   }
   return -1;
