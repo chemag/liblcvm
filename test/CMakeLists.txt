@@ -56,9 +56,12 @@ foreach(test_file IN LISTS TEST_FILES)
   add_liblcvm_test(${test_name})
 endforeach()
 
-# The multi-audio regressions exercise the CLI's union-header serialization too.
-if(TARGET liblcvm_multi_audio_unittest)
-  target_compile_definitions(liblcvm_multi_audio_unittest PRIVATE
-    LCVM_TOOL_PATH="$<TARGET_FILE:lcvm>")
-  add_dependencies(liblcvm_multi_audio_unittest lcvm)
-endif()
+# CLI regressions exercise compact track fields and union-header serialization.
+foreach(cli_test IN ITEMS liblcvm_multi_audio_unittest
+                          liblcvm_compact_tracks_unittest)
+  if(TARGET ${cli_test})
+    target_compile_definitions(${cli_test} PRIVATE
+      LCVM_TOOL_PATH="$<TARGET_FILE:lcvm>")
+    add_dependencies(${cli_test} lcvm)
+  endif()
+endforeach()

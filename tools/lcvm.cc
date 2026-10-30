@@ -34,6 +34,7 @@ typedef struct arg_options {
   bool skip_audio_parsing;
   uint32_t max_num_frames;
   int64_t audio_track_id;
+  int64_t video_track_id;
   std::vector<std::string> infile_list;
 #if ADD_POLICY
   char* policy_file;
@@ -50,6 +51,7 @@ arg_options DEFAULT_OPTIONS{
     .skip_audio_parsing = false,
     .max_num_frames = LiblcvmConfig::kDefaultMaxNumFrames,
     .audio_track_id = -1,
+    .video_track_id = -1,
     .infile_list = {},
 #if ADD_POLICY
     .policy_file = nullptr,
@@ -70,10 +72,34 @@ std::string csv_escape(const std::string& value) {
   return escaped;
 }
 
+// Recognize explicitly qualified library fields, then remove singleton suffix
+// segments from right to left so a retained audio suffix does not hide the
+// preceding video suffix in a pair field. Unsuffixed aliases return false.
+bool compact_track_key(const std::string& key, size_t num_video_tracks,
+                       size_t num_audio_tracks, std::string* compact_key) {
+  *compact_key = key;
+  bool qualified = false;
+  size_t end = key.size();
+  while (end > 0) {
+    const auto marker = key.find_last_not_of("0123456789", end - 1);
+    if (marker == std::string::npos || marker == 0 || marker + 1 == end ||
+        key[marker - 1] != '_' || (key[marker] != 'v' && key[marker] != 'a')) {
+      break;
+    }
+    const auto start = marker - 1;
+    const auto count = key[marker] == 'v' ? num_video_tracks : num_audio_tracks;
+    if (count == 1) compact_key->erase(start, end - start);
+    qualified = true;
+    end = start;
+  }
+  return qualified;
+}
+
 int parse_files(std::vector<std::string>& infile_list, char* outfile,
                 char* outfile_timestamps, bool outfile_timestamps_sort_pts,
                 bool skip_audio_parsing, uint32_t max_num_frames, int debug,
-                const std::string& policy_str, int64_t audio_track_id) {
+                const std::string& policy_str, int64_t audio_track_id,
+                int64_t video_track_id) {
   // 1. open outfile
   FILE* outfp;
   if (outfile == nullptr || (strlen(outfile) == 1 && outfile[0] == '-')) {
@@ -94,16 +120,18 @@ int parse_files(std::vector<std::string>& infile_list, char* outfile,
   liblcvm_config->set_policy(policy_str);
   liblcvm_config->set_debug(debug);
   liblcvm_config->set_audio_track_id(audio_track_id);
+  liblcvm_config->set_video_track_id(video_track_id);
   liblcvm_config->set_include_track_keys(true);
 
   // 3. parse the input files
   int ret = 0;
-  // Inputs can have different IDs and numbers of audio tracks. Build a stable
-  // union header before emitting rows; absent fields are empty, not fabricated.
+  // Inputs can have different IDs and numbers of video/audio tracks. Build a
+  // stable union header before emitting rows; absent fields stay empty.
   LiblcvmKeyList csv_keys;
   std::set<std::string> seen_csv_keys;
-  // The library keeps selected-track aliases for API/policy compatibility.
-  // CLI CSV publishes only qualified track fields and file-wide metadata.
+  // Filter library selected-track aliases BEFORE compacting qualified fields.
+  // File-wide metadata is never track-qualified; singleton dimensions need no
+  // suffix in CLI output. Selectors do not limit the exported track results.
   const std::set<std::string> file_keys = {
       "infile",         "filesize",  "bitrate_bps", "timescale_movie_hz",
       "policy_version", "warn_list", "error_list"};
@@ -116,35 +144,48 @@ int parse_files(std::vector<std::string>& infile_list, char* outfile,
     LiblcvmValList vals;
     LiblcvmKeyList pkeys_timing;
     LiblcvmTimingList vals_timing;
-    if (IsobmffFileInformation::parse_to_lists(
-            infile.c_str(), *liblcvm_config, &keys, &vals, calculate_timestamps,
-            &pkeys_timing, &vals_timing)) {
-      fprintf(stderr, "error: IsobmffFileInformation::parse_to_map() in %s\n",
-              infile.c_str());
-      // keep processing the remaining files, but report the error
+    // Retain the parsed object for cheap cardinality queries, rather than
+    // parsing twice or copying the per-track timing analyses just to count.
+    const auto file =
+        IsobmffFileInformation::parse(infile.c_str(), *liblcvm_config);
+    if (file && file->get_num_video_tracks() == 0) {
+      fprintf(stderr, "error: no video track in %s\n", infile.c_str());
       ret = -1;
       continue;
     }
+    if (!file ||
+        IsobmffFileInformation::LiblcvmConfig_to_lists(
+            file, &keys, &vals, calculate_timestamps, &pkeys_timing,
+            &vals_timing, debug, audio_track_id, true, video_track_id)) {
+      fprintf(stderr, "error: failed to parse/export %s\n", infile.c_str());
+      // Keep processing the remaining files, but report the error. Local
+      // timestamp lists ensure a later failure cannot erase a valid header.
+      ret = -1;
+      continue;
+    }
+    const auto num_video_tracks = file->get_num_video_tracks();
+    const auto num_audio_tracks = file->get_num_audio_tracks();
     std::map<std::string, std::string> row;
     for (size_t i = 0; i < keys.size(); ++i) {
       const auto& key = keys[i];
-      const auto suffix = key.find_last_not_of("0123456789");
-      const bool qualified = suffix != std::string::npos && suffix > 0 &&
-                             suffix + 1 < key.size() &&
-                             key[suffix - 1] == '_' &&
-                             (key[suffix] == 'a' || key[suffix] == 'v');
-      if (!qualified && file_keys.count(key) == 0) continue;
-      if (seen_csv_keys.insert(key).second) csv_keys.push_back(key);
+      std::string csv_key;
+      if (file_keys.count(key) != 0) {
+        csv_key = key;
+      } else if (!compact_track_key(key, num_video_tracks, num_audio_tracks,
+                                    &csv_key)) {
+        continue;
+      }
+      if (seen_csv_keys.insert(csv_key).second) csv_keys.push_back(csv_key);
       std::string value;
       if (liblcvmvalue_to_string(vals[i], &value) != 0) value = "ERROR";
-      row.emplace(key, std::move(value));
+      row.emplace(std::move(csv_key), std::move(value));
     }
     csv_rows.push_back(std::move(row));
 
     // capture outfile timestamps
     if (calculate_timestamps) {
       keys_timing = std::move(pkeys_timing);
-      vals_timing_map.emplace(infile, vals_timing);
+      vals_timing_map.emplace(infile, std::move(vals_timing));
     }
   }
 
@@ -261,8 +302,11 @@ void usage(char* name) {
           "\t--audio-track-id <id>:\tSelect audio for policy/default view; "
           "-1 selects the first audio track (default)\n");
   fprintf(stderr,
-          "\tCSV contains file-wide metadata and _a<ID>, _v<ID>, "
-          "_v<ID>_a<ID> track fields; no unsuffixed track aliases\n");
+          "\t--video-track-id <id>:\tSelect video for policy and timestamps; "
+          "-1 selects the first video track (default)\n");
+  fprintf(stderr,
+          "\tCSV contains all tracks and file-wide metadata; _v<ID> and "
+          "_a<ID> suffixes appear only for non-singleton dimensions\n");
   fprintf(stderr, "\t-h:\t\tHelp\n");
   exit(-1);
 }
@@ -278,6 +322,7 @@ enum {
   NO_SKIP_AUDIO_PARSING_OPTION,
   MAX_NUM_FRAMES_OPTION,
   AUDIO_TRACK_ID_OPTION,
+  VIDEO_TRACK_ID_OPTION,
   RUNS_OPTION,
   VERSION_OPTION,
 };
@@ -310,6 +355,7 @@ arg_options* parse_args(int argc, char** argv) {
       // options without a short option
       {"max-num-frames", required_argument, nullptr, MAX_NUM_FRAMES_OPTION},
       {"audio-track-id", required_argument, nullptr, AUDIO_TRACK_ID_OPTION},
+      {"video-track-id", required_argument, nullptr, VIDEO_TRACK_ID_OPTION},
       {"runs", required_argument, nullptr, RUNS_OPTION},
       {"quiet", no_argument, nullptr, QUIET_OPTION},
       {"version", no_argument, NULL, VERSION_OPTION},
@@ -380,17 +426,24 @@ arg_options* parse_args(int argc, char** argv) {
         options.max_num_frames = static_cast<uint32_t>(val);
       } break;
 
-      case AUDIO_TRACK_ID_OPTION: {
+      case AUDIO_TRACK_ID_OPTION:
+      case VIDEO_TRACK_ID_OPTION: {
         char* endptr;
         errno = 0;
         const long long val = strtoll(optarg, &endptr, 0);
         if (endptr == optarg || *endptr != '\0' || errno == ERANGE ||
             val < -1 || val > UINT32_MAX) {
-          fprintf(stderr, "error: invalid --audio-track-id parameter: %s\n",
-                  optarg);
+          fprintf(
+              stderr, "error: invalid --%s parameter: %s\n",
+              c == AUDIO_TRACK_ID_OPTION ? "audio-track-id" : "video-track-id",
+              optarg);
           exit(-1);
         }
-        options.audio_track_id = static_cast<int64_t>(val);
+        if (c == AUDIO_TRACK_ID_OPTION) {
+          options.audio_track_id = static_cast<int64_t>(val);
+        } else {
+          options.video_track_id = static_cast<int64_t>(val);
+        }
       } break;
 
       case QUIET_OPTION:
@@ -464,11 +517,11 @@ int main(int argc, char** argv) {
 
   int ret = 0;
   for (int i = 0; i < options->nruns; ++i) {
-    if (parse_files(options->infile_list, options->outfile,
-                    options->outfile_timestamps,
-                    options->outfile_timestamps_sort_pts,
-                    options->skip_audio_parsing, options->max_num_frames,
-                    options->debug, policy_str, options->audio_track_id) != 0) {
+    if (parse_files(
+            options->infile_list, options->outfile, options->outfile_timestamps,
+            options->outfile_timestamps_sort_pts, options->skip_audio_parsing,
+            options->max_num_frames, options->debug, policy_str,
+            options->audio_track_id, options->video_track_id) != 0) {
       ret = -1;
     }
   }
