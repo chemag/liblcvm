@@ -214,19 +214,15 @@ TEST(LiblcvmMultiAudioTest, QualifiedKeysAndAliasesAreConsistent) {
   EXPECT_EQ(0u, legacy.count("audio_track_id"));
 }
 
-TEST(LiblcvmMultiAudioTest, SkipRetainsEachMdhdDurationAndIdentity) {
+TEST(LiblcvmMultiAudioTest, SkipBypassesEveryAudioTrack) {
   auto file = Parse("multi_audio_max_id.mp4", true);
   ASSERT_NE(nullptr, file);
-  ASSERT_EQ(2u, file->get_audio_tracks().size());
-  EXPECT_EQ(UINT32_MAX, file->get_audio_track()->get_track_id());
-  EXPECT_EQ(23u, file->get_audio_track(23)->get_track_id());
-  EXPECT_EQ("", file->get_audio_track(23)->get_audio_type());
-  EXPECT_EQ(0, file->get_audio_track(23)->get_channel_count());
-  EXPECT_DOUBLE_EQ(4.5, file->get_timing().get_duration_audio_sec());
-  EXPECT_DOUBLE_EQ(5.0, file->get_timing(23).get_duration_audio_sec());
-  auto fields = Fields(file);
-  EXPECT_EQ("5.000000", Text(fields.at("duration_audio_sec_a23")));
-  EXPECT_EQ("0", Text(fields.at("sample_rate_a23")));
+  EXPECT_TRUE(file->get_audio_tracks().empty());
+  EXPECT_EQ(nullptr, file->get_audio_track());
+  EXPECT_EQ(nullptr, file->get_audio_track(23));
+  EXPECT_DOUBLE_EQ(-1, file->get_timing().get_duration_audio_sec());
+  EXPECT_DOUBLE_EQ(-1, file->get_timing().get_audio_video_ratio());
+  EXPECT_EQ(0u, Fields(file).count("duration_audio_sec_a23"));
 }
 
 TEST(LiblcvmMultiAudioTest, NoAudioKeepsDefaultButRejectsExplicitId) {
@@ -250,9 +246,11 @@ TEST(LiblcvmMultiAudioTest, NoAudioKeepsDefaultButRejectsExplicitId) {
   }
 }
 
-TEST(LiblcvmMultiAudioTest, DuplicateIdsRejectedWithAndWithoutSkip) {
+TEST(LiblcvmMultiAudioTest, DuplicateAudioIdsIgnoredOnlyWhenAudioIsSkipped) {
   EXPECT_EQ(nullptr, Parse("multi_audio_duplicate_id.mp4"));
-  EXPECT_EQ(nullptr, Parse("multi_audio_duplicate_id.mp4", true));
+  auto skipped = Parse("multi_audio_duplicate_id.mp4", true);
+  ASSERT_NE(nullptr, skipped);
+  EXPECT_TRUE(skipped->get_audio_tracks().empty());
 }
 
 TEST(LiblcvmMultiAudioTest, PublicHelperRefreshesParsedFirstTrackConsistently) {
@@ -286,14 +284,12 @@ TEST(LiblcvmMultiAudioTest, PublicHelperRefreshesParsedFirstTrackConsistently) {
             file->get_audio_track(int64_t(UINT32_MAX))->get_sample_rate());
 }
 
-TEST(LiblcvmMultiAudioTest,
-     SkippedUnsupportedAudioCanBeSelectedWithoutFakeMetadata) {
+TEST(LiblcvmMultiAudioTest, UnsupportedAudioIsBypassedWhenSkipped) {
   auto file = Parse("unsupported_then_aac.mp4", true);
   ASSERT_NE(nullptr, file);
-  EXPECT_EQ(2u, file->get_audio_track(2)->get_track_id());
-  EXPECT_EQ("", file->get_audio_track(2)->get_audio_type());
-  EXPECT_EQ(0, file->get_audio_track(2)->get_sample_rate());
-  EXPECT_DOUBLE_EQ(4.5, file->get_timing(2).get_duration_audio_sec());
+  EXPECT_TRUE(file->get_audio_tracks().empty());
+  EXPECT_EQ(nullptr, file->get_audio_track(2));
+  EXPECT_DOUBLE_EQ(-1, file->get_timing().get_duration_audio_sec());
   EXPECT_EQ(nullptr, Parse("unsupported_then_aac.mp4", false));
 }
 

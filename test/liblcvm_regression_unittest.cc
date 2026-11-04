@@ -57,9 +57,9 @@ TEST_F(LiblcvmRegressionTest, TestCttsMoreSamplesThanStts) {
       ASSERT_NE(nullptr, ptr);
       const auto timing = ptr->get_timing();
       EXPECT_EQ(timing.get_pts_unit_list().size(),
-                static_cast<size_t>(timing.get_num_video_frames()));
+                static_cast<size_t>(timing.get_num_frames()));
       EXPECT_EQ(timing.get_pts_sec_list().size(),
-                static_cast<size_t>(timing.get_num_video_frames()));
+                static_cast<size_t>(timing.get_num_frames()));
       // no ctts value beyond the last frame
       EXPECT_LE(timing.get_ctts_unit_list().size(),
                 timing.get_pts_unit_list().size());
@@ -95,7 +95,7 @@ TEST_F(LiblcvmRegressionTest, TestCttsFewerSamplesThanStts) {
       ASSERT_NE(nullptr, ptr);
       const auto timing = ptr->get_timing();
       const size_t num_frames = timing.get_pts_unit_list().size();
-      EXPECT_EQ(num_frames, static_cast<size_t>(timing.get_num_video_frames()));
+      EXPECT_EQ(num_frames, static_cast<size_t>(timing.get_num_frames()));
       EXPECT_EQ(timing.get_ctts_unit_list().size(), num_frames);
       EXPECT_EQ(timing.get_stts_unit_list().size(), num_frames);
       EXPECT_EQ(timing.get_dts_sec_list().size(), num_frames);

@@ -32,13 +32,7 @@ namespace py = pybind11;
 
 // Define the macro to bind timing getters
 #define TIMING_GETTERS(class_name)                                            \
-  .def("get_video_freeze", &class_name::get_video_freeze)                     \
-      .def("get_audio_video_ratio", &class_name::get_audio_video_ratio)       \
-      .def("get_duration_video_sec", &class_name::get_duration_video_sec)     \
-      .def("get_duration_audio_sec", &class_name::get_duration_audio_sec)     \
-      .def("get_timescale_movie_hz", &class_name::get_timescale_movie_hz)     \
-      .def("get_timescale_video_hz", &class_name::get_timescale_video_hz)     \
-      .def("get_timescale_audio_hz", &class_name::get_timescale_audio_hz)     \
+  .def("get_timescale_movie_hz", &class_name::get_timescale_movie_hz)         \
       .def("get_pts_duration_sec_average",                                    \
            &class_name::get_pts_duration_sec_average)                         \
       .def("get_pts_duration_sec_median",                                     \
@@ -46,7 +40,7 @@ namespace py = pybind11;
       .def("get_pts_duration_sec_stddev",                                     \
            &class_name::get_pts_duration_sec_stddev)                          \
       .def("get_pts_duration_sec_mad", &class_name::get_pts_duration_sec_mad) \
-      .def("get_num_video_frames", &class_name::get_num_video_frames)         \
+      .def("get_num_frames", &class_name::get_num_frames)                     \
       .def("get_frame_rate_fps_median",                                       \
            &class_name::get_frame_rate_fps_median)                            \
       .def("get_frame_rate_fps_average",                                      \
@@ -81,7 +75,7 @@ namespace py = pybind11;
             return frame_drop_length_consecutive;                             \
           },                                                                  \
           py::arg("consecutive_list"), py::arg("debug"))                      \
-      .def("get_num_video_keyframes", &class_name::get_num_video_keyframes)   \
+      .def("get_num_keyframes", &class_name::get_num_keyframes)               \
       .def("get_key_frame_ratio", &class_name::get_key_frame_ratio)           \
       .def("get_frame_num_orig_list", &class_name::get_frame_num_orig_list)   \
       .def("get_stts_unit_list", &class_name::get_stts_unit_list)             \
@@ -145,11 +139,56 @@ PYBIND11_MODULE(liblcvm, m) {
       .def("get_timing", &VideoTrack::get_timing,
            py::return_value_policy::reference_internal);
 
+  py::class_<TimingInformation::SampleTimingEntry>(m, "SampleTimingEntry")
+      .def_readonly("sample_count",
+                    &TimingInformation::SampleTimingEntry::sample_count)
+      .def_readonly("sample_delta",
+                    &TimingInformation::SampleTimingEntry::sample_delta);
+  py::class_<TimingInformation::CompositionTimingEntry>(
+      m, "CompositionTimingEntry")
+      .def_readonly("sample_count",
+                    &TimingInformation::CompositionTimingEntry::sample_count)
+      .def_readonly("sample_offset",
+                    &TimingInformation::CompositionTimingEntry::sample_offset);
+
   // Expose the TimingInformation class
   py::class_<TimingInformation>(m, "TimingInformation")
       .def(py::init<>())
+      .def("get_stts_entries", &TimingInformation::get_stts_entries)
+      .def("get_ctts_entries", &TimingInformation::get_ctts_entries)
+      .def("get_per_frame_info", &TimingInformation::get_per_frame_info)
+      .def("get_has_stts", &TimingInformation::get_has_stts)
+      .def("get_num_samples", &TimingInformation::get_num_samples)
+      .def("get_timescale_hz", &TimingInformation::get_timescale_hz)
+      .def("get_stts_duration_units",
+           &TimingInformation::get_stts_duration_units)
+      .def("get_stts_duration_sec", &TimingInformation::get_stts_duration_sec)
+      .def("get_mdhd_duration_sec", &TimingInformation::get_mdhd_duration_sec)
+      .def("get_duration_sec", &TimingInformation::get_duration_sec)
+      .def("get_mdhd_duration_units",
+           &TimingInformation::get_mdhd_duration_units)
+      .def("get_tkhd_duration_units",
+           &TimingInformation::get_tkhd_duration_units)
       // Automatically bind all TimingInformation class getters
       TIMING_GETTERS(TimingInformation);
+
+  py::class_<AudioVideoTimingInformation, TimingInformation>(
+      m, "AudioVideoTimingInformation")
+      .def("get_duration_video_sec",
+           &AudioVideoTimingInformation::get_duration_video_sec)
+      .def("get_duration_audio_sec",
+           &AudioVideoTimingInformation::get_duration_audio_sec)
+      .def("get_timescale_video_hz",
+           &AudioVideoTimingInformation::get_timescale_video_hz)
+      .def("get_timescale_audio_hz",
+           &AudioVideoTimingInformation::get_timescale_audio_hz)
+      .def("get_num_video_frames",
+           &AudioVideoTimingInformation::get_num_video_frames)
+      .def("get_num_video_keyframes",
+           &AudioVideoTimingInformation::get_num_video_keyframes)
+      .def("get_audio_video_ratio",
+           &AudioVideoTimingInformation::get_audio_video_ratio)
+      .def("get_video_freeze", &AudioVideoTimingInformation::get_video_freeze);
 
   // Expose the AudioTrack class
   py::class_<AudioTrack>(m, "AudioTrack")

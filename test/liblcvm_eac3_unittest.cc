@@ -125,20 +125,13 @@ TEST(LiblcvmEac3Test, HalfRateFallbackAndUnknownRate) {
   EXPECT_EQ(-1, unknown->get_audio_track()->get_sample_rate());
 }
 
-TEST(LiblcvmEac3Test, SkipRetainsIdentityButSuppressesCodecDetails) {
+TEST(LiblcvmEac3Test, SkipBypassesAudioRatherThanOnlyCodecDetails) {
   auto file = ParseEac3("eac3_then_aac.mp4", true);
   ASSERT_NE(nullptr, file);
-  ASSERT_EQ(2u, file->get_audio_tracks().size());
-  EXPECT_EQ(0xf1234567u, file->get_audio_track()->get_track_id());
-  EXPECT_EQ("", file->get_audio_track()->get_audio_type());
-  EXPECT_EQ(0, file->get_audio_track()->get_channel_count());
-  EXPECT_EQ(0, file->get_audio_track()->get_sample_rate());
-  EXPECT_EQ(0, file->get_audio_track()->get_sample_size());
-  EXPECT_EQ(nullptr, file->get_audio_track()->get_eac3_configuration());
-  // Skip still uses mdhd duration for whichever track is selected.
-  EXPECT_DOUBLE_EQ(4.5, file->get_timing().get_duration_audio_sec());
-  EXPECT_DOUBLE_EQ(1.125, file->get_timing().get_audio_video_ratio());
-  EXPECT_DOUBLE_EQ(4.125, file->get_timing(23).get_duration_audio_sec());
+  EXPECT_TRUE(file->get_audio_tracks().empty());
+  EXPECT_EQ(nullptr, file->get_audio_track());
+  EXPECT_DOUBLE_EQ(-1, file->get_timing().get_duration_audio_sec());
+  EXPECT_DOUBLE_EQ(-1, file->get_timing().get_audio_video_ratio());
 }
 
 TEST(LiblcvmEac3Test, MalformedConfigurationNeverHiddenByAacSibling) {

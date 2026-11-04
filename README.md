@@ -127,6 +127,34 @@ to `None` and retains the owner for borrowed track/timing objects.
 
 This patch does not redesign the timing parser, derivation, or codec policy.
 
+## 4.2. Shared Timing Reader and Derivation
+
+Video and audio use the same owner-independent
+`TimingInformation::parse_timing_information(stbl, timescale_hz,
+max_num_frames, per_frame_info, filename, debug)` reader. It stores compact
+STTS/CTTS values and optional raw sync-sample values, with no expanded
+DTS/PTS arrays or frame-drop calculations. Successful reads replace prior
+source/header context; failed reads leave the prior result intact.
+
+`derive_timing_info(sort_by_pts, filename, debug)` computes sample counts,
+STTS tick totals, and durations. With `per_frame_info=true`, it also expands
+and orders frame timing and computes cadence, keyframes, and drops. Video
+uses true; audio uses false and retains only scalar summaries. Header-only
+scalar audio descriptions remain supported when no STTS table is present.
+
+Track header values are attached after the read as raw MDHD/TKHD duration
+units. Derivation preserves TKHD priority when the movie timescale is known,
+and falls back to MDHD otherwise. Intrinsic timing uses `get_duration_sec()`
+and `get_timescale_hz()`; audio/video-specific getters exist only on the
+separate `AudioVideoTimingInformation` view returned by file `get_timing()`.
+That view does not expose the track reader/deriver through its normal API;
+mutable base-reference casts are outside this snapshot contract. `get_stts_duration_sec()` is the decode-table
+summary, not a replacement for the presentation duration.
+
+`skip_audio_parsing` bypasses every audio track; it is not scalar-only mode.
+No audio records or AV fields are produced for skipped tracks. The lower
+ISOBMFF parser still validates container/box syntax before track analysis.
+
 As an alternative, and to keep backwards compatibility, we will keep for
 a while the old API that returned a set of variables at the same time. These
 include:

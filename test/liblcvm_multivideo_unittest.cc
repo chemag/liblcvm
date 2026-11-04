@@ -60,19 +60,19 @@ TEST(LiblcvmMultivideoTest, EveryVideoRetainsIndependentDimensionsAndTimeline) {
   EXPECT_DOUBLE_EQ(240, file->get_video_track(11)->get_height());
   EXPECT_DOUBLE_EQ(360, file->get_video_track(21)->get_height());
   auto first = file->get_timing(-1, 11), second = file->get_timing(-1, 21);
-  EXPECT_EQ(120, first.get_num_video_frames());
-  EXPECT_EQ(72, second.get_num_video_frames());
+  EXPECT_EQ(120, first.get_num_frames());
+  EXPECT_EQ(72, second.get_num_frames());
   EXPECT_EQ(30000u, first.get_timescale_video_hz());
   EXPECT_EQ(24000u, second.get_timescale_video_hz());
   EXPECT_DOUBLE_EQ(30, first.get_frame_rate_fps_median());
   EXPECT_DOUBLE_EQ(24, second.get_frame_rate_fps_median());
   EXPECT_DOUBLE_EQ(4, first.get_duration_video_sec());
   EXPECT_DOUBLE_EQ(3, second.get_duration_video_sec());
-  EXPECT_EQ(2, first.get_num_video_keyframes());
-  EXPECT_EQ(1, second.get_num_video_keyframes());
+  EXPECT_EQ(2, first.get_num_keyframes());
+  EXPECT_EQ(1, second.get_num_keyframes());
   EXPECT_EQ(120u, first.get_pts_sec_list().size());
   EXPECT_EQ(72u, second.get_pts_sec_list().size());
-  EXPECT_EQ(120, file->get_timing().get_num_video_frames());
+  EXPECT_EQ(120, file->get_timing().get_num_frames());
 }
 
 TEST(LiblcvmMultivideoTest, FirstVideoMeansContainerOrderNotLowestId) {
@@ -80,11 +80,11 @@ TEST(LiblcvmMultivideoTest, FirstVideoMeansContainerOrderNotLowestId) {
   ASSERT_NE(nullptr, file);
   EXPECT_EQ((std::vector<uint32_t>{21, 11}), file->get_video_track_ids());
   EXPECT_EQ(21u, file->get_video_track()->get_track_id());
-  EXPECT_EQ(72, file->get_timing().get_num_video_frames());
+  EXPECT_EQ(72, file->get_timing().get_num_frames());
   EXPECT_DOUBLE_EQ(3, file->get_timing().get_duration_video_sec());
   EXPECT_DOUBLE_EQ(4.5, file->get_timing().get_duration_audio_sec());
   EXPECT_DOUBLE_EQ(1.5, file->get_timing().get_audio_video_ratio());
-  EXPECT_EQ(120, file->get_timing(-1, 11).get_num_video_frames());
+  EXPECT_EQ(120, file->get_timing(-1, 11).get_num_frames());
 }
 
 TEST(LiblcvmMultivideoTest, AudioFirstTimingArgumentsAndAllPairs) {
@@ -159,8 +159,7 @@ TEST(LiblcvmMultivideoTest, MaxUint32VideoIdAndInvalidSelectors) {
   EXPECT_EQ(UINT32_MAX, file->get_video_track()->get_track_id());
   EXPECT_EQ(UINT32_MAX,
             file->get_video_track(int64_t(UINT32_MAX))->get_track_id());
-  EXPECT_EQ(120,
-            file->get_timing(-1, int64_t(UINT32_MAX)).get_num_video_frames());
+  EXPECT_EQ(120, file->get_timing(-1, int64_t(UINT32_MAX)).get_num_frames());
   for (int64_t id : {int64_t(-2), int64_t(99), int64_t(UINT32_MAX) + 1,
                      std::numeric_limits<int64_t>::min(),
                      std::numeric_limits<int64_t>::max()}) {
@@ -195,15 +194,15 @@ TEST(LiblcvmMultivideoTest, EveryVideoHasIndependentPtsOrderingAndDropState) {
             unsorted->get_timing(-1, 21).get_frame_num_orig_list());
 }
 
-TEST(LiblcvmMultivideoTest, SkippedAudioPreservesEveryVideoAndMdhdPairing) {
+TEST(LiblcvmMultivideoTest, SkippedAudioLeavesIndependentVideoTimelines) {
   auto file = ParseVideo("multivideo_2v_2a.mp4", true);
   ASSERT_NE(nullptr, file);
   EXPECT_EQ(2u, file->get_num_video_tracks());
-  EXPECT_EQ(2u, file->get_num_audio_tracks());
-  EXPECT_EQ("", file->get_audio_track(41)->get_audio_type());
-  EXPECT_DOUBLE_EQ(3.2, file->get_timing(41, 21).get_duration_audio_sec());
-  EXPECT_DOUBLE_EQ(3, file->get_timing(41, 21).get_duration_video_sec());
-  EXPECT_TRUE(file->get_timing(41, 21).get_video_freeze());
+  EXPECT_EQ(0u, file->get_num_audio_tracks());
+  EXPECT_EQ(nullptr, file->get_audio_track(41));
+  EXPECT_DOUBLE_EQ(-1, file->get_timing(-1, 21).get_duration_audio_sec());
+  EXPECT_DOUBLE_EQ(3, file->get_timing(-1, 21).get_duration_video_sec());
+  EXPECT_EQ(72, file->get_timing(-1, 21).get_num_frames());
 }
 
 TEST(LiblcvmMultivideoTest,

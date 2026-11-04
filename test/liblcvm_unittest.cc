@@ -350,21 +350,12 @@ TEST_F(LiblcvmTest, TestSkipAudioParsing) {
   ASSERT_NE(nullptr, ptr) << "error: IsobmffFileInformation::parse() in "
                           << infile;
 
-  // audio timing still comes from the audio track's mdhd box
-  const TimingInformation& timing = ptr->get_timing();
-  EXPECT_EQ(634, timing.get_num_video_frames());
-  EXPECT_TRUE(
-      doubles_are_close(10.634739229024943, timing.get_duration_audio_sec()));
-  EXPECT_EQ(44100u, timing.get_timescale_audio_hz());
-  EXPECT_TRUE(
-      doubles_are_close(1.0058076193907575, timing.get_audio_video_ratio()));
-
-  // the audio sample entry is not parsed
-  const AudioTrack* audio = ptr->get_audio_track();
-  EXPECT_EQ("", audio->get_audio_type());
-  EXPECT_EQ(0, audio->get_channel_count());
-  EXPECT_EQ(0, audio->get_sample_rate());
-  EXPECT_EQ(0, audio->get_sample_size());
+  const auto& timing = ptr->get_timing();
+  EXPECT_EQ(634, timing.get_num_frames());
+  EXPECT_DOUBLE_EQ(-1, timing.get_duration_audio_sec());
+  EXPECT_EQ(0u, timing.get_timescale_audio_hz());
+  EXPECT_DOUBLE_EQ(-1, timing.get_audio_video_ratio());
+  EXPECT_EQ(nullptr, ptr->get_audio_track());
 }
 
 TEST_F(LiblcvmTest, TestMaxNumFrames) {
@@ -378,13 +369,13 @@ TEST_F(LiblcvmTest, TestMaxNumFrames) {
       IsobmffFileInformation::parse(infile.c_str(), liblcvm_config);
   ASSERT_NE(nullptr, ptr) << "error: IsobmffFileInformation::parse() in "
                           << infile;
-  EXPECT_EQ(634, ptr->get_timing().get_num_video_frames());
+  EXPECT_EQ(634, ptr->get_timing().get_num_frames());
 
   // a limit equal to the number of frames accepts the file
   liblcvm_config.set_max_num_frames(634);
   ptr = IsobmffFileInformation::parse(infile.c_str(), liblcvm_config);
   ASSERT_NE(nullptr, ptr);
-  EXPECT_EQ(634, ptr->get_timing().get_num_video_frames());
+  EXPECT_EQ(634, ptr->get_timing().get_num_frames());
 
   // a lower limit rejects it
   liblcvm_config.set_max_num_frames(633);

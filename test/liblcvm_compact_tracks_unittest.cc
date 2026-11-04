@@ -352,24 +352,18 @@ TEST(LiblcvmCompactTracksCliTest, OrderedUnionHeaderHasBlankAbsentCells) {
   }
 }
 
-TEST(LiblcvmCompactTracksCliTest, SkippedAudioPreservesCountsAndMdhdTiming) {
+TEST(LiblcvmCompactTracksCliTest, SkippedAudioProducesVideoOnlyFields) {
   const auto& fixture = kFixtures[3];
   const auto result = Cli({fixture.name}, "--skip-audio-parsing");
   ASSERT_EQ(0, result.status);
   const auto csv = ReadCsv(result.output);
   ASSERT_EQ(1u, csv.rows.size());
   const auto& row = csv.rows[0];
-  ExpectSchema(fixture, row);
-  ExpectText(row, "audio_type_a31", "");
-  ExpectText(row, "audio_type_a41", "");
-  ExpectNumber(row, "sample_rate_a31", 0);
-  ExpectNumber(row, "sample_rate_a41", 0);
-  ExpectNumber(row, "duration_audio_sec_a31", 4.5);
-  ExpectNumber(row, "duration_audio_sec_a41", 3.2);
-  ExpectNumber(row, "audio_video_ratio_v11_a41", 0.8);
-  ExpectNumber(row, "audio_video_ratio_v21_a41", 3.2 / 3.0);
-  ExpectText(row, "video_freeze_v11_a41", "0");
-  ExpectText(row, "video_freeze_v21_a41", "1");
+  EXPECT_EQ(0u, row.count("audio_type_a31"));
+  EXPECT_EQ(0u, row.count("duration_audio_sec_a41"));
+  EXPECT_EQ(0u, row.count("audio_video_ratio_v11_a31"));
+  ExpectNumber(row, "num_video_frames_v11", 120);
+  ExpectNumber(row, "num_video_frames_v21", 72);
 }
 
 TEST(LiblcvmCompactTracksCliTest, InvalidOrMissingVideoIdsNeverFallBack) {

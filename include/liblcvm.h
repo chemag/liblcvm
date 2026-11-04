@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <limits>
 #include <list>
 #include <map>
 #include <numeric>
@@ -31,18 +32,36 @@ class IsobmffFileInformation;
 
 // Declaration of IsobmffFileInforrmation structure.
 class TimingInformation {
-  // num_video_frames: Number of video frames in the file.
-  int num_video_frames;
-  // duration_video_sec: Video length (seconds).
-  double duration_video_sec;
-  // duration_audio_sec: Audio length (seconds).
-  double duration_audio_sec;
-  // timescale_video_hz: Video length (Hz).
-  uint32_t timescale_video_hz;
-  // timescale_audio_hz: Audio length (Hz).
-  uint32_t timescale_audio_hz;
+ public:
+  struct SampleTimingEntry {
+    uint32_t sample_count = 0;
+    uint32_t sample_delta = 0;
+  };
+  struct CompositionTimingEntry {
+    uint32_t sample_count = 0;
+    int32_t sample_offset;
+  };
+
+ private:
+  std::vector<SampleTimingEntry> stts_entries;
+  std::vector<CompositionTimingEntry> ctts_entries;
+  std::vector<uint32_t> raw_keyframe_sample_number_list;
+  uint32_t timescale_hz = 0;
+  bool per_frame_info = false;
+  bool has_stts = false;
+  bool has_ctts = false;
+  uint64_t num_samples = 0;
+  uint64_t stts_duration_units = 0;
+  double stts_duration_sec = -1.0;
+  bool has_header_timing = false;
+  uint64_t mdhd_duration_units = 0;
+  uint64_t tkhd_duration_units = 0;
+  double duration_sec = -1.0;
+  double mdhd_duration_sec = -1.0;
+  // num_frames: Number of expanded sample frames in the track.
+  int num_frames = 0;
   // timescale_movie_hz: Movie timescale (Hz) from mvhd box.
-  uint32_t timescale_movie_hz;
+  uint32_t timescale_movie_hz = 0;
   // frame_num_orig_list: original frame numbers (unitless).
   std::vector<uint32_t> frame_num_orig_list;
   // stts_unit_list: STTS values (units).
@@ -64,47 +83,40 @@ class TimingInformation {
   // pts_framerate_list: Instantaneous framerate (fps).
   std::vector<double> pts_framerate_list;
   // pts_duration_sec_average: pts duration average (sec).
-  double pts_duration_sec_average;
+  double pts_duration_sec_average = std::numeric_limits<double>::quiet_NaN();
   // pts_duration_sec_median: pts duration median (sec).
-  double pts_duration_sec_median;
+  double pts_duration_sec_median = 0.0;
   // pts_duration_sec_stddev: pts duration standard deviation (sec).
-  double pts_duration_sec_stddev;
+  double pts_duration_sec_stddev = 0.0;
   // pts_duration_sec_mad: pts duration MAD (median absolute deviation) (sec).
-  double pts_duration_sec_mad;
+  double pts_duration_sec_mad = 0.0;
   std::vector<uint32_t> keyframe_sample_number_list;
-  // num_video_keyframes: Number of video key frames in the file.
-  int num_video_keyframes;
-  double key_frame_ratio;
-  // audio_video_ratio: Audio/video length ratio.
-  double audio_video_ratio;
-  // video_freeze: Whether there is a video freeze.
-  bool video_freeze;
+  // num_keyframes: Number of sync samples in the track.
+  int num_keyframes = 0;
+  double key_frame_ratio = 0.0;
   // frame_rate_fps_list: Vector of per-frame frame rates (fps).
   std::vector<double> frame_rate_fps_list;
   // frame_rate_fps_median: Frame rate (median, fps).
-  double frame_rate_fps_median;
+  double frame_rate_fps_median = 0.0;
   // frame_rate_fps_average: Frame rate (average, fps).
-  double frame_rate_fps_average;
+  double frame_rate_fps_average = std::numeric_limits<double>::quiet_NaN();
   // frame_rate_fps_reverse_average: Average frame rate calculated
   // as the reverse of average PTS duration (sec)
-  double frame_rate_fps_reverse_average;
+  double frame_rate_fps_reverse_average =
+      std::numeric_limits<double>::quiet_NaN();
   // frame_rate_fps_stddev: Frame rate (stddev).
-  double frame_rate_fps_stddev;
+  double frame_rate_fps_stddev = 0.0;
   // frame_drop_length_sec_list: Vector of lengths between frame drops.
   std::vector<double> frame_drop_length_sec_list;
   // frame_drop_count: Frame drop count.
-  int frame_drop_count;
+  int frame_drop_count = 0;
   // frame_drop_ratio: Frame drop ratio (unitless).
-  double frame_drop_ratio;
+  double frame_drop_ratio = std::numeric_limits<double>::quiet_NaN();
   // normalized_frame_drop_average_length: Normalized frame drop length.
-  double normalized_frame_drop_average_length;
+  double normalized_frame_drop_average_length = 0.0;
 
  public:
-  DECL_GETTER(num_video_frames, int)
-  DECL_GETTER(duration_video_sec, double)
-  DECL_GETTER(duration_audio_sec, double)
-  DECL_GETTER(timescale_video_hz, uint32_t)
-  DECL_GETTER(timescale_audio_hz, uint32_t)
+  DECL_GETTER(num_frames, int)
   DECL_GETTER(timescale_movie_hz, uint32_t)
   DECL_GETTER(frame_num_orig_list, std::vector<uint32_t>)
   DECL_GETTER(stts_unit_list, std::vector<uint32_t>)
@@ -120,10 +132,8 @@ class TimingInformation {
   DECL_GETTER(pts_duration_sec_stddev, double)
   DECL_GETTER(pts_duration_sec_mad, double)
   DECL_GETTER(keyframe_sample_number_list, std::vector<uint32_t>)
-  DECL_GETTER(num_video_keyframes, int)
+  DECL_GETTER(num_keyframes, int)
   DECL_GETTER(key_frame_ratio, double)
-  DECL_GETTER(audio_video_ratio, double)
-  DECL_GETTER(video_freeze, bool)
   DECL_GETTER(frame_rate_fps_list, std::vector<double>)
   DECL_GETTER(frame_rate_fps_median, double)
   DECL_GETTER(frame_rate_fps_average, double)
@@ -134,17 +144,26 @@ class TimingInformation {
   DECL_GETTER(frame_drop_ratio, double)
   DECL_GETTER(normalized_frame_drop_average_length, double)
 
-  static int parse_timing_information(
-      std::shared_ptr<ISOBMFF::ContainerBox> stbl, uint32_t timescale_track_hz,
-      uint32_t max_num_frames, std::shared_ptr<IsobmffFileInformation> ptr,
-      int debug);
-
-  static int parse_keyframe_information(
-      std::shared_ptr<ISOBMFF::ContainerBox> stbl,
-      std::shared_ptr<IsobmffFileInformation> ptr, int debug);
-
-  static int derive_timing_info(std::shared_ptr<IsobmffFileInformation> ptr,
-                                bool sort_by_pts, int debug);
+  // The reader stores compact values only; derivation generates
+  // summaries/lists.
+  int parse_timing_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
+                               uint32_t timescale_hz, uint32_t max_num_frames,
+                               bool per_frame_info, const std::string& filename,
+                               int debug);
+  int derive_timing_info(bool sort_by_pts, const std::string& filename,
+                         int debug);
+  DECL_GETTER(stts_entries, std::vector<SampleTimingEntry>)
+  DECL_GETTER(ctts_entries, std::vector<CompositionTimingEntry>)
+  DECL_GETTER(timescale_hz, uint32_t)
+  DECL_GETTER(per_frame_info, bool)
+  DECL_GETTER(has_stts, bool)
+  DECL_GETTER(num_samples, uint64_t)
+  DECL_GETTER(stts_duration_units, uint64_t)
+  DECL_GETTER(stts_duration_sec, double)
+  DECL_GETTER(duration_sec, double)
+  DECL_GETTER(mdhd_duration_units, uint64_t)
+  DECL_GETTER(tkhd_duration_units, uint64_t)
+  DECL_GETTER(mdhd_duration_sec, double)
 
   // @param[in] percentile_list: Percentile list.
   // @param[out] frame_drop_length_percentile_list: Frame drop length percentile
@@ -162,6 +181,27 @@ class TimingInformation {
   friend class IsobmffFileInformation;
 };
 
+class AudioVideoTimingInformation : public TimingInformation {
+ private:
+  using TimingInformation::derive_timing_info;
+  using TimingInformation::parse_timing_information;
+  double duration_audio_sec = -1.0;
+  uint32_t timescale_audio_hz = 0;
+  double audio_video_ratio = -1.0;
+  bool video_freeze = false;
+
+ public:
+  double get_duration_video_sec() const { return get_duration_sec(); }
+  uint32_t get_timescale_video_hz() const { return get_timescale_hz(); }
+  int get_num_video_frames() const { return get_num_frames(); }
+  int get_num_video_keyframes() const { return get_num_keyframes(); }
+  DECL_GETTER(duration_audio_sec, double)
+  DECL_GETTER(timescale_audio_hz, uint32_t)
+  DECL_GETTER(audio_video_ratio, double)
+  DECL_GETTER(video_freeze, bool)
+  friend class IsobmffFileInformation;
+};
+
 class AudioTrack {
  private:
   TimingInformation timing{};
@@ -176,7 +216,6 @@ class AudioTrack {
   // This is not elementary-stream validation or decoder configuration.
   std::shared_ptr<const ISOBMFF::DEC3> eac3_configuration;
   uint32_t track_id = 0;
-  double mdhd_duration_sec = -1.0;
 
   int parse_sample_entry(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
                          const std::string& filename, int debug);
@@ -192,9 +231,11 @@ class AudioTrack {
   // skipped.
   DECL_GETTER(eac3_configuration, std::shared_ptr<const ISOBMFF::DEC3>)
   DECL_GETTER(track_id, uint32_t)
-  uint32_t get_timescale_hz() const { return timing.get_timescale_audio_hz(); }
-  DECL_GETTER(mdhd_duration_sec, double)
-  double get_duration_sec() const { return timing.get_duration_audio_sec(); }
+  uint32_t get_timescale_hz() const { return timing.get_timescale_hz(); }
+  double get_mdhd_duration_sec() const {
+    return timing.get_mdhd_duration_sec();
+  }
+  double get_duration_sec() const { return timing.get_duration_sec(); }
 
   // Refresh the owner's first/default audio metadata. Registered track IDs
   // and durations are preserved, and the per-track/default views stay aligned.
@@ -282,11 +323,9 @@ class VideoTrack {
   DECL_GETTER(profile_type_str, std::string)
 
   int parse_video_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
-                              std::shared_ptr<IsobmffFileInformation> ptr,
-                              int debug);
+                              const std::string& filename, int debug);
 
-  static int derive_video_info(std::shared_ptr<IsobmffFileInformation> ptr,
-                               bool sort_by_pts, int debug);
+  int derive_video_info(const std::string& filename, int debug);
 
   friend class IsobmffFileInformation;
   friend class TimingInformation;
@@ -310,9 +349,7 @@ class LiblcvmConfig {
  private:
   // sort_by_pts: Whether to sort the frames by PTS values.
   bool sort_by_pts;
-  // skip_audio_parsing: Whether to skip parsing the audio sample entry
-  // (codec, channel count, sample size, sample rate). The audio duration
-  // and timescale are still read from the track's mdhd box.
+  // skip_audio_parsing: Bypass all audio-track analysis, supported or not.
   bool skip_audio_parsing;
   // max_num_frames: Maximum total number of video frames (stts samples)
   // across all video tracks to accept. liblcvm keeps several per-frame lists,
@@ -390,8 +427,8 @@ class IsobmffFileInformation {
   const AudioTrack* get_audio_track(int64_t audio_track_id = -1) const;
   // -1 selects the first video. Audio remains the first argument so existing
   // get_timing(audio_id) calls keep their meaning.
-  TimingInformation get_timing(int64_t audio_track_id = -1,
-                               int64_t video_track_id = -1) const;
+  AudioVideoTimingInformation get_timing(int64_t audio_track_id = -1,
+                                         int64_t video_track_id = -1) const;
   const VideoTrack* get_video_track(int64_t video_track_id = -1) const;
   std::vector<uint32_t> get_video_track_ids() const;
   std::vector<uint32_t> get_audio_track_ids() const;

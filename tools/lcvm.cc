@@ -291,9 +291,7 @@ void usage(char* name) {
           "dump timestamps\n");
   fprintf(stderr, "\t--sort-pts:\t\tSort outfile timestamps by PTS\n");
   fprintf(stderr, "\t--no-sort-pts:\t\tDo not outfile timestamps by PTS\n");
-  fprintf(stderr,
-          "\t--skip-audio-parsing:\tSkip the audio sample entry (codec "
-          "details)\n");
+  fprintf(stderr, "\t--skip-audio-parsing:\tSkip all audio-track analysis\n");
   fprintf(stderr,
           "\t--no-skip-audio-parsing:\tParse the audio sample entry "
           "(default)\n");

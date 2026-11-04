@@ -34,14 +34,17 @@ VIDEO_ENTRY = box('avc1', VIDEO_HEADER + box('avcC', bytes.fromhex('0142001effe0
 STTS = full('stts', u32(1) + u32(120) + u32(1000))
 
 
-def track(track_id, handler, entry, mdhd_duration, tkhd_duration, timescale):
+def track(track_id, handler, entry, mdhd_duration, tkhd_duration, timescale,
+          sample_timing=None):
     tkhd = full('tkhd', u32(0) * 2 + u32(track_id) + u32(0) +
                 u32(tkhd_duration) + bytes(8) + bytes(8) + MATRIX +
                 u32(16 << 16) * 2, 3)
     mdhd = full('mdhd', u32(0) * 2 + u32(timescale) + u32(mdhd_duration) + bytes(4))
     hdlr = full('hdlr', u32(0) + handler.encode('ascii') + bytes(12) + b'\0')
     stsd = full('stsd', u32(1) + entry)
-    stbl = box('stbl', stsd + (STTS if handler == 'vide' else b''))
+    timing = sample_timing if sample_timing is not None else (
+        STTS if handler == 'vide' else b'')
+    stbl = box('stbl', stsd + timing)
     return box('trak', tkhd + box('mdia', mdhd + hdlr + box('minf', stbl)))
 
 
