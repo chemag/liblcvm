@@ -169,6 +169,20 @@ sibling cannot hide a malformed known configuration. Unknown generic tracks
 do not contribute timing or consume the per-frame allocation budget. Library
 exports retain invalid generic fields; acceptance/filtering is a tool policy.
 
+## 4.4. CLI Strictness
+
+The CLI defaults to `--strict`, rejecting generic unsupported audio/video
+records. `--no-strict` omits generic fields and their AV pairs and chooses
+supported tracks for presentation; explicit absent/unsupported selectors are
+errors. Supported counts determine singleton suffix elision. Library track
+collections, getters, and invalid generic fields remain unchanged by tool mode.
+
+CLI policy evaluation also excludes generic records before evaluating rules,
+using the selected supported aliases and absent-audio defaults when no known
+audio remains. The library policy API itself is unchanged. Audio skipping
+bypasses tracks in both modes; lower container syntax errors remain fatal.
+No source bytes are removed: File-wide size/bitrate describe the original file.
+
 As an alternative, and to keep backwards compatibility, we will keep for
 a while the old API that returned a set of variables at the same time. These
 include:

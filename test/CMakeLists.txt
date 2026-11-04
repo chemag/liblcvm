@@ -58,7 +58,8 @@ endforeach()
 
 # CLI regressions exercise compact track fields and union-header serialization.
 foreach(cli_test IN ITEMS liblcvm_multi_audio_unittest
-                          liblcvm_compact_tracks_unittest)
+                          liblcvm_compact_tracks_unittest
+                          liblcvm_strict_cli_unittest)
   if(TARGET ${cli_test})
     target_compile_definitions(${cli_test} PRIVATE
       LCVM_TOOL_PATH="$<TARGET_FILE:lcvm>")
