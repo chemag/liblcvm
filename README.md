@@ -155,6 +155,20 @@ summary, not a replacement for the presentation duration.
 No audio records or AV fields are produced for skipped tracks. The lower
 ISOBMFF parser still validates container/box syntax before track analysis.
 
+## 4.3. Generic Unsupported Tracks
+
+Track helpers recognize supported sample entries; unknown entries retain
+ordinary `AudioTrack`/`VideoTrack` records with the first direct `stsd` child
+name, or `none` for missing/empty descriptions. Their `is_supported()` is
+false and detail/timing values are invalid. No separate unsupported class or
+FLAC support is introduced. Generic track IDs remain discoverable in container
+order; pointer lookup is non-null for a generic record and null for absence.
+
+All direct recognized entries are validated before selecting one, so a valid
+sibling cannot hide a malformed known configuration. Unknown generic tracks
+do not contribute timing or consume the per-frame allocation budget. Library
+exports retain invalid generic fields; acceptance/filtering is a tool policy.
+
 As an alternative, and to keep backwards compatibility, we will keep for
 a while the old API that returned a set of variables at the same time. These
 include:

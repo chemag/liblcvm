@@ -205,14 +205,22 @@ TEST(LiblcvmMultivideoTest, SkippedAudioLeavesIndependentVideoTimelines) {
   EXPECT_EQ(72, file->get_timing(-1, 21).get_num_frames());
 }
 
-TEST(LiblcvmMultivideoTest,
-     MissingAndUnsupportedVideoNeverHiddenByValidSibling) {
+TEST(LiblcvmMultivideoTest, MalformedVideoNeverHiddenByValidSibling) {
   for (const auto& name :
-       {"multivideo_duplicate.mp4", "multivideo_unsupported.mp4",
-        "multivideo_missing_config.mp4"}) {
+       {"multivideo_duplicate.mp4", "multivideo_missing_config.mp4"}) {
     EXPECT_EQ(nullptr, ParseVideo(name));
     EXPECT_EQ(nullptr, ParseVideo(name, true));
   }
+}
+
+TEST(LiblcvmMultivideoTest, UnsupportedVideoRetainsItsSupportedSibling) {
+  const auto file = ParseVideo("multivideo_unsupported.mp4");
+  ASSERT_NE(nullptr, file);
+  EXPECT_EQ((std::vector<uint32_t>{11, 21}), file->get_video_track_ids());
+  EXPECT_FALSE(file->get_video_track(11)->is_supported());
+  EXPECT_EQ("zzzz", file->get_video_track(11)->get_video_codec_type());
+  EXPECT_TRUE(file->get_video_track(21)->is_supported());
+  EXPECT_EQ(72, file->get_timing(-1, 21).get_num_frames());
 }
 
 TEST(LiblcvmMultivideoTest, AbsentVideoOrAudioHasNoInventedPairs) {

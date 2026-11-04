@@ -204,6 +204,7 @@ class AudioVideoTimingInformation : public TimingInformation {
 
 class AudioTrack {
  private:
+  bool supported = false;
   TimingInformation timing{};
   // audio_type: Exact audio sample entry type ("mp4a", "Opus", or "ec-3").
   std::string audio_type;
@@ -221,6 +222,7 @@ class AudioTrack {
                          const std::string& filename, int debug);
 
  public:
+  bool is_supported() const { return supported; }
   AudioTrack();
   const TimingInformation& get_timing() const { return timing; }
   DECL_GETTER(audio_type, std::string)
@@ -248,6 +250,7 @@ class AudioTrack {
 
 class VideoTrack {
  private:
+  bool supported = false;
   TimingInformation timing{};
   // track_id: Stored tkhd ID of the analyzed video track, not its index.
   uint32_t track_id = 0;
@@ -298,6 +301,7 @@ class VideoTrack {
   void parse_avcc(std::shared_ptr<ISOBMFF::AVCC> avcc, int debug);
 
  public:
+  bool is_supported() const { return supported; }
   VideoTrack();
   const TimingInformation& get_timing() const { return timing; }
   DECL_GETTER(track_id, uint32_t)

@@ -278,10 +278,12 @@ TEST(LiblcvmMultiAudioTest, PublicHelperRefreshesParsedFirstTrackConsistently) {
   EXPECT_EQ(Text(fields.at("sample_rate")),
             Text(fields.at("sample_rate_a4294967295")));
   auto empty = std::make_shared<ISOBMFF::ContainerBox>("stbl");
-  EXPECT_NE(0, receiver.parse_audio_information(empty, file, 0));
-  EXPECT_EQ(32000, file->get_audio_track()->get_sample_rate());
-  EXPECT_EQ(32000,
-            file->get_audio_track(int64_t(UINT32_MAX))->get_sample_rate());
+  EXPECT_EQ(0, receiver.parse_audio_information(empty, file, 0));
+  EXPECT_EQ("none", file->get_audio_track()->get_audio_type());
+  EXPECT_FALSE(file->get_audio_track()->is_supported());
+  EXPECT_EQ(-1, file->get_audio_track()->get_sample_rate());
+  EXPECT_DOUBLE_EQ(-1, file->get_audio_track()->get_duration_sec());
+  EXPECT_EQ(44100, file->get_audio_track(23)->get_sample_rate());
 }
 
 TEST(LiblcvmMultiAudioTest, UnsupportedAudioIsBypassedWhenSkipped) {
@@ -290,7 +292,13 @@ TEST(LiblcvmMultiAudioTest, UnsupportedAudioIsBypassedWhenSkipped) {
   EXPECT_TRUE(file->get_audio_tracks().empty());
   EXPECT_EQ(nullptr, file->get_audio_track(2));
   EXPECT_DOUBLE_EQ(-1, file->get_timing().get_duration_audio_sec());
-  EXPECT_EQ(nullptr, Parse("unsupported_then_aac.mp4", false));
+  const auto full = Parse("unsupported_then_aac.mp4", false);
+  ASSERT_NE(nullptr, full);
+  ASSERT_NE(nullptr, full->get_audio_track(2));
+  EXPECT_EQ("zzzz", full->get_audio_track(2)->get_audio_type());
+  EXPECT_FALSE(full->get_audio_track(2)->is_supported());
+  EXPECT_DOUBLE_EQ(-1, full->get_audio_track(2)->get_duration_sec());
+  EXPECT_TRUE(full->get_audio_track(23)->is_supported());
 }
 
 TEST(LiblcvmMultiAudioTest, VideoQualificationUsesStoredIdNotPosition) {
@@ -430,7 +438,7 @@ TEST(LiblcvmMultiAudioCliTest, FailedLastSelectionPreservesTimestampHeader) {
 }
 
 TEST(LiblcvmMultiAudioCliTest, PartialFailuresDoNotMisalignSuccessfulRows) {
-  auto result = Cli({"multi_audio_max_id.mp4", "unsupported_then_aac.mp4",
+  auto result = Cli({"multi_audio_max_id.mp4", "eac3_missing_dec3.mp4",
                      "multi_audio_no_audio.mp4"});
   EXPECT_NE(0, result.status);
   auto rows = Rows(result.output);

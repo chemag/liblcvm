@@ -136,6 +136,7 @@ PYBIND11_MODULE(liblcvm, m) {
       .def(py::init<>())
       // Automatically bind all VideoTrack class getters
       VIDEO_GETTERS(VideoTrack)
+      .def("is_supported", &VideoTrack::is_supported)
       .def("get_timing", &VideoTrack::get_timing,
            py::return_value_policy::reference_internal);
 
@@ -195,6 +196,7 @@ PYBIND11_MODULE(liblcvm, m) {
       .def(py::init<>())
       // Automatically bind all AudioTrack class getters
       AUDIO_GETTERS(AudioTrack)
+      .def("is_supported", &AudioTrack::is_supported)
       .def("get_timing", &AudioTrack::get_timing,
            py::return_value_policy::reference_internal);
 

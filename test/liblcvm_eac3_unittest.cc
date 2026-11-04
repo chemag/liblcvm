@@ -176,11 +176,16 @@ TEST(LiblcvmEac3Test, PublicHelperStillUpdatesOwnerNotReceiver) {
   EXPECT_EQ(5, owner->get_audio_track()->get_channel_count());
 }
 
-TEST(LiblcvmEac3Test, OtherUnsupportedAudioStillFailsInEitherOrder) {
+TEST(LiblcvmEac3Test, UnsupportedAudioDoesNotHideKnownSibling) {
   for (const auto& name :
        {"unsupported_then_aac.mp4", "aac_then_unsupported.mp4"}) {
     SCOPED_TRACE(name);
-    EXPECT_EQ(nullptr, ParseEac3(name));
-    EXPECT_NE(nullptr, ParseEac3(name, true));
+    const auto file = ParseEac3(name);
+    ASSERT_NE(nullptr, file);
+    ASSERT_NE(nullptr, file->get_audio_track(2));
+    EXPECT_FALSE(file->get_audio_track(2)->is_supported());
+    EXPECT_EQ("zzzz", file->get_audio_track(2)->get_audio_type());
+    EXPECT_DOUBLE_EQ(-1, file->get_audio_track(2)->get_duration_sec());
+    EXPECT_TRUE(file->get_audio_track(23)->is_supported());
   }
 }

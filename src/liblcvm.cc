@@ -586,6 +586,10 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
       if (metadata_result < 0)
         return nullptr;
       track.track_id = id;
+      if (!track.is_supported()) {
+        ptr->audio_tracks.push_back(std::move(track));
+        continue;
+      }
 
       const int timing_result = track.timing.parse_timing_information(
           stbl, timescale_track_hz, liblcvm_config.get_max_num_frames(), false,
@@ -611,6 +615,10 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     if (metadata_result < 0)
       return nullptr;
     track.track_id = id;
+    if (!track.is_supported()) {
+      ptr->video_tracks.push_back(std::move(track));
+      continue;
+    }
     track.width = tkhd->GetWidth();
     track.height = tkhd->GetHeight();
 
@@ -1232,7 +1240,8 @@ int AudioTrack::parse_audio_information(
   } else {
     const auto& first = ptr->audio_tracks.front();
     parsed.track_id = first.track_id;
-    parsed.timing = first.timing;
+    if (parsed.is_supported())
+      parsed.timing = first.timing;
     ptr->audio_tracks.front() = std::move(parsed);
   }
   return 0;
@@ -1240,19 +1249,39 @@ int AudioTrack::parse_audio_information(
 
 int AudioTrack::parse_sample_entry(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
                                    const std::string& filename, int debug) {
+  if (!stbl)
+    return -1;
   auto saved_timing = std::move(timing);
   *this = AudioTrack();
   timing = std::move(saved_timing);
   auto stsd = stbl->GetTypedBox<ISOBMFF::STSD>("stsd");
-  if (!stsd) {
-    if (debug > 0) {
-      fprintf(stderr, "error: no /moov/trak/mdia/minf/stbl/stsd in %s\n",
-              filename.c_str());
+  const auto generic = [&](const std::string& type) {
+    audio_type = type;
+    supported = false;
+    channel_count = sample_rate = sample_size = -1;
+    timing = TimingInformation{};
+    eac3_configuration.reset();
+    return 0;
+  };
+  if (!stsd || stsd->GetBoxes().empty())
+    return generic("none");
+  for (const auto& box : stsd->GetBoxes()) {
+    const auto name = box->GetName();
+    if ((name == "mp4a" && !std::dynamic_pointer_cast<ISOBMFF::MP4A>(box)) ||
+        (name == "Opus" && !std::dynamic_pointer_cast<ISOBMFF::OPUS>(box)))
+      return -1;
+    if (name == "ec-3") {
+      const auto entry = std::dynamic_pointer_cast<ISOBMFF::EC3>(box);
+      if (!entry)
+        return -1;
+      const auto config = entry->GetTypedBox<ISOBMFF::DEC3>("dec3");
+      if (!config || config->GetIndependentSubstreams().empty())
+        return -1;
     }
-    return -1;
   }
   auto mp4a = stsd->GetTypedBox<ISOBMFF::MP4A>("mp4a");
   if (mp4a) {
+    supported = true;
     audio_type = "mp4a";
     channel_count = mp4a->GetChannelCount();
     sample_size = mp4a->GetSampleSize();
@@ -1261,6 +1290,7 @@ int AudioTrack::parse_sample_entry(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
   }
   auto opus = stsd->GetTypedBox<ISOBMFF::OPUS>("Opus");
   if (opus) {
+    supported = true;
     audio_type = "Opus";
     channel_count = opus->GetChannelCount();
     sample_size = opus->GetSampleSize();
@@ -1272,6 +1302,7 @@ int AudioTrack::parse_sample_entry(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
     auto dec3 = ec3->GetTypedBox<ISOBMFF::DEC3>("dec3");
     if (!dec3 || dec3->GetIndependentSubstreams().empty())
       return -1;
+    supported = true;
     audio_type = "ec-3";
     eac3_configuration = dec3;
     // Annex F.5.2 requires ignoring sample-entry ChannelCount and SampleSize.
@@ -1288,12 +1319,7 @@ int AudioTrack::parse_sample_entry(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
     sample_size = -1;  // No compressed PCM precision is declared by dec3.
     return 0;
   }
-  if (debug > 0) {
-    fprintf(stderr,
-            "error: no /moov/trak/mdia/minf/stbl/stsd/{mp4a,Opus,ec-3} in %s\n",
-            filename.c_str());
-  }
-  return -1;
+  return generic(stsd->GetBoxes().front()->GetName());
 }
 
 int VideoTrack::parse_video_information(
@@ -1304,15 +1330,44 @@ int VideoTrack::parse_video_information(
   // 1. look for a stsd container box
   std::shared_ptr<ISOBMFF::STSD> stsd =
       stbl->GetTypedBox<ISOBMFF::STSD>("stsd");
-  if (stsd == nullptr) {
-    if (debug > 0) {
-      fprintf(stderr, "error: no /moov/trak/mdia/minf/stbl/stsd in %s\n",
-              filename.c_str());
-    }
-    return -1;
-  }
-
+  const auto generic = [&](const std::string& type) {
+    const auto id = track_id;
+    *this = VideoTrack{};
+    track_id = id;
+    video_codec_type = type;
+    supported = false;
+    filesize = width2 = height2 = horizresolution = vertresolution = depth =
+        chroma_format = bit_depth_luma = bit_depth_chroma =
+            video_full_range_flag = colour_primaries =
+                transfer_characteristics = matrix_coeffs = profile_idc =
+                    level_idc = -1;
+    width = height = bitrate_bps = -1.0;
+    return 0;
+  };
+  if (!stsd || stsd->GetBoxes().empty())
+    return generic("none");
   // 2. look for hvc1/hev1 or avc1/avc3 (container) boxes
+  for (const auto& box : stsd->GetBoxes()) {
+    const auto name = box->GetName();
+    const bool hevc = name == "hvc1" || name == "hev1";
+    const bool avc = name == "avc1" || name == "avc3";
+    if (!hevc && !avc)
+      continue;
+    if ((name == "hvc1" && !std::dynamic_pointer_cast<ISOBMFF::HVC1>(box)) ||
+        (name == "hev1" && !std::dynamic_pointer_cast<ISOBMFF::HEV1>(box)) ||
+        (name == "avc1" && !std::dynamic_pointer_cast<ISOBMFF::AVC1>(box)) ||
+        (name == "avc3" && !std::dynamic_pointer_cast<ISOBMFF::AVC3>(box)))
+      return -1;
+    if (hevc) {
+      const auto entry = std::dynamic_pointer_cast<ISOBMFF::HVC1>(box);
+      if (!entry || !entry->GetTypedBox<ISOBMFF::HVCC>("hvcC"))
+        return -1;
+    } else {
+      const auto entry = std::dynamic_pointer_cast<ISOBMFF::AVC1>(box);
+      if (!entry || !entry->GetTypedBox<ISOBMFF::AVCC>("avcC"))
+        return -1;
+    }
+  }
   std::shared_ptr<ISOBMFF::HVC1> hvc1 =
       stsd->GetTypedBox<ISOBMFF::HVC1>("hvc1");
   std::shared_ptr<ISOBMFF::HEV1> hev1 =
@@ -1375,14 +1430,8 @@ int VideoTrack::parse_video_information(
     this->parse_avcc(avcc, debug);
 
   } else {
-    if (debug > 0) {
-      fprintf(stderr,
-              "error: cannot find a supported video trak in %s. Searched "
-              "/moov/trak/mdia/minf/stbl/stsd/{hvc1|hev1|avc1|avc3}\n",
-              filename.c_str());
-    }
-    return -1;
+    return generic(stsd->GetBoxes().front()->GetName());
   }
-
+  supported = true;
   return 0;
 }
