@@ -50,73 +50,83 @@ static void derive_audio_video_metrics(double video_sec, double audio_sec,
   }
 }
 
-AudioInformation IsobmffFileInformation::get_audio_info(
+const IsobmffFileInformation::AudioTrack* IsobmffFileInformation::audio_view(
     int64_t audio_track_id) const {
   if (audio_track_id == -1)
-    return audio;
-  if (audio_track_id < 0 ||
-      static_cast<uint64_t>(audio_track_id) > UINT32_MAX) {
+    return audio_tracks.empty() ? nullptr : &audio_tracks.front();
+  if (audio_track_id < 0 || static_cast<uint64_t>(audio_track_id) > UINT32_MAX)
     throw std::out_of_range("invalid audio track selector: " +
                             std::to_string(audio_track_id));
-  }
-  for (const auto& track : audio_tracks) {
-    if (track.get_track_id() == static_cast<uint32_t>(audio_track_id)) {
-      return track;
-    }
-  }
+  for (const auto& track : audio_tracks)
+    if (track.audio.get_track_id() == static_cast<uint32_t>(audio_track_id))
+      return &track;
   throw std::out_of_range("audio track ID not found: " +
                           std::to_string(audio_track_id));
 }
 
+AudioInformation IsobmffFileInformation::get_audio_info(
+    int64_t audio_track_id) const {
+  const auto* track = audio_view(audio_track_id);
+  if (!track)
+    return {};
+  auto result = track->audio;
+  // Compatibility snapshot; measured effective timing belongs to AudioTrack.
+  result.timescale_hz = track->timing.get_timescale_audio_hz();
+  result.duration_sec = track->timing.get_duration_audio_sec();
+  return result;
+}
+
 std::pair<const VideoInformation*, const TimingInformation*>
 IsobmffFileInformation::video_view(int64_t video_track_id) const {
-  if (video_track_id == -1)
-    return {&video, &timing};
-  if (video_track_id < 0 ||
-      static_cast<uint64_t>(video_track_id) > UINT32_MAX) {
+  if (video_track_id == -1) {
+    if (video_tracks.empty())
+      return {nullptr, nullptr};
+    return {&video_tracks.front().video, &video_tracks.front().timing};
+  }
+  if (video_track_id < 0 || static_cast<uint64_t>(video_track_id) > UINT32_MAX)
     throw std::out_of_range("invalid video track selector: " +
                             std::to_string(video_track_id));
-  }
-  const auto id = static_cast<uint32_t>(video_track_id);
-  if (has_video_track && video.get_track_id() == id)
-    return {&video, &timing};
-  for (const auto& track : additional_video_tracks) {
-    if (track.video.get_track_id() == id)
+  for (const auto& track : video_tracks)
+    if (track.video.get_track_id() == static_cast<uint32_t>(video_track_id))
       return {&track.video, &track.timing};
-  }
   throw std::out_of_range("video track ID not found: " +
                           std::to_string(video_track_id));
 }
 
 VideoInformation IsobmffFileInformation::get_video_info(
     int64_t video_track_id) const {
-  return *video_view(video_track_id).first;
+  const auto selected = video_view(video_track_id);
+  if (selected.first)
+    return *selected.first;
+  VideoInformation empty{};
+  empty.filesize = filesize;
+  empty.bitrate_bps = -8.0 * static_cast<double>(filesize);
+  return empty;
 }
 
 std::vector<uint32_t> IsobmffFileInformation::get_video_track_ids() const {
   std::vector<uint32_t> ids;
-  if (has_video_track)
-    ids.push_back(video.get_track_id());
-  for (const auto& track : additional_video_tracks)
+  for (const auto& track : video_tracks)
     ids.push_back(track.video.get_track_id());
   return ids;
 }
-
 std::vector<uint32_t> IsobmffFileInformation::get_audio_track_ids() const {
   std::vector<uint32_t> ids;
   for (const auto& track : audio_tracks)
-    ids.push_back(track.get_track_id());
+    ids.push_back(track.audio.get_track_id());
   return ids;
 }
 
 TimingInformation IsobmffFileInformation::get_timing(
     int64_t audio_track_id, int64_t video_track_id) const {
-  if (audio_track_id == -1 && video_track_id == -1)
-    return timing;
-  const auto selected = get_audio_info(audio_track_id);
-  auto result = *video_view(video_track_id).second;
-  result.duration_audio_sec = selected.get_duration_sec();
-  result.timescale_audio_hz = selected.get_timescale_hz();
+  const auto* audio = audio_view(audio_track_id);
+  const auto video = video_view(video_track_id);
+  auto result = video.second ? *video.second : empty_timing();
+  result.timescale_movie_hz = timescale_movie_hz;
+  result.duration_audio_sec =
+      audio ? audio->timing.get_duration_audio_sec() : -1.0;
+  result.timescale_audio_hz =
+      audio ? audio->timing.get_timescale_audio_hz() : 0;
   derive_audio_video_metrics(result.duration_video_sec,
                              result.duration_audio_sec,
                              result.audio_video_ratio, result.video_freeze);
@@ -371,7 +381,7 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
         pvals->push_back(video_values[i]);
       }
     }
-    const auto tracks = pobj->get_audio_tracks();
+    const auto& tracks = pobj->get_audio_tracks();
     pkeys->push_back("audio_track_id");
     pvals->push_back(tracks.empty()
                          ? LiblcvmValue(-1)
@@ -381,11 +391,13 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
                          ? LiblcvmValue(-1)
                          : LiblcvmValue(selected_video.get_track_id()));
     for (const auto& audio : tracks) {
-      const auto suffix = "_a" + std::to_string(audio.get_track_id());
-      const LiblcvmValList values = {
-          audio.get_audio_type(),   audio.get_channel_count(),
-          audio.get_sample_rate(),  audio.get_sample_size(),
-          audio.get_duration_sec(), audio.get_timescale_hz()};
+      const auto suffix = "_a" + std::to_string(audio.audio.get_track_id());
+      const LiblcvmValList values = {audio.audio.get_audio_type(),
+                                     audio.audio.get_channel_count(),
+                                     audio.audio.get_sample_rate(),
+                                     audio.audio.get_sample_size(),
+                                     audio.timing.get_duration_audio_sec(),
+                                     audio.timing.get_timescale_audio_hz()};
       for (size_t i = 0; i < audio_keys.size(); ++i) {
         pkeys->push_back(audio_keys[i] + suffix);
         pvals->push_back(values[i]);
@@ -395,7 +407,8 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
         double ratio;
         bool freeze;
         derive_audio_video_metrics(pair_timing.get_duration_video_sec(),
-                                   audio.get_duration_sec(), ratio, freeze);
+                                   audio.timing.get_duration_audio_sec(), ratio,
+                                   freeze);
         const auto pair = "_v" + std::to_string(video_id) + suffix;
         pkeys->push_back("audio_video_ratio" + pair);
         pvals->push_back(ratio);
@@ -528,12 +541,9 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     return nullptr;
   }
   uint32_t timescale_movie_hz = mvhd->GetTimescale();
-  ptr->timing.timescale_movie_hz = timescale_movie_hz;
+  ptr->timescale_movie_hz = timescale_movie_hz;
 
   // 4. look for trak container boxes
-  ptr->timing.duration_video_sec = -1.0;
-  ptr->timing.duration_audio_sec = -1.0;
-  ptr->timing.timescale_audio_hz = 0;
   uint64_t total_video_frames = 0;
   for (auto& box : moov->GetBoxes()) {
     std::string name = box->GetName();
@@ -586,20 +596,27 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
       fprintf(stdout, "mdhd_duration: %" PRIu64 " ", mdhd_duration);
       fprintf(stdout, "mdhd_duration_sec: %f\n", mdhd_duration_sec);
     }
+    AudioTrack audio_track{};
+    audio_track.timing.duration_video_sec = -1.0;
+    audio_track.timing.duration_audio_sec = -1.0;
+    audio_track.timing.timescale_movie_hz = timescale_movie_hz;
     std::shared_ptr<IsobmffFileInformation> video_ptr;
     if (handler_type.compare("vide") == 0) {
-      video_ptr = ptr->has_video_track
-                      ? std::make_shared<IsobmffFileInformation>()
-                      : ptr;
+      video_ptr = std::make_shared<IsobmffFileInformation>();
+      video_ptr->video_tracks.emplace_back();
       video_ptr->filename = ptr->filename;
+      video_ptr->timescale_movie_hz = timescale_movie_hz;
       // Every video gets independent video/timing state, including drop and
       // keyframe lists. Keep the first analysis in the legacy default members.
-      video_ptr->video = VideoInformation{};
-      video_ptr->timing = TimingInformation{};
-      video_ptr->timing.timescale_movie_hz = timescale_movie_hz;
-      video_ptr->timing.duration_audio_sec = -1.0;
-      video_ptr->timing.duration_video_sec = mdhd_duration_sec;
-      video_ptr->timing.timescale_video_hz = timescale_track_hz;
+      video_ptr->video_tracks.front().video = VideoInformation{};
+      video_ptr->video_tracks.front().timing = TimingInformation{};
+      video_ptr->video_tracks.front().timing.timescale_movie_hz =
+          timescale_movie_hz;
+      video_ptr->video_tracks.front().timing.duration_audio_sec = -1.0;
+      video_ptr->video_tracks.front().timing.duration_video_sec =
+          mdhd_duration_sec;
+      video_ptr->video_tracks.front().timing.timescale_video_hz =
+          timescale_track_hz;
     }
 
     if (handler_type.compare("vide") != 0 &&
@@ -613,17 +630,19 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
       auto tkhd = trak->GetTypedBox<ISOBMFF::TKHD>("tkhd");
       if (!tkhd)
         return nullptr;
-      AudioInformation skipped;
-      skipped.track_id = tkhd->GetTrackID();
-      skipped.timescale_hz = timescale_track_hz;
-      skipped.mdhd_duration_sec = mdhd_duration_sec;
+      AudioTrack skipped{};
+      skipped.timing.duration_video_sec = -1.0;
+      skipped.timing.timescale_movie_hz = timescale_movie_hz;
+      skipped.audio.track_id = tkhd->GetTrackID();
+      skipped.timing.timescale_audio_hz = timescale_track_hz;
+      skipped.audio.mdhd_duration_sec = mdhd_duration_sec;
       // Preserve the skip option's mdhd-only duration semantics.
-      skipped.duration_sec = mdhd_duration_sec;
+      skipped.timing.duration_audio_sec = mdhd_duration_sec;
       for (const auto& audio : ptr->audio_tracks) {
-        if (audio.get_track_id() == skipped.track_id) {
+        if (audio.audio.get_track_id() == skipped.audio.track_id) {
           if (liblcvm_config.get_debug() > 0) {
             fprintf(stderr, "error: duplicate audio track ID %u\n",
-                    skipped.track_id);
+                    skipped.audio.track_id);
           }
           return nullptr;
         }
@@ -656,8 +675,8 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
 
     // stbl-based audio processing
     if (handler_type.compare("soun") == 0) {
-      if (ptr->audio.parse_sample_entry(stbl, ptr->filename,
-                                        liblcvm_config.get_debug()) < 0) {
+      if (audio_track.audio.parse_sample_entry(
+              stbl, ptr->filename, liblcvm_config.get_debug()) < 0) {
         if (liblcvm_config.get_debug() > 0) {
           fprintf(stderr, "error: in getting audio information in %s\n",
                   ptr->filename.c_str());
@@ -665,8 +684,8 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
         return nullptr;
       }
       // Preserve mdhd fallback when movie timescale is unavailable.
-      ptr->timing.duration_audio_sec = mdhd_duration_sec;
-      ptr->timing.timescale_audio_hz = timescale_track_hz;
+      audio_track.timing.duration_audio_sec = mdhd_duration_sec;
+      audio_track.timing.timescale_audio_hz = timescale_track_hz;
     }
 
     // 9. look for a tkhd box
@@ -681,21 +700,16 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     }
     if (handler_type.compare("vide") == 0) {
       const auto id = tkhd->GetTrackID();
-      if (ptr->has_video_track) {
-        bool duplicate = ptr->video.get_track_id() == id;
-        for (const auto& video : ptr->additional_video_tracks) {
-          duplicate = duplicate || video.video.get_track_id() == id;
-        }
-        if (duplicate) {
-          if (liblcvm_config.get_debug() > 0) {
+      for (const auto& track : ptr->video_tracks) {
+        if (track.video.get_track_id() == id) {
+          if (liblcvm_config.get_debug() > 0)
             fprintf(stderr, "error: duplicate video track ID %u\n", id);
-          }
           return nullptr;
         }
       }
-      video_ptr->video.track_id = id;
-      video_ptr->video.width = tkhd->GetWidth();
-      video_ptr->video.height = tkhd->GetHeight();
+      video_ptr->video_tracks.front().video.track_id = id;
+      video_ptr->video_tracks.front().video.width = tkhd->GetWidth();
+      video_ptr->video_tracks.front().video.height = tkhd->GetHeight();
     }
 
     // tkhd-based track duration
@@ -711,48 +725,47 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
       }
       // tkhd duration has priority over mdhd duration
       if (handler_type.compare("soun") == 0) {
-        ptr->timing.duration_audio_sec = tkhd_duration_sec;
+        audio_track.timing.duration_audio_sec = tkhd_duration_sec;
       } else if (handler_type.compare("vide") == 0) {
-        video_ptr->timing.duration_video_sec = tkhd_duration_sec;
+        video_ptr->video_tracks.front().timing.duration_video_sec =
+            tkhd_duration_sec;
       }
     }
 
     // Retain every audio record before choosing the first-track default.
     if (handler_type.compare("soun") == 0) {
-      ptr->audio.track_id = tkhd->GetTrackID();
-      ptr->audio.timescale_hz = timescale_track_hz;
-      ptr->audio.mdhd_duration_sec = mdhd_duration_sec;
-      ptr->audio.duration_sec = ptr->timing.duration_audio_sec;
+      audio_track.audio.track_id = tkhd->GetTrackID();
+      audio_track.audio.mdhd_duration_sec = mdhd_duration_sec;
       for (const auto& audio : ptr->audio_tracks) {
-        if (audio.get_track_id() == ptr->audio.track_id) {
+        if (audio.audio.get_track_id() == audio_track.audio.track_id) {
           if (liblcvm_config.get_debug() > 0) {
             fprintf(stderr, "error: duplicate audio track ID %u\n",
-                    ptr->audio.track_id);
+                    audio_track.audio.track_id);
           }
           return nullptr;
         }
       }
-      ptr->audio_tracks.push_back(ptr->audio);
+      ptr->audio_tracks.push_back(std::move(audio_track));
       continue;
     }
 
     // 10. get video timing information
     // init timing info
-    video_ptr->timing.num_video_frames = 0;
-    video_ptr->timing.dts_sec_list.clear();
-    video_ptr->timing.pts_unit_list.clear();
-    video_ptr->timing.pts_sec_list.clear();
-    video_ptr->timing.stts_unit_list.clear();
-    video_ptr->timing.ctts_unit_list.clear();
+    video_ptr->video_tracks.front().timing.num_video_frames = 0;
+    video_ptr->video_tracks.front().timing.dts_sec_list.clear();
+    video_ptr->video_tracks.front().timing.pts_unit_list.clear();
+    video_ptr->video_tracks.front().timing.pts_sec_list.clear();
+    video_ptr->video_tracks.front().timing.stts_unit_list.clear();
+    video_ptr->video_tracks.front().timing.ctts_unit_list.clear();
     // first frame starts at 0.0
-    video_ptr->timing.dts_sec_list.push_back(0.0);
-    video_ptr->timing.pts_unit_list.push_back(0);
-    video_ptr->timing.pts_sec_list.push_back(0.0);
+    video_ptr->video_tracks.front().timing.dts_sec_list.push_back(0.0);
+    video_ptr->video_tracks.front().timing.pts_unit_list.push_back(0);
+    video_ptr->video_tracks.front().timing.pts_sec_list.push_back(0.0);
     // max_num_frames is a FILE-wide allocation budget, not one budget per
     // video.
     const auto remaining = static_cast<uint32_t>(
         liblcvm_config.get_max_num_frames() - total_video_frames);
-    if (video_ptr->timing.parse_timing_information(
+    if (video_ptr->video_tracks.front().timing.parse_timing_information(
             stbl, timescale_track_hz, remaining, video_ptr,
             liblcvm_config.get_debug()) < 0) {
       if (liblcvm_config.get_debug() > 0) {
@@ -763,7 +776,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     }
 
     // 11. get video keyframe information
-    if (video_ptr->timing.parse_keyframe_information(
+    if (video_ptr->video_tracks.front().timing.parse_keyframe_information(
             stbl, video_ptr, liblcvm_config.get_debug()) < 0) {
       if (liblcvm_config.get_debug() > 0) {
         fprintf(stderr, "error: no keyframe information in %s\n",
@@ -773,7 +786,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     }
 
     // 12. get video frame information
-    if (video_ptr->video.parse_video_information(
+    if (video_ptr->video_tracks.front().video.parse_video_information(
             stbl, video_ptr, liblcvm_config.get_debug()) < 0) {
       if (liblcvm_config.get_debug() > 0) {
         fprintf(stderr, "error: no frame information in %s\n",
@@ -781,47 +794,22 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
       }
       return nullptr;
     }
-    if (video_ptr->timing.derive_timing_info(video_ptr,
-                                             liblcvm_config.get_sort_by_pts(),
-                                             liblcvm_config.get_debug()) < 0 ||
-        video_ptr->video.derive_video_info(video_ptr,
-                                           liblcvm_config.get_sort_by_pts(),
-                                           liblcvm_config.get_debug()) < 0) {
+    if (video_ptr->video_tracks.front().timing.derive_timing_info(
+            video_ptr, liblcvm_config.get_sort_by_pts(),
+            liblcvm_config.get_debug()) < 0 ||
+        video_ptr->video_tracks.front().video.derive_video_info(
+            video_ptr, liblcvm_config.get_sort_by_pts(),
+            liblcvm_config.get_debug()) < 0) {
       return nullptr;
     }
-    total_video_frames +=
-        static_cast<uint64_t>(video_ptr->timing.num_video_frames);
-    if (!ptr->has_video_track) {
-      ptr->has_video_track = true;
-    } else {
-      ptr->additional_video_tracks.push_back(
-          {std::move(video_ptr->video), std::move(video_ptr->timing)});
-    }
+    total_video_frames += static_cast<uint64_t>(
+        video_ptr->video_tracks.front().timing.num_video_frames);
+    ptr->video_tracks.push_back(std::move(video_ptr->video_tracks.front()));
   }
-
-  // Choose the first audio record in container order, not the lowest tkhd ID.
-  // This intentionally replaces the previous last-audio default.
-  if (!ptr->audio_tracks.empty()) {
-    ptr->audio = ptr->audio_tracks.front();
-    ptr->timing.duration_audio_sec = ptr->audio.get_duration_sec();
-    ptr->timing.timescale_audio_hz = ptr->audio.get_timescale_hz();
-  }
-
-  // For files without video, preserve the legacy empty/default analysis.
-  if (!ptr->has_video_track) {
-    if (ptr->timing.derive_timing_info(ptr, liblcvm_config.get_sort_by_pts(),
-                                       liblcvm_config.get_debug()) < 0 ||
-        ptr->video.derive_video_info(ptr, liblcvm_config.get_sort_by_pts(),
-                                     liblcvm_config.get_debug()) < 0) {
-      return nullptr;
-    }
-  } else {
-    // Video-derived lists are already finalized independently. Only refresh
-    // the first/default AV relationship after all audio records are known.
-    derive_audio_video_metrics(
-        ptr->timing.duration_video_sec, ptr->timing.duration_audio_sec,
-        ptr->timing.audio_video_ratio, ptr->timing.video_freeze);
-  }
+  struct stat stat_buf;
+  if (stat(ptr->filename.c_str(), &stat_buf) < 0)
+    return nullptr;
+  ptr->filesize = stat_buf.st_size;
 
   return ptr;
 }
@@ -839,6 +827,8 @@ int TimingInformation::parse_timing_information(
     std::shared_ptr<ISOBMFF::ContainerBox> stbl, uint32_t timescale_track_hz,
     uint32_t max_num_frames, std::shared_ptr<IsobmffFileInformation> ptr,
     int debug) {
+  if (!ptr || ptr->video_tracks.empty())
+    return -1;
   // 1. look for a stts box
   std::shared_ptr<ISOBMFF::STTS> stts =
       stbl->GetTypedBox<ISOBMFF::STTS>("stts");
@@ -875,18 +865,18 @@ int TimingInformation::parse_timing_information(
   for (unsigned int i = 0; i < stts->GetEntryCount(); i++) {
     uint32_t sample_count = stts->GetSampleCount(i);
     stts_sample_count += sample_count;
-    ptr->timing.num_video_frames += sample_count;
+    ptr->video_tracks.front().timing.num_video_frames += sample_count;
     uint32_t sample_offset = stts->GetSampleOffset(i);
     for (uint32_t sample = 0; sample < sample_count; sample++) {
       // store the new stts value
-      ptr->timing.stts_unit_list.push_back(sample_offset);
+      ptr->video_tracks.front().timing.stts_unit_list.push_back(sample_offset);
       // set the dts value of the next frame
       uint32_t dts_unit = last_dts_unit + sample_offset;
       double dts_sec = ((double)dts_unit) / timescale_track_hz;
-      ptr->timing.dts_sec_list.push_back(dts_sec);
+      ptr->video_tracks.front().timing.dts_sec_list.push_back(dts_sec);
       // init the pts value of the next frame
-      ptr->timing.pts_unit_list.push_back(dts_unit);
-      ptr->timing.pts_sec_list.push_back(dts_sec);
+      ptr->video_tracks.front().timing.pts_unit_list.push_back(dts_unit);
+      ptr->video_tracks.front().timing.pts_sec_list.push_back(dts_sec);
       last_dts_unit = dts_unit;
     }
     if (debug > 2) {
@@ -899,9 +889,9 @@ int TimingInformation::parse_timing_information(
   }
   // we need to remove the last element of the dts and pts lists, as we
   // set them pointing at the start of the next frame (inexistent)
-  ptr->timing.dts_sec_list.pop_back();
-  ptr->timing.pts_unit_list.pop_back();
-  ptr->timing.pts_sec_list.pop_back();
+  ptr->video_tracks.front().timing.dts_sec_list.pop_back();
+  ptr->video_tracks.front().timing.pts_unit_list.pop_back();
+  ptr->video_tracks.front().timing.pts_sec_list.pop_back();
 
   // 3. look for a ctts box
   std::shared_ptr<ISOBMFF::CTTS> ctts =
@@ -913,7 +903,8 @@ int TimingInformation::parse_timing_information(
     // describe the same samples, but a malformed file can describe more:
     // ignore the extra ctts samples instead of writing past the end of
     // the pts lists.
-    const size_t num_frames = ptr->timing.pts_unit_list.size();
+    const size_t num_frames =
+        ptr->video_tracks.front().timing.pts_unit_list.size();
     uint64_t ctts_sample_count = 0;
     size_t cur_video_frame = 0;
     for (unsigned int i = 0; i < ctts->GetEntryCount(); i++) {
@@ -925,12 +916,16 @@ int TimingInformation::parse_timing_information(
       for (uint32_t sample = 0;
            sample < sample_count && cur_video_frame < num_frames; sample++) {
         // store the new ctts value
-        ptr->timing.ctts_unit_list.push_back(sample_offset);
+        ptr->video_tracks.front().timing.ctts_unit_list.push_back(
+            sample_offset);
         // update the pts value
-        ptr->timing.pts_unit_list[cur_video_frame] = add_int32_wraparound(
-            ptr->timing.pts_unit_list[cur_video_frame], sample_offset);
-        ptr->timing.pts_sec_list[cur_video_frame] =
-            ((double)ptr->timing.pts_unit_list[cur_video_frame]) /
+        ptr->video_tracks.front().timing.pts_unit_list[cur_video_frame] =
+            add_int32_wraparound(
+                ptr->video_tracks.front().timing.pts_unit_list[cur_video_frame],
+                sample_offset);
+        ptr->video_tracks.front().timing.pts_sec_list[cur_video_frame] =
+            ((double)ptr->video_tracks.front()
+                 .timing.pts_unit_list[cur_video_frame]) /
             timescale_track_hz;
         ++cur_video_frame;
       }
@@ -951,13 +946,16 @@ int TimingInformation::parse_timing_information(
     while (cur_video_frame < num_frames) {
       // store the (reused) ctts value, so ctts_unit_list keeps one entry
       // per frame, like the other per-frame lists
-      ptr->timing.ctts_unit_list.push_back(last_ctts_sample_offset_unit);
+      ptr->video_tracks.front().timing.ctts_unit_list.push_back(
+          last_ctts_sample_offset_unit);
       // update the pts value
-      ptr->timing.pts_unit_list[cur_video_frame] =
-          add_int32_wraparound(ptr->timing.pts_unit_list[cur_video_frame],
-                               last_ctts_sample_offset_unit);
-      ptr->timing.pts_sec_list[cur_video_frame] =
-          ((double)ptr->timing.pts_unit_list[cur_video_frame]) /
+      ptr->video_tracks.front().timing.pts_unit_list[cur_video_frame] =
+          add_int32_wraparound(
+              ptr->video_tracks.front().timing.pts_unit_list[cur_video_frame],
+              last_ctts_sample_offset_unit);
+      ptr->video_tracks.front().timing.pts_sec_list[cur_video_frame] =
+          ((double)ptr->video_tracks.front()
+               .timing.pts_unit_list[cur_video_frame]) /
           timescale_track_hz;
       ++cur_video_frame;
     }
@@ -974,10 +972,12 @@ int TimingInformation::parse_timing_information(
 int TimingInformation::parse_keyframe_information(
     std::shared_ptr<ISOBMFF::ContainerBox> stbl,
     std::shared_ptr<IsobmffFileInformation> ptr, int debug) {
+  if (!ptr || ptr->video_tracks.empty())
+    return -1;
   // look for a stss box in the video track for key frames
   std::shared_ptr<ISOBMFF::STSS> stss =
       stbl->GetTypedBox<ISOBMFF::STSS>("stss");
-  ptr->timing.keyframe_sample_number_list.clear();
+  ptr->video_tracks.front().timing.keyframe_sample_number_list.clear();
   if (stss == nullptr) {
     if (debug > 0) {
       fprintf(stderr, "warning: no /moov/trak/mdia/minf/stbl/stss in %s\n",
@@ -986,7 +986,8 @@ int TimingInformation::parse_keyframe_information(
   } else {
     for (unsigned int i = 0; i < stss->GetEntryCount(); i++) {
       uint32_t sample_count = stss->GetSampleNumber(i);
-      ptr->timing.keyframe_sample_number_list.push_back(sample_count);
+      ptr->video_tracks.front().timing.keyframe_sample_number_list.push_back(
+          sample_count);
     }
   }
 
@@ -1084,36 +1085,46 @@ static int reorder_by_index(std::vector<T>& list,
 
 int TimingInformation::derive_timing_info(
     std::shared_ptr<IsobmffFileInformation> ptr, bool sort_by_pts, int debug) {
+  if (!ptr || ptr->video_tracks.empty())
+    return -1;
   // 1. set the frame_num_orig_list vector
-  ptr->timing.frame_num_orig_list.resize(ptr->timing.pts_sec_list.size());
-  for (uint32_t i = 0; i < ptr->timing.pts_sec_list.size(); ++i) {
-    ptr->timing.frame_num_orig_list[i] = i;
+  ptr->video_tracks.front().timing.frame_num_orig_list.resize(
+      ptr->video_tracks.front().timing.pts_sec_list.size());
+  for (uint32_t i = 0; i < ptr->video_tracks.front().timing.pts_sec_list.size();
+       ++i) {
+    ptr->video_tracks.front().timing.frame_num_orig_list[i] = i;
   }
 
   // 2. sort the frames by pts value
   if (sort_by_pts) {
     // sort frame_num_orig_list elements based on the values in pts_sec_list
     // TODO(chema): there should be a clear way to access the struct element
-    const auto& pts_sec_list = ptr->timing.pts_sec_list;
-    std::stable_sort(ptr->timing.frame_num_orig_list.begin(),
-                     ptr->timing.frame_num_orig_list.end(),
-                     [&pts_sec_list](int a, int b) {
-                       return pts_sec_list[a] < pts_sec_list[b];
-                     });
+    const auto& pts_sec_list = ptr->video_tracks.front().timing.pts_sec_list;
+    std::stable_sort(
+        ptr->video_tracks.front().timing.frame_num_orig_list.begin(),
+        ptr->video_tracks.front().timing.frame_num_orig_list.end(),
+        [&pts_sec_list](int a, int b) {
+          return pts_sec_list[a] < pts_sec_list[b];
+        });
     // sort all the others based in the new order
     // All the per-frame lists must have one entry per frame (ctts_unit_list
     // may also be empty, when there is no ctts box): indexing a shorter list
     // with frame_num_orig_list would read past its end.
-    if (reorder_by_index(ptr->timing.stts_unit_list,
-                         ptr->timing.frame_num_orig_list) < 0 ||
-        reorder_by_index(ptr->timing.ctts_unit_list,
-                         ptr->timing.frame_num_orig_list) < 0 ||
-        reorder_by_index(ptr->timing.dts_sec_list,
-                         ptr->timing.frame_num_orig_list) < 0 ||
-        reorder_by_index(ptr->timing.pts_unit_list,
-                         ptr->timing.frame_num_orig_list) < 0 ||
-        reorder_by_index(ptr->timing.pts_sec_list,
-                         ptr->timing.frame_num_orig_list) < 0) {
+    if (reorder_by_index(ptr->video_tracks.front().timing.stts_unit_list,
+                         ptr->video_tracks.front().timing.frame_num_orig_list) <
+            0 ||
+        reorder_by_index(ptr->video_tracks.front().timing.ctts_unit_list,
+                         ptr->video_tracks.front().timing.frame_num_orig_list) <
+            0 ||
+        reorder_by_index(ptr->video_tracks.front().timing.dts_sec_list,
+                         ptr->video_tracks.front().timing.frame_num_orig_list) <
+            0 ||
+        reorder_by_index(ptr->video_tracks.front().timing.pts_unit_list,
+                         ptr->video_tracks.front().timing.frame_num_orig_list) <
+            0 ||
+        reorder_by_index(ptr->video_tracks.front().timing.pts_sec_list,
+                         ptr->video_tracks.front().timing.frame_num_orig_list) <
+            0) {
       if (debug > 0) {
         fprintf(stderr,
                 "error: inconsistent per-frame timing list sizes in %s\n",
@@ -1126,70 +1137,80 @@ int TimingInformation::derive_timing_info(
   // 3. derived timing values
   // 3.1. calculate the duration (inter-frame distance)
   std::vector<int32_t> pts_duration_unit_list;
-  calculate_vector_deltas_int32_t(ptr->timing.pts_unit_list,
-                                  pts_duration_unit_list);
-  ptr->timing.pts_duration_sec_list.resize(pts_duration_unit_list.size());
+  calculate_vector_deltas_int32_t(
+      ptr->video_tracks.front().timing.pts_unit_list, pts_duration_unit_list);
+  ptr->video_tracks.front().timing.pts_duration_sec_list.resize(
+      pts_duration_unit_list.size());
   for (uint32_t i = 0; i < pts_duration_unit_list.size(); ++i) {
-    ptr->timing.pts_duration_sec_list[i] =
-        ((double)pts_duration_unit_list[i]) / ptr->timing.timescale_video_hz;
+    ptr->video_tracks.front().timing.pts_duration_sec_list[i] =
+        ((double)pts_duration_unit_list[i]) /
+        ptr->video_tracks.front().timing.timescale_video_hz;
   }
   // 3.2. calculate the duration average/median
-  ptr->timing.pts_duration_sec_average =
-      calculate_average(ptr->timing.pts_duration_sec_list);
-  ptr->timing.pts_duration_sec_median =
-      calculate_median(ptr->timing.pts_duration_sec_list);
+  ptr->video_tracks.front().timing.pts_duration_sec_average =
+      calculate_average(ptr->video_tracks.front().timing.pts_duration_sec_list);
+  ptr->video_tracks.front().timing.pts_duration_sec_median =
+      calculate_median(ptr->video_tracks.front().timing.pts_duration_sec_list);
   // 3.3. calculate the duration stddev and median absolute difference (MAD)
-  ptr->timing.pts_duration_sec_stddev =
-      calculate_standard_deviation(ptr->timing.pts_duration_sec_list);
-  ptr->timing.pts_duration_sec_mad =
-      calculate_median_absolute_deviation(ptr->timing.pts_duration_sec_list);
+  ptr->video_tracks.front().timing.pts_duration_sec_stddev =
+      calculate_standard_deviation(
+          ptr->video_tracks.front().timing.pts_duration_sec_list);
+  ptr->video_tracks.front().timing.pts_duration_sec_mad =
+      calculate_median_absolute_deviation(
+          ptr->video_tracks.front().timing.pts_duration_sec_list);
   // 3.4. derive the pts_duration_delta_sec_list
-  ptr->timing.pts_duration_delta_sec_list.resize(
-      ptr->timing.pts_duration_sec_list.size());
-  for (uint32_t i = 0; i < ptr->timing.pts_duration_sec_list.size(); ++i) {
-    ptr->timing.pts_duration_delta_sec_list[i] =
-        ptr->timing.pts_duration_sec_list[i] -
-        ptr->timing.pts_duration_sec_average;
+  ptr->video_tracks.front().timing.pts_duration_delta_sec_list.resize(
+      ptr->video_tracks.front().timing.pts_duration_sec_list.size());
+  for (uint32_t i = 0;
+       i < ptr->video_tracks.front().timing.pts_duration_sec_list.size(); ++i) {
+    ptr->video_tracks.front().timing.pts_duration_delta_sec_list[i] =
+        ptr->video_tracks.front().timing.pts_duration_sec_list[i] -
+        ptr->video_tracks.front().timing.pts_duration_sec_average;
   }
   // 3.5 derive the pts_framerate_list (instantaneous framerate)
-  ptr->timing.pts_framerate_list.resize(
-      ptr->timing.pts_duration_sec_list.size());
-  for (uint32_t i = 0; i < ptr->timing.pts_duration_sec_list.size(); ++i) {
-    ptr->timing.pts_framerate_list[i] =
-        (ptr->timing.pts_duration_sec_list[i] == 0.0)
+  ptr->video_tracks.front().timing.pts_framerate_list.resize(
+      ptr->video_tracks.front().timing.pts_duration_sec_list.size());
+  for (uint32_t i = 0;
+       i < ptr->video_tracks.front().timing.pts_duration_sec_list.size(); ++i) {
+    ptr->video_tracks.front().timing.pts_framerate_list[i] =
+        (ptr->video_tracks.front().timing.pts_duration_sec_list[i] == 0.0)
             ? std::nan("")
-            : 1.0 / ptr->timing.pts_duration_sec_list[i];
+            : 1.0 / ptr->video_tracks.front().timing.pts_duration_sec_list[i];
   }
 
   // 4. derive keyframe-related values
-  ptr->timing.num_video_keyframes =
-      ptr->timing.get_keyframe_sample_number_list().size();
-  ptr->timing.key_frame_ratio = (ptr->timing.num_video_keyframes > 0)
-                                    ? (1.0 * ptr->timing.num_video_frames) /
-                                          ptr->timing.num_video_keyframes
-                                    : 0.0;
+  ptr->video_tracks.front().timing.num_video_keyframes =
+      ptr->video_tracks.front().timing.get_keyframe_sample_number_list().size();
+  ptr->video_tracks.front().timing.key_frame_ratio =
+      (ptr->video_tracks.front().timing.num_video_keyframes > 0)
+          ? (1.0 * ptr->video_tracks.front().timing.num_video_frames) /
+                ptr->video_tracks.front().timing.num_video_keyframes
+          : 0.0;
 
   // 5. audio/video ratio and video freeze info
   derive_audio_video_metrics(
-      ptr->timing.duration_video_sec, ptr->timing.duration_audio_sec,
-      ptr->timing.audio_video_ratio, ptr->timing.video_freeze);
+      ptr->video_tracks.front().timing.duration_video_sec,
+      ptr->video_tracks.front().timing.duration_audio_sec,
+      ptr->video_tracks.front().timing.audio_video_ratio,
+      ptr->video_tracks.front().timing.video_freeze);
 
   // 6. calculate framerate statistics
   // 6.1. get the framerate series
-  ptr->timing.frame_rate_fps_list.resize(
-      ptr->timing.pts_duration_sec_list.size());
-  std::transform(ptr->timing.pts_duration_sec_list.begin(),
-                 ptr->timing.pts_duration_sec_list.end(),
-                 ptr->timing.frame_rate_fps_list.begin(), [](double val) {
+  ptr->video_tracks.front().timing.frame_rate_fps_list.resize(
+      ptr->video_tracks.front().timing.pts_duration_sec_list.size());
+  std::transform(ptr->video_tracks.front().timing.pts_duration_sec_list.begin(),
+                 ptr->video_tracks.front().timing.pts_duration_sec_list.end(),
+                 ptr->video_tracks.front().timing.frame_rate_fps_list.begin(),
+                 [](double val) {
                    // Handle division by zero
                    return val != 0.0f ? 1.0f / static_cast<double>(val) : 0.0f;
                  });
   // 6.2. median
-  ptr->timing.frame_rate_fps_median =
-      calculate_median(ptr->timing.frame_rate_fps_list);
+  ptr->video_tracks.front().timing.frame_rate_fps_median =
+      calculate_median(ptr->video_tracks.front().timing.frame_rate_fps_list);
   // 6.3. average
-  ptr->timing.frame_rate_fps_average =
-      calculate_average(ptr->timing.frame_rate_fps_list);
+  ptr->video_tracks.front().timing.frame_rate_fps_average =
+      calculate_average(ptr->video_tracks.front().timing.frame_rate_fps_list);
   // 6.4. reverse average
   // Considering the sample_duration of different frames inside boxes
   // as a series X: {x1, x2, ..., xn}, for calculating average FPS from this,
@@ -1200,54 +1221,60 @@ int TimingInformation::derive_timing_info(
   // extreme, leading to extreme values in frame_rate_fps_average calculation.
   // In contrast, the reverse of the average of X ($1/\hat{X}$) should not
   // have this biased to extreme value.
-  ptr->timing.frame_rate_fps_reverse_average =
-      1.0 / ptr->timing.pts_duration_sec_average;
+  ptr->video_tracks.front().timing.frame_rate_fps_reverse_average =
+      1.0 / ptr->video_tracks.front().timing.pts_duration_sec_average;
   // 6.5. stddev
-  ptr->timing.frame_rate_fps_stddev =
-      calculate_standard_deviation(ptr->timing.frame_rate_fps_list);
+  ptr->video_tracks.front().timing.frame_rate_fps_stddev =
+      calculate_standard_deviation(
+          ptr->video_tracks.front().timing.frame_rate_fps_list);
 
   // 7. calculate the threshold to consider frame drop: This should be 2
   // times the median, minus a factor
   double FACTOR = 0.75;
   double pts_duration_sec_threshold =
-      ptr->timing.pts_duration_sec_median * FACTOR * 2;
+      ptr->video_tracks.front().timing.pts_duration_sec_median * FACTOR * 2;
 
   // 8. get the list of all the drops (absolute inter-frame values)
-  for (const auto& pts_duration_sec : ptr->timing.pts_duration_sec_list) {
+  for (const auto& pts_duration_sec :
+       ptr->video_tracks.front().timing.pts_duration_sec_list) {
     if (pts_duration_sec > pts_duration_sec_threshold) {
-      ptr->timing.frame_drop_length_sec_list.push_back(pts_duration_sec);
+      ptr->video_tracks.front().timing.frame_drop_length_sec_list.push_back(
+          pts_duration_sec);
     }
   }
-  // ptr->timing.frame_drop_length_sec_list: {0.6668900000000022,
-  // 0.10025600000000168,
+  // ptr->video_tracks.front().timing.frame_drop_length_sec_list:
+  // {0.6668900000000022, 0.10025600000000168,
   // ...}
 
   // 9. sum all the drops, but adding only the length over 1x frame time
   double frame_drop_length_sec_list = 0.0;
-  for (const auto& drop_length_sec : ptr->timing.frame_drop_length_sec_list) {
+  for (const auto& drop_length_sec :
+       ptr->video_tracks.front().timing.frame_drop_length_sec_list) {
     frame_drop_length_sec_list += drop_length_sec;
   }
   double drop_length_duration_sec =
       frame_drop_length_sec_list -
-      ptr->timing.pts_duration_sec_median *
-          ptr->timing.frame_drop_length_sec_list.size();
+      ptr->video_tracks.front().timing.pts_duration_sec_median *
+          ptr->video_tracks.front().timing.frame_drop_length_sec_list.size();
   // drop_length_duration_sec: sum({33.35900000000022, 66.92600000000168, ...})
 
   // 10. get the total duration as the sum of all the inter-frame distances
   double total_duration_sec = 0.0;
-  for (const auto& pts_duration_sec : ptr->timing.pts_duration_sec_list) {
+  for (const auto& pts_duration_sec :
+       ptr->video_tracks.front().timing.pts_duration_sec_list) {
     total_duration_sec += pts_duration_sec;
   }
 
   // 11. calculate frame drop ratio as extra drop length over total duration
-  ptr->timing.frame_drop_ratio = drop_length_duration_sec / total_duration_sec;
+  ptr->video_tracks.front().timing.frame_drop_ratio =
+      drop_length_duration_sec / total_duration_sec;
   // The ratio is NaN or infinite when there is no usable inter-frame
   // duration (e.g. a single frame, all frames with the same pts, or a zero
   // timescale), and converting NaN, infinity, or an out-of-range value to
   // int is undefined behavior. Report 0 frame drops in that case.
-  double frame_drop_count =
-      ptr->timing.frame_drop_ratio * ptr->timing.num_video_frames;
-  ptr->timing.frame_drop_count =
+  double frame_drop_count = ptr->video_tracks.front().timing.frame_drop_ratio *
+                            ptr->video_tracks.front().timing.num_video_frames;
+  ptr->video_tracks.front().timing.frame_drop_count =
       (std::isfinite(frame_drop_count) && frame_drop_count > INT_MIN &&
        frame_drop_count < INT_MAX)
           ? static_cast<int>(frame_drop_count)
@@ -1257,16 +1284,31 @@ int TimingInformation::derive_timing_info(
   // a single frame drop is a normalized frame drop length of 2. When
   // frame drops are uncorrelated, the normalized average drop length
   // should be close to 2
-  ptr->timing.normalized_frame_drop_average_length = 0.0;
-  if (ptr->timing.frame_drop_length_sec_list.size() > 0) {
+  ptr->video_tracks.front().timing.normalized_frame_drop_average_length = 0.0;
+  if (ptr->video_tracks.front().timing.frame_drop_length_sec_list.size() > 0) {
     double frame_drop_average_length =
         frame_drop_length_sec_list /
-        ptr->timing.frame_drop_length_sec_list.size();
-    ptr->timing.normalized_frame_drop_average_length =
-        (frame_drop_average_length / ptr->timing.pts_duration_sec_median);
+        ptr->video_tracks.front().timing.frame_drop_length_sec_list.size();
+    ptr->video_tracks.front().timing.normalized_frame_drop_average_length =
+        (frame_drop_average_length /
+         ptr->video_tracks.front().timing.pts_duration_sec_median);
   }
 
   return 0;
+}
+
+TimingInformation IsobmffFileInformation::empty_timing() {
+  TimingInformation result{};
+  result.duration_video_sec = -1.0;
+  result.duration_audio_sec = -1.0;
+  result.audio_video_ratio = -1.0;
+  result.pts_duration_sec_average =
+      calculate_average(result.pts_duration_sec_list);
+  result.frame_rate_fps_average = calculate_average(result.frame_rate_fps_list);
+  result.frame_rate_fps_reverse_average = 1.0 / result.pts_duration_sec_average;
+  const double zero = 0.0;
+  result.frame_drop_ratio = zero / zero;
+  return result;
 }
 
 void TimingInformation::calculate_percentile_list(
@@ -1310,6 +1352,8 @@ void TimingInformation::calculate_consecutive_list(
 
 int VideoInformation::derive_video_info(
     std::shared_ptr<IsobmffFileInformation> ptr, bool sort_by_pts, int debug) {
+  if (!ptr || ptr->video_tracks.empty())
+    return -1;
   // 1. get basic file info
   struct stat stat_buf;
   int rc = stat(ptr->get_filename().c_str(), &stat_buf);
@@ -1317,9 +1361,10 @@ int VideoInformation::derive_video_info(
     fprintf(stderr, "error: cannot access %s\n", ptr->filename.c_str());
     return -1;
   }
-  ptr->video.filesize = stat_buf.st_size;
-  ptr->video.bitrate_bps = 8.0 * ((double)(ptr->video.filesize)) /
-                           ((double)ptr->get_timing().get_duration_video_sec());
+  ptr->video_tracks.front().video.filesize = stat_buf.st_size;
+  ptr->video_tracks.front().video.bitrate_bps =
+      8.0 * ((double)(ptr->video_tracks.front().video.filesize)) /
+      ((double)ptr->get_timing().get_duration_video_sec());
 
   return 0;
 }
@@ -1464,19 +1509,20 @@ int AudioInformation::parse_audio_information(
   if (!ptr || !stbl)
     return -1;
   AudioInformation parsed;
-  if (parsed.parse_sample_entry(stbl, ptr->filename, debug) < 0)
+  const int result = parsed.parse_sample_entry(stbl, ptr->filename, debug);
+  if (result < 0)
     return -1;
-  // Preserve the legacy owner-update helper, now consistently refreshing the
-  // first/default registered track. A failed refresh leaves the owner intact.
-  if (!ptr->audio_tracks.empty()) {
-    const auto& first = ptr->audio_tracks.front();
-    parsed.track_id = first.track_id;
-    parsed.timescale_hz = first.timescale_hz;
-    parsed.mdhd_duration_sec = first.mdhd_duration_sec;
-    parsed.duration_sec = first.duration_sec;
-    ptr->audio_tracks.front() = parsed;
+  if (ptr->audio_tracks.empty()) {
+    IsobmffFileInformation::AudioTrack track{};
+    track.audio = std::move(parsed);
+    track.timing = IsobmffFileInformation::empty_timing();
+    ptr->audio_tracks.push_back(std::move(track));
+  } else {
+    auto& first = ptr->audio_tracks.front();
+    parsed.track_id = first.audio.track_id;
+    parsed.mdhd_duration_sec = first.audio.mdhd_duration_sec;
+    first.audio = std::move(parsed);
   }
-  ptr->audio = parsed;
   return 0;
 }
 
@@ -1540,6 +1586,8 @@ int AudioInformation::parse_sample_entry(
 int VideoInformation::parse_video_information(
     std::shared_ptr<ISOBMFF::ContainerBox> stbl,
     std::shared_ptr<IsobmffFileInformation> ptr, int debug) {
+  if (!ptr || ptr->video_tracks.empty())
+    return -1;
   // 1. look for a stsd container box
   std::shared_ptr<ISOBMFF::STSD> stsd =
       stbl->GetTypedBox<ISOBMFF::STSD>("stsd");
@@ -1574,20 +1622,25 @@ int VideoInformation::parse_video_information(
       }
       return -1;
     }
-    ptr->video.video_codec_type = (hvc1 != nullptr) ? "hvc1" : "hev1";
-    ptr->video.width2 = hevc_box->GetWidth();
-    ptr->video.height2 = hevc_box->GetHeight();
-    ptr->video.horizresolution = hevc_box->GetHorizResolution();
-    ptr->video.vertresolution = hevc_box->GetVertResolution();
-    ptr->video.depth = hevc_box->GetDepth();
-    ptr->video.chroma_format = hvcc->GetChromaFormat();
-    ptr->video.bit_depth_luma = 8 + hvcc->GetBitDepthLumaMinus8();
-    ptr->video.bit_depth_chroma = 8 + hvcc->GetBitDepthChromaMinus8();
-    ptr->video.colour_primaries = -1;
-    ptr->video.transfer_characteristics = -1;
-    ptr->video.matrix_coeffs = -1;
-    ptr->video.video_full_range_flag = -1;
-    ptr->video.parse_hvcc(hvcc, debug);
+    ptr->video_tracks.front().video.video_codec_type =
+        (hvc1 != nullptr) ? "hvc1" : "hev1";
+    ptr->video_tracks.front().video.width2 = hevc_box->GetWidth();
+    ptr->video_tracks.front().video.height2 = hevc_box->GetHeight();
+    ptr->video_tracks.front().video.horizresolution =
+        hevc_box->GetHorizResolution();
+    ptr->video_tracks.front().video.vertresolution =
+        hevc_box->GetVertResolution();
+    ptr->video_tracks.front().video.depth = hevc_box->GetDepth();
+    ptr->video_tracks.front().video.chroma_format = hvcc->GetChromaFormat();
+    ptr->video_tracks.front().video.bit_depth_luma =
+        8 + hvcc->GetBitDepthLumaMinus8();
+    ptr->video_tracks.front().video.bit_depth_chroma =
+        8 + hvcc->GetBitDepthChromaMinus8();
+    ptr->video_tracks.front().video.colour_primaries = -1;
+    ptr->video_tracks.front().video.transfer_characteristics = -1;
+    ptr->video_tracks.front().video.matrix_coeffs = -1;
+    ptr->video_tracks.front().video.video_full_range_flag = -1;
+    ptr->video_tracks.front().video.parse_hvcc(hvcc, debug);
 
   } else if (avc1 != nullptr || avc3 != nullptr) {
     auto avc_box = (avc1 != nullptr) ? avc1 : avc3;
@@ -1602,16 +1655,19 @@ int VideoInformation::parse_video_information(
       }
       return -1;
     }
-    ptr->video.video_codec_type = (avc1 != nullptr) ? "avc1" : "avc3";
-    ptr->video.width2 = avc_box->GetWidth();
-    ptr->video.height2 = avc_box->GetHeight();
-    ptr->video.horizresolution = avc_box->GetHorizResolution();
-    ptr->video.vertresolution = avc_box->GetVertResolution();
-    ptr->video.depth = avc_box->GetDepth();
-    ptr->video.chroma_format = -1;
-    ptr->video.bit_depth_luma = -1;
-    ptr->video.bit_depth_chroma = -1;
-    ptr->video.parse_avcc(avcc, debug);
+    ptr->video_tracks.front().video.video_codec_type =
+        (avc1 != nullptr) ? "avc1" : "avc3";
+    ptr->video_tracks.front().video.width2 = avc_box->GetWidth();
+    ptr->video_tracks.front().video.height2 = avc_box->GetHeight();
+    ptr->video_tracks.front().video.horizresolution =
+        avc_box->GetHorizResolution();
+    ptr->video_tracks.front().video.vertresolution =
+        avc_box->GetVertResolution();
+    ptr->video_tracks.front().video.depth = avc_box->GetDepth();
+    ptr->video_tracks.front().video.chroma_format = -1;
+    ptr->video_tracks.front().video.bit_depth_luma = -1;
+    ptr->video_tracks.front().video.bit_depth_chroma = -1;
+    ptr->video_tracks.front().video.parse_avcc(avcc, debug);
 
   } else {
     if (debug > 0) {

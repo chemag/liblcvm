@@ -47,8 +47,10 @@ TEST(LiblcvmEac3Test, RealTrackIdsAndAllAudioRetainedInBothOrders) {
     ASSERT_NE(nullptr, file);
     auto tracks = file->get_audio_tracks();
     ASSERT_EQ(2u, tracks.size());
-    const auto& ec3 = tracks[ec3_first ? 0 : 1];
-    const auto& aac = tracks[ec3_first ? 1 : 0];
+    const auto ec3 =
+        file->get_audio_info(tracks[ec3_first ? 0 : 1].audio.get_track_id());
+    const auto aac =
+        file->get_audio_info(tracks[ec3_first ? 1 : 0].audio.get_track_id());
     EXPECT_EQ(0xf1234567u, ec3.get_track_id());
     EXPECT_EQ(23u, aac.get_track_id());
     EXPECT_EQ("ec-3", ec3.get_audio_type());
@@ -68,7 +70,7 @@ TEST(LiblcvmEac3Test, RealTrackIdsAndAllAudioRetainedInBothOrders) {
     EXPECT_DOUBLE_EQ(4.125, aac.get_mdhd_duration_sec());
     // Select consistently: -1 means the first audio in container order,
     // even when its actual ID is much larger than the second audio ID.
-    EXPECT_EQ(tracks.front().get_track_id(),
+    EXPECT_EQ(tracks.front().audio.get_track_id(),
               file->get_audio_info().get_track_id());
     EXPECT_EQ(ec3_first ? "ec-3" : "mp4a",
               file->get_audio_info().get_audio_type());
@@ -87,9 +89,9 @@ TEST(LiblcvmEac3Test, RealTrackIdsAndAllAudioRetainedInBothOrders) {
     std::map<std::string, LiblcvmValue> fields;
     for (size_t i = 0; i < keys.size(); ++i)
       fields[keys[i]] = values[i];
-    EXPECT_EQ(tracks.front().get_audio_type(),
+    EXPECT_EQ(tracks.front().audio.get_audio_type(),
               std::get<std::string>(fields["audio_type"]));
-    EXPECT_EQ(tracks.front().get_channel_count(),
+    EXPECT_EQ(tracks.front().audio.get_channel_count(),
               std::get<int>(fields["channel_count"]));
   }
 }

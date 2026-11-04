@@ -364,26 +364,28 @@ class LiblcvmConfig {
 // Main class
 
 class IsobmffFileInformation {
+ public:
+  struct VideoTrack {
+    VideoInformation video{};
+    TimingInformation timing{};
+  };
+  struct AudioTrack {
+    AudioInformation audio{};
+    TimingInformation timing{};
+  };
+
  private:
   std::string filename;
   std::string policy;
-  TimingInformation timing;
-  VideoInformation video;
-  AudioInformation audio;
-  // Keep all audio tracks in container order. The default audio/timing view
-  // uses the FIRST audio track, independently of its stored tkhd ID.
-  std::vector<AudioInformation> audio_tracks;
-  // The first video's analysis lives in video/timing for legacy helper
-  // compatibility. Store only additional analyses, avoiding a duplicate copy
-  // of the first video's per-frame lists.
-  struct VideoAnalysis {
-    VideoInformation video;
-    TimingInformation timing;
-  };
-  bool has_video_track = false;
-  std::vector<VideoAnalysis> additional_video_tracks;
+  uint32_t timescale_movie_hz = 0;
+  int filesize = 0;
+  // Container order defines the default view, independently of stored IDs.
+  std::vector<VideoTrack> video_tracks;
+  std::vector<AudioTrack> audio_tracks;
+  const AudioTrack* audio_view(int64_t audio_track_id) const;
   std::pair<const VideoInformation*, const TimingInformation*> video_view(
       int64_t video_track_id) const;
+  static TimingInformation empty_timing();
 
  public:
   DECL_GETTER(filename, std::string)
@@ -399,11 +401,14 @@ class IsobmffFileInformation {
   VideoInformation get_video_info(int64_t video_track_id = -1) const;
   std::vector<uint32_t> get_video_track_ids() const;
   std::vector<uint32_t> get_audio_track_ids() const;
-  size_t get_num_video_tracks() const {
-    return (has_video_track ? 1u : 0u) + additional_video_tracks.size();
-  }
+  size_t get_num_video_tracks() const { return video_tracks.size(); }
   size_t get_num_audio_tracks() const { return audio_tracks.size(); }
-  DECL_GETTER(audio_tracks, std::vector<AudioInformation>)
+  const std::vector<AudioTrack>& get_audio_tracks() const {
+    return audio_tracks;
+  }
+  const std::vector<VideoTrack>& get_video_tracks() const {
+    return video_tracks;
+  }
 
   // @brief Get the library version.
   //

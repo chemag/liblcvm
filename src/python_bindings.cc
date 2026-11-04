@@ -119,6 +119,7 @@ PYBIND11_MODULE(liblcvm, m) {
       .def("get_audio_info", &IsobmffFileInformation::get_audio_info,
            py::arg("audio_track_id") = -1)
       .def("get_audio_tracks", &IsobmffFileInformation::get_audio_tracks)
+      .def("get_video_tracks", &IsobmffFileInformation::get_video_tracks)
       .def("get_video_track_ids", &IsobmffFileInformation::get_video_track_ids)
       .def("get_audio_track_ids", &IsobmffFileInformation::get_audio_track_ids)
       .def("get_num_video_tracks",
@@ -148,6 +149,13 @@ PYBIND11_MODULE(liblcvm, m) {
       .def(py::init<>())
       // Automatically bind all AudioInformation class getters
       AUDIO_GETTERS(AudioInformation);
+
+  py::class_<IsobmffFileInformation::AudioTrack>(m, "AudioTrack")
+      .def_readonly("audio", &IsobmffFileInformation::AudioTrack::audio)
+      .def_readonly("timing", &IsobmffFileInformation::AudioTrack::timing);
+  py::class_<IsobmffFileInformation::VideoTrack>(m, "VideoTrack")
+      .def_readonly("video", &IsobmffFileInformation::VideoTrack::video)
+      .def_readonly("timing", &IsobmffFileInformation::VideoTrack::timing);
 
   // Expose the LiblcvmConfig class
   py::class_<LiblcvmConfig>(m, "LiblcvmConfig").def(py::init<>());
