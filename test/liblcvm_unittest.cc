@@ -351,16 +351,16 @@ TEST_F(LiblcvmTest, TestSkipAudioParsing) {
                           << infile;
 
   // audio timing still comes from the audio track's mdhd box
-  const TimingInformation &timing = ptr->get_timing();
+  const TimingInformation& timing = ptr->get_timing();
   EXPECT_EQ(634, timing.get_num_video_frames());
-  EXPECT_TRUE(doubles_are_close(10.634739229024943,
-                                timing.get_duration_audio_sec()));
+  EXPECT_TRUE(
+      doubles_are_close(10.634739229024943, timing.get_duration_audio_sec()));
   EXPECT_EQ(44100u, timing.get_timescale_audio_hz());
   EXPECT_TRUE(
       doubles_are_close(1.0058076193907575, timing.get_audio_video_ratio()));
 
   // the audio sample entry is not parsed
-  const AudioInformation &audio = ptr->get_audio();
+  const AudioInformation& audio = ptr->get_audio();
   EXPECT_EQ("", audio.get_audio_type());
   EXPECT_EQ(0, audio.get_channel_count());
   EXPECT_EQ(0, audio.get_sample_rate());

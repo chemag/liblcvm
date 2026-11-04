@@ -20,7 +20,8 @@ std::string Quote(const std::string& text) {
   return "\"" + text + "\"";
 #else
   std::string result = "'";
-  for (char c : text) result += c == '\'' ? "'\\''" : std::string(1, c);
+  for (char c : text)
+    result += c == '\'' ? "'\\''" : std::string(1, c);
   return result + "'";
 #endif
 }
@@ -43,10 +44,12 @@ CliResult Cli(const std::vector<std::string>& fixtures,
   cmd += " 2>/dev/null";
   FILE* pipe = popen(cmd.c_str(), "r");
 #endif
-  if (!pipe) return {-1, ""};
+  if (!pipe)
+    return {-1, ""};
   std::string text;
   char buffer[4096];
-  while (fgets(buffer, sizeof(buffer), pipe)) text += buffer;
+  while (fgets(buffer, sizeof(buffer), pipe))
+    text += buffer;
 #ifdef _WIN32
   const int status = _pclose(pipe);
 #else
@@ -89,14 +92,16 @@ Csv ReadCsv(const std::string& text) {
   std::istringstream in(text);
   std::string line;
   Csv csv;
-  if (!std::getline(in, line)) return csv;
+  if (!std::getline(in, line))
+    return csv;
   csv.header = CsvRow(line);
   EXPECT_EQ(csv.header.size(),
             std::set<std::string>(csv.header.begin(), csv.header.end()).size());
   while (std::getline(in, line)) {
     const auto values = CsvRow(line);
     EXPECT_EQ(csv.header.size(), values.size());
-    if (csv.header.size() != values.size()) continue;
+    if (csv.header.size() != values.size())
+      continue;
     Row row;
     for (size_t i = 0; i < values.size(); ++i) {
       row.emplace(csv.header[i], values[i]);
@@ -191,19 +196,23 @@ void ExpectSchema(const Fixture& fixture, const Row& row) {
                                     "timescale_movie_hz"};
   for (size_t v = 0; v < fixture.videos; ++v) {
     const auto vs = VideoSuffix(fixture, v);
-    for (const auto& key : kVideoKeys) expected.insert(key + vs);
+    for (const auto& key : kVideoKeys)
+      expected.insert(key + vs);
     for (size_t a = 0; a < fixture.audios; ++a) {
       const auto suffix = vs + AudioSuffix(fixture, a);
-      for (const auto& key : kPairKeys) expected.insert(key + suffix);
+      for (const auto& key : kPairKeys)
+        expected.insert(key + suffix);
     }
   }
   for (size_t a = 0; a < fixture.audios; ++a) {
     const auto suffix = AudioSuffix(fixture, a);
-    for (const auto& key : kAudioKeys) expected.insert(key + suffix);
+    for (const auto& key : kAudioKeys)
+      expected.insert(key + suffix);
   }
   std::set<std::string> actual;
   for (const auto& entry : row) {
-    if (kPolicyKeys.count(entry.first) == 0) actual.insert(entry.first);
+    if (kPolicyKeys.count(entry.first) == 0)
+      actual.insert(entry.first);
   }
   EXPECT_EQ(expected, actual);
   EXPECT_EQ(0u, row.count("audio_track_id"));
@@ -324,7 +333,8 @@ TEST(LiblcvmCompactTracksCliTest, OrderedUnionHeaderHasBlankAbsentCells) {
     singles.push_back(ReadCsv(result.output));
     ASSERT_EQ(1u, singles.back().rows.size());
     for (const auto& key : singles.back().header) {
-      if (seen.insert(key).second) expected_header.push_back(key);
+      if (seen.insert(key).second)
+        expected_header.push_back(key);
     }
   }
   const auto result = Cli(names);

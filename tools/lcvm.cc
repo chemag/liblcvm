@@ -88,7 +88,8 @@ bool compact_track_key(const std::string& key, size_t num_video_tracks,
     }
     const auto start = marker - 1;
     const auto count = key[marker] == 'v' ? num_video_tracks : num_audio_tracks;
-    if (count == 1) compact_key->erase(start, end - start);
+    if (count == 1)
+      compact_key->erase(start, end - start);
     qualified = true;
     end = start;
   }
@@ -175,9 +176,11 @@ int parse_files(std::vector<std::string>& infile_list, char* outfile,
                                     &csv_key)) {
         continue;
       }
-      if (seen_csv_keys.insert(csv_key).second) csv_keys.push_back(csv_key);
+      if (seen_csv_keys.insert(csv_key).second)
+        csv_keys.push_back(csv_key);
       std::string value;
-      if (liblcvmvalue_to_string(vals[i], &value) != 0) value = "ERROR";
+      if (liblcvmvalue_to_string(vals[i], &value) != 0)
+        value = "ERROR";
       row.emplace(std::move(csv_key), std::move(value));
     }
     csv_rows.push_back(std::move(row));

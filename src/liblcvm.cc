@@ -52,7 +52,8 @@ static void derive_audio_video_metrics(double video_sec, double audio_sec,
 
 AudioInformation IsobmffFileInformation::get_audio(
     int64_t audio_track_id) const {
-  if (audio_track_id == -1) return audio;
+  if (audio_track_id == -1)
+    return audio;
   if (audio_track_id < 0 ||
       static_cast<uint64_t>(audio_track_id) > UINT32_MAX) {
     throw std::out_of_range("invalid audio track selector: " +
@@ -69,16 +70,19 @@ AudioInformation IsobmffFileInformation::get_audio(
 
 std::pair<const FrameInformation*, const TimingInformation*>
 IsobmffFileInformation::video_view(int64_t video_track_id) const {
-  if (video_track_id == -1) return {&frame, &timing};
+  if (video_track_id == -1)
+    return {&frame, &timing};
   if (video_track_id < 0 ||
       static_cast<uint64_t>(video_track_id) > UINT32_MAX) {
     throw std::out_of_range("invalid video track selector: " +
                             std::to_string(video_track_id));
   }
   const auto id = static_cast<uint32_t>(video_track_id);
-  if (has_video_track && frame.get_track_id() == id) return {&frame, &timing};
+  if (has_video_track && frame.get_track_id() == id)
+    return {&frame, &timing};
   for (const auto& track : additional_video_tracks) {
-    if (track.frame.get_track_id() == id) return {&track.frame, &track.timing};
+    if (track.frame.get_track_id() == id)
+      return {&track.frame, &track.timing};
   }
   throw std::out_of_range("video track ID not found: " +
                           std::to_string(video_track_id));
@@ -91,7 +95,8 @@ FrameInformation IsobmffFileInformation::get_frame(
 
 std::vector<uint32_t> IsobmffFileInformation::get_video_track_ids() const {
   std::vector<uint32_t> ids;
-  if (has_video_track) ids.push_back(frame.get_track_id());
+  if (has_video_track)
+    ids.push_back(frame.get_track_id());
   for (const auto& track : additional_video_tracks)
     ids.push_back(track.frame.get_track_id());
   return ids;
@@ -99,13 +104,15 @@ std::vector<uint32_t> IsobmffFileInformation::get_video_track_ids() const {
 
 std::vector<uint32_t> IsobmffFileInformation::get_audio_track_ids() const {
   std::vector<uint32_t> ids;
-  for (const auto& track : audio_tracks) ids.push_back(track.get_track_id());
+  for (const auto& track : audio_tracks)
+    ids.push_back(track.get_track_id());
   return ids;
 }
 
 TimingInformation IsobmffFileInformation::get_timing(
     int64_t audio_track_id, int64_t video_track_id) const {
-  if (audio_track_id == -1 && video_track_id == -1) return timing;
+  if (audio_track_id == -1 && video_track_id == -1)
+    return timing;
   const auto selected = get_audio(audio_track_id);
   auto result = *video_view(video_track_id).second;
   result.duration_audio_sec = selected.get_duration_sec();
@@ -604,7 +611,8 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     if (handler_type.compare("soun") == 0 &&
         liblcvm_config.get_skip_audio_parsing()) {
       auto tkhd = trak->GetTypedBox<ISOBMFF::TKHD>("tkhd");
-      if (!tkhd) return nullptr;
+      if (!tkhd)
+        return nullptr;
       AudioInformation skipped;
       skipped.track_id = tkhd->GetTrackID();
       skipped.timescale_hz = timescale_track_hz;
@@ -1453,9 +1461,11 @@ void FrameInformation::parse_hvcc(std::shared_ptr<ISOBMFF::HVCC> hvcc,
 int AudioInformation::parse_audio_information(
     std::shared_ptr<ISOBMFF::ContainerBox> stbl,
     std::shared_ptr<IsobmffFileInformation> ptr, int debug) {
-  if (!ptr || !stbl) return -1;
+  if (!ptr || !stbl)
+    return -1;
   AudioInformation parsed;
-  if (parsed.parse_sample_entry(stbl, ptr->filename, debug) < 0) return -1;
+  if (parsed.parse_sample_entry(stbl, ptr->filename, debug) < 0)
+    return -1;
   // Preserve the legacy owner-update helper, now consistently refreshing the
   // first/default registered track. A failed refresh leaves the owner intact.
   if (!ptr->audio_tracks.empty()) {
@@ -1501,7 +1511,8 @@ int AudioInformation::parse_sample_entry(
   auto ec3 = stsd->GetTypedBox<ISOBMFF::EC3>("ec-3");
   if (ec3) {
     auto dec3 = ec3->GetTypedBox<ISOBMFF::DEC3>("dec3");
-    if (!dec3 || dec3->GetIndependentSubstreams().empty()) return -1;
+    if (!dec3 || dec3->GetIndependentSubstreams().empty())
+      return -1;
     audio_type = "ec-3";
     eac3_configuration = dec3;
     // Annex F.5.2 requires ignoring sample-entry ChannelCount and SampleSize.
@@ -1512,7 +1523,8 @@ int AudioInformation::parse_sample_entry(
     uint32_t rate = service.GetSampleRate();
     // fscod2 is bitstream-only when fscod == 3: use the declared entry rate
     // if available; otherwise report unknown rather than inventing a rate.
-    if (rate == 0) rate = ec3->GetSampleRateRaw() >> 16;
+    if (rate == 0)
+      rate = ec3->GetSampleRateRaw() >> 16;
     sample_rate = rate == 0 ? -1 : static_cast<int>(rate);
     sample_size = -1;  // No compressed PCM precision is declared by dec3.
     return 0;

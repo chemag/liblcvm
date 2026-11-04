@@ -83,7 +83,8 @@ TEST(LiblcvmEac3Test, RealTrackIdsAndAllAudioRetainedInBothOrders) {
         0, IsobmffFileInformation::LiblcvmConfig_to_lists(
                file, &keys, &values, false, &timing_keys, &timing_values, 0));
     std::map<std::string, LiblcvmValue> fields;
-    for (size_t i = 0; i < keys.size(); ++i) fields[keys[i]] = values[i];
+    for (size_t i = 0; i < keys.size(); ++i)
+      fields[keys[i]] = values[i];
     EXPECT_EQ(tracks.front().get_audio_type(),
               std::get<std::string>(fields["audio_type"]));
     EXPECT_EQ(tracks.front().get_channel_count(),

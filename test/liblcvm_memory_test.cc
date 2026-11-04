@@ -8,17 +8,17 @@
  * This test suite measures memory consumption when processing multiple videos
  * with liblcvm. It provides three types of tests:
  *
- * 1. MultipleVideosMemoryUsage: Processes all videos in test/corpus/ sequentially
- *    and tracks memory usage after each video to ensure memory doesn't grow
- *    excessively.
+ * 1. MultipleVideosMemoryUsage: Processes all videos in test/corpus/
+ * sequentially and tracks memory usage after each video to ensure memory
+ * doesn't grow excessively.
  *
  * 2. SingleVideoMemoryLeakCheck: Processes the same video multiple times (10
  *    iterations) to detect memory leaks. If memory continuously grows with each
  *    iteration, it indicates a leak.
  *
  * 3. DetailedMemoryProfileMassifStyle: Creates a timeline of memory snapshots
- *    before and after each video processing, similar to Valgrind Massif. Outputs
- *    both console timeline and a memory_profile.txt file.
+ *    before and after each video processing, similar to Valgrind Massif.
+ * Outputs both console timeline and a memory_profile.txt file.
  *
  * Memory Measurement:
  * - Uses RSS (Resident Set Size) on both macOS and Linux
@@ -31,7 +31,8 @@
  *   ./liblcvm_memory_test
  *
  *   # Run specific test
- *   ./liblcvm_memory_test --gtest_filter=MemoryUsageTest.SingleVideoMemoryLeakCheck
+ *   ./liblcvm_memory_test
+ * --gtest_filter=MemoryUsageTest.SingleVideoMemoryLeakCheck
  *
  * Setup:
  *   Place test videos in test/corpus/ directory
@@ -102,9 +103,9 @@ class MemoryUsageTest : public ::testing::Test {
   // Represents a single point-in-time memory measurement
   // Used for creating timeline-based memory profiles
   struct MemorySnapshot {
-    size_t timestamp_ms;     // Milliseconds since test start
-    size_t memory_bytes;     // Memory usage at this point
-    std::string event;       // Description of what happened
+    size_t timestamp_ms;  // Milliseconds since test start
+    size_t memory_bytes;  // Memory usage at this point
+    std::string event;    // Description of what happened
   };
 
   // Writes memory snapshots to a file in a Massif-like format

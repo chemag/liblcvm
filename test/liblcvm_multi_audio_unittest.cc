@@ -72,7 +72,8 @@ std::string Quote(const std::string& s) {
   return "\"" + s + "\"";
 #else
   std::string result = "'";
-  for (char c : s) result += c == '\'' ? "'\\''" : std::string(1, c);
+  for (char c : s)
+    result += c == '\'' ? "'\\''" : std::string(1, c);
   return result + "'";
 #endif
 }
@@ -94,10 +95,12 @@ CliResult Cli(const std::vector<std::string>& fixtures,
   cmd += " 2>/dev/null";
   FILE* pipe = popen(cmd.c_str(), "r");
 #endif
-  if (!pipe) return {-1, ""};
+  if (!pipe)
+    return {-1, ""};
   std::string text;
   char buffer[4096];
-  while (fgets(buffer, sizeof(buffer), pipe)) text += buffer;
+  while (fgets(buffer, sizeof(buffer), pipe))
+    text += buffer;
 #ifdef _WIN32
   const int status = _pclose(pipe);
 #else
@@ -109,7 +112,8 @@ CliResult Cli(const std::vector<std::string>& fixtures,
 std::vector<std::map<std::string, std::string>> Rows(const std::string& csv) {
   std::istringstream in(csv);
   std::string line;
-  if (!std::getline(in, line)) return {};
+  if (!std::getline(in, line))
+    return {};
   const auto keys = CsvRow(line);
   EXPECT_EQ(keys.size(),
             std::set<std::string>(keys.begin(), keys.end()).size());
@@ -117,9 +121,11 @@ std::vector<std::map<std::string, std::string>> Rows(const std::string& csv) {
   while (std::getline(in, line)) {
     auto vals = CsvRow(line);
     EXPECT_EQ(keys.size(), vals.size());
-    if (keys.size() != vals.size()) continue;
+    if (keys.size() != vals.size())
+      continue;
     std::map<std::string, std::string> row;
-    for (size_t i = 0; i < keys.size(); ++i) row[keys[i]] = vals[i];
+    for (size_t i = 0; i < keys.size(); ++i)
+      row[keys[i]] = vals[i];
     rows.push_back(row);
   }
   return rows;
@@ -324,11 +330,13 @@ TEST(LiblcvmMultiAudioCliTest, CompactOutputHasNoDuplicateTrackAliases) {
         suffix != std::string::npos && suffix > 0 &&
         suffix + 1 < entry.first.size() && entry.first[suffix - 1] == '_' &&
         (entry.first[suffix] == 'a' || entry.first[suffix] == 'v');
-    if (!qualified && !file_keys.count(entry.first)) continue;
+    if (!qualified && !file_keys.count(entry.first))
+      continue;
     auto key = entry.first;
     // The library remains fully qualified; this file has only one video.
     const auto video_suffix = key.rfind("_v1");
-    if (video_suffix != std::string::npos) key.erase(video_suffix, 3);
+    if (video_suffix != std::string::npos)
+      key.erase(video_suffix, 3);
     EXPECT_TRUE(expected.emplace(key, Text(entry.second)).second) << key;
   }
   EXPECT_EQ(expected, first);
