@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cmath>
 #include <map>
 #include <memory>
 #include <string>
@@ -75,7 +76,7 @@ TEST(LiblcvmGenericTracksTest, ContainerOrderDefinesGenericDefaults) {
   EXPECT_DOUBLE_EQ(-1,
                    file->get_video_track()->get_timing().get_duration_sec());
   EXPECT_EQ(0u, file->get_video_track()->get_timing().get_timescale_hz());
-  EXPECT_EQ(0, file->get_timing().get_num_frames());
+  EXPECT_EQ(-1, file->get_timing().get_num_frames());
   EXPECT_EQ(120, file->get_timing(31, 11).get_num_frames());
   EXPECT_EQ(nullptr, file->get_video_track(12345));
   EXPECT_EQ(nullptr, file->get_audio_track(12345));
@@ -183,7 +184,7 @@ TEST(LiblcvmGenericTracksTest, GenericOnlyTracksAreRecordsNotAbsentIds) {
   EXPECT_EQ(1u, file->get_num_video_tracks());
   ASSERT_NE(nullptr, file->get_video_track(77));
   EXPECT_FALSE(file->get_video_track(77)->is_supported());
-  EXPECT_EQ(0, file->get_timing().get_num_frames());
+  EXPECT_EQ(-1, file->get_timing().get_num_frames());
   EXPECT_DOUBLE_EQ(-1, file->get_timing().get_duration_video_sec());
 }
 
@@ -233,4 +234,52 @@ TEST(LiblcvmGenericTracksTest,
     AudioTrack receiver;
     EXPECT_NE(0, receiver.parse_audio_information(stbl, file, 0));
   }
+}
+
+TEST(LiblcvmGenericTracksTest,
+     UnsupportedTimingCannotLookLikeZeroMeasurements) {
+  const auto file = Parse("unknown_both.mp4");
+  ASSERT_NE(nullptr, file);
+  for (const TimingInformation* timing :
+       {&file->get_audio_track(99)->get_timing(),
+        &file->get_video_track(77)->get_timing()}) {
+    EXPECT_EQ(-1, timing->get_num_frames());
+    EXPECT_EQ(-1, timing->get_num_keyframes());
+    EXPECT_EQ(-1, timing->get_frame_drop_count());
+    EXPECT_TRUE(std::isnan(timing->get_key_frame_ratio()));
+    EXPECT_TRUE(std::isnan(timing->get_pts_duration_sec_average()));
+    EXPECT_TRUE(std::isnan(timing->get_pts_duration_sec_median()));
+    EXPECT_TRUE(std::isnan(timing->get_pts_duration_sec_stddev()));
+    EXPECT_TRUE(std::isnan(timing->get_pts_duration_sec_mad()));
+    EXPECT_TRUE(std::isnan(timing->get_frame_rate_fps_median()));
+    EXPECT_TRUE(std::isnan(timing->get_frame_rate_fps_average()));
+    EXPECT_TRUE(std::isnan(timing->get_frame_rate_fps_reverse_average()));
+    EXPECT_TRUE(std::isnan(timing->get_frame_rate_fps_stddev()));
+    EXPECT_TRUE(std::isnan(timing->get_frame_drop_ratio()));
+    EXPECT_TRUE(std::isnan(timing->get_normalized_frame_drop_average_length()));
+  }
+  auto view = file->get_timing(99, 77);
+  std::vector<double> percentiles;
+  view.calculate_percentile_list({50, 90}, percentiles, 0);
+  ASSERT_EQ(2u, percentiles.size());
+  EXPECT_TRUE(std::isnan(percentiles[0]));
+  EXPECT_TRUE(std::isnan(percentiles[1]));
+  std::vector<long int> consecutive;
+  view.calculate_consecutive_list({2, 5}, consecutive, 0);
+  EXPECT_EQ((std::vector<long int>{-1, -1}), consecutive);
+  EXPECT_EQ(120, file->get_video_track(11)->get_timing().get_num_frames());
+  EXPECT_DOUBLE_EQ(
+      30, file->get_video_track(11)->get_timing().get_frame_rate_fps_median());
+  LiblcvmKeyList keys, timing_keys;
+  LiblcvmValList values;
+  LiblcvmTimingList timing_values;
+  ASSERT_EQ(0, IsobmffFileInformation::LiblcvmConfig_to_lists(
+                   file, &keys, &values, false, &timing_keys, &timing_values, 0,
+                   -1, true));
+  std::map<std::string, LiblcvmValue> fields;
+  for (size_t i = 0; i < keys.size(); ++i)
+    fields[keys[i]] = values[i];
+  EXPECT_EQ(-1, std::get<int>(fields.at("video_freeze_v77_a31")));
+  EXPECT_EQ(-1, std::get<int>(fields.at("video_freeze_v11_a99")));
+  EXPECT_EQ(0, std::get<int>(fields.at("video_freeze_v11_a31")));
 }

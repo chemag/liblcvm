@@ -174,7 +174,11 @@ exports retain invalid generic fields; acceptance/filtering is a tool policy.
 The CLI defaults to `--strict`, rejecting generic unsupported audio/video
 records. `--no-strict` reports those records with the exact direct `stsd` entry
 name and invalid analysis values, even if the only video is unsupported.
-Unknown formats do not imply codec support. Known sibling analyses remain
+Unknown formats do not imply codec support. Unsupported analysis counts use
+`-1`, and timing statistics/ratios use `NaN` (the AV duration ratio uses `-1`).
+A zero timebase and empty timing lists indicate that no timing was parsed.
+An exported freeze flag involving a generic track is `-1`, not false/zero.
+Known sibling analyses remain
 usable. All retained tracks count for singleton suffix elision; defaults follow
 container order. Explicit generic IDs are valid; absent IDs are errors.
 

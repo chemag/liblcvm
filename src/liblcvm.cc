@@ -255,7 +255,11 @@ static void fill_base_fields(
   pkeys->push_back("frame_rate_fps_stddev");
   pvals->push_back(selected_timing.get_frame_rate_fps_stddev());
   pkeys->push_back("video_freeze");
-  pvals->push_back(selected_timing.get_video_freeze() ? 1 : 0);
+  const bool unsupported_pair =
+      (selected_video && !selected_video->is_supported()) ||
+      (selected_audio && !selected_audio->is_supported());
+  pvals->push_back(
+      unsupported_pair ? -1 : (selected_timing.get_video_freeze() ? 1 : 0));
   pkeys->push_back("audio_video_ratio");
   pvals->push_back(selected_timing.get_audio_video_ratio());
   pkeys->push_back("duration_video_sec");
@@ -391,7 +395,8 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
         pvals->push_back(values[i]);
       }
       for (const auto video_id : video_ids) {
-        const auto& pair_timing = pobj->get_video_track(video_id)->get_timing();
+        const auto* video = pobj->get_video_track(video_id);
+        const auto& pair_timing = video->get_timing();
         double ratio;
         bool freeze;
         derive_audio_video_metrics(pair_timing.get_duration_sec(),
@@ -401,7 +406,9 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
         pkeys->push_back("audio_video_ratio" + pair);
         pvals->push_back(ratio);
         pkeys->push_back("video_freeze" + pair);
-        pvals->push_back(freeze ? 1 : 0);
+        pvals->push_back(!video->is_supported() || !audio.is_supported()
+                             ? -1
+                             : (freeze ? 1 : 0));
       }
     }
   }
@@ -1045,6 +1052,18 @@ int TimingInformation::derive_timing_info(bool sort_by_pts,
   return 0;
 }
 
+void TimingInformation::invalidate_analysis() {
+  *this = TimingInformation{};
+  num_frames = num_keyframes = frame_drop_count = -1;
+  const double invalid = std::numeric_limits<double>::quiet_NaN();
+  pts_duration_sec_average = pts_duration_sec_median = pts_duration_sec_stddev =
+      pts_duration_sec_mad = invalid;
+  frame_rate_fps_median = frame_rate_fps_average =
+      frame_rate_fps_reverse_average = frame_rate_fps_stddev = invalid;
+  key_frame_ratio = frame_drop_ratio = normalized_frame_drop_average_length =
+      invalid;
+}
+
 TimingInformation IsobmffFileInformation::empty_timing() { return {}; }
 
 void TimingInformation::calculate_percentile_list(
@@ -1052,6 +1071,11 @@ void TimingInformation::calculate_percentile_list(
     std::vector<double>& frame_drop_length_percentile_list, int debug) {
   // calculate percentile list
   frame_drop_length_percentile_list.clear();
+  if (num_frames < 0) {
+    frame_drop_length_percentile_list.assign(
+        percentile_list.size(), std::numeric_limits<double>::quiet_NaN());
+    return;
+  }
   if (frame_drop_length_sec_list.size() > 0) {
     auto sorted_lengths = frame_drop_length_sec_list;
     std::sort(sorted_lengths.begin(), sorted_lengths.end());
@@ -1071,6 +1095,10 @@ void TimingInformation::calculate_consecutive_list(
     std::vector<long int>& frame_drop_length_consecutive, int debug) {
   // calculate consecutive list
   frame_drop_length_consecutive.clear();
+  if (num_frames < 0) {
+    frame_drop_length_consecutive.assign(consecutive_list.size(), -1);
+    return;
+  }
   frame_drop_length_consecutive.resize(consecutive_list.size(), 0);
   if (frame_drop_length_sec_list.size() > 0) {
     for (const auto& frame_drop_length_sec : frame_drop_length_sec_list) {
@@ -1259,7 +1287,7 @@ int AudioTrack::parse_sample_entry(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
     audio_type = type;
     supported = false;
     channel_count = sample_rate = sample_size = -1;
-    timing = TimingInformation{};
+    timing.invalidate_analysis();
     eac3_configuration.reset();
     return 0;
   };
@@ -1333,6 +1361,7 @@ int VideoTrack::parse_video_information(
   const auto generic = [&](const std::string& type) {
     const auto id = track_id;
     *this = VideoTrack{};
+    timing.invalidate_analysis();
     track_id = id;
     video_codec_type = type;
     supported = false;

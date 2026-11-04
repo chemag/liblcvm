@@ -44,6 +44,7 @@ class TimingInformation {
 
  private:
   std::vector<SampleTimingEntry> stts_entries;
+  void invalidate_analysis();
   std::vector<CompositionTimingEntry> ctts_entries;
   std::vector<uint32_t> raw_keyframe_sample_number_list;
   uint32_t timescale_hz = 0;
@@ -179,6 +180,8 @@ class TimingInformation {
       std::vector<long int>& frame_drop_length_consecutive, int debug);
 
   friend class IsobmffFileInformation;
+  friend class AudioTrack;
+  friend class VideoTrack;
 };
 
 class AudioVideoTimingInformation : public TimingInformation {
