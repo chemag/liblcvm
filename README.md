@@ -195,7 +195,6 @@ include:
 * `get_video_freeze_info()`
 * `get_video_structure_info()`
 * `get_video_generic_info()`
-* `get_frame_interframe_info()`
 
 
 
