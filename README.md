@@ -172,14 +172,15 @@ exports retain invalid generic fields; acceptance/filtering is a tool policy.
 ## 4.4. CLI Strictness
 
 The CLI defaults to `--strict`, rejecting generic unsupported audio/video
-records. `--no-strict` omits generic fields and their AV pairs and chooses
-supported tracks for presentation; explicit absent/unsupported selectors are
-errors. Supported counts determine singleton suffix elision. Library track
-collections, getters, and invalid generic fields remain unchanged by tool mode.
+records. `--no-strict` reports those records with the exact direct `stsd` entry
+name and invalid analysis values, even if the only video is unsupported.
+Unknown formats do not imply codec support. Known sibling analyses remain
+usable. All retained tracks count for singleton suffix elision; defaults follow
+container order. Explicit generic IDs are valid; absent IDs are errors.
 
-CLI policy evaluation also excludes generic records before evaluating rules,
-using the selected supported aliases and absent-audio defaults when no known
-audio remains. The library policy API itself is unchanged. Audio skipping
+CLI policy sees the reported generic records and their invalid values as well
+as supported records. A selected generic video has no timestamp rows; select
+a supported video ID explicitly when its timeline is wanted. Audio skipping
 bypasses tracks in both modes; lower container syntax errors remain fatal.
 No source bytes are removed: File-wide size/bitrate describe the original file.
 

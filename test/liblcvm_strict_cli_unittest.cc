@@ -68,9 +68,12 @@ TEST(LiblcvmStrictCliTest, StrictIsDefaultAndOnlyToolPolicy) {
     EXPECT_NE(std::string::npos, result.output.find("audio_type_a41"));
     EXPECT_NE(std::string::npos, result.output.find("mp4a"));
     EXPECT_NE(std::string::npos, result.output.find("Opus"));
-    EXPECT_EQ(std::string::npos, result.output.find("_a99"));
-    EXPECT_EQ(std::string::npos, result.output.find("_v77"));
-    EXPECT_EQ(std::string::npos, result.output.find("fLaC"));
+    if (std::string(name) != "unknown_video_first.mp4")
+      EXPECT_NE(std::string::npos, result.output.find("_a99"));
+    if (std::string(name) != "unknown_audio_last.mp4")
+      EXPECT_NE(std::string::npos, result.output.find("_v77"));
+    if (std::string(name) != "unknown_video_first.mp4")
+      EXPECT_NE(std::string::npos, result.output.find("fLaC"));
   }
 }
 
@@ -80,11 +83,11 @@ TEST(LiblcvmStrictCliTest, ModeOrderingAndExplicitSelectorErrors) {
   EXPECT_EQ(
       0,
       Cli("unknown_audio_last.mp4", "--no-strict --audio-track-id 41").status);
-  EXPECT_NE(
+  EXPECT_EQ(
       0,
       Cli("unknown_audio_last.mp4", "--no-strict --audio-track-id 99").status);
-  EXPECT_NE(0, Cli("only_unknown_video.mp4", "--no-strict").status);
-  EXPECT_NE(
+  EXPECT_EQ(0, Cli("only_unknown_video.mp4", "--no-strict").status);
+  EXPECT_EQ(
       0,
       Cli("unknown_video_first.mp4", "--no-strict --video-track-id 77").status);
   EXPECT_EQ(0, Cli("only_unknown_audio.mp4", "--no-strict").status);
@@ -116,7 +119,7 @@ TEST(LiblcvmStrictCliTest, SupportedFileOutputIsModeIndependent) {
   }
 }
 
-TEST(LiblcvmStrictCliTest, GenericDescriptorsDoNotCountAsSupportedAudio) {
+TEST(LiblcvmStrictCliTest, GenericDescriptorsRemainInAudioCardinality) {
   for (const auto& name : {"missing_audio_stsd.mp4", "empty_audio_stsd.mp4",
                            "generic_audio_children.mp4"}) {
     SCOPED_TRACE(name);
@@ -124,12 +127,15 @@ TEST(LiblcvmStrictCliTest, GenericDescriptorsDoNotCountAsSupportedAudio) {
     const auto result = Cli(name, "--no-strict");
     ASSERT_EQ(0, result.status);
     const auto header = result.output.substr(0, result.output.find('\n'));
-    EXPECT_EQ(std::string::npos, header.find("_a99"));
-    EXPECT_EQ(std::string::npos, header.find("_a31"));
+    EXPECT_NE(std::string::npos, header.find("_a99"));
+    EXPECT_NE(std::string::npos, header.find("_a31"));
     EXPECT_NE(std::string::npos, header.find("audio_type"));
     EXPECT_NE(std::string::npos, result.output.find("mp4a"));
-    EXPECT_EQ(std::string::npos, result.output.find("fLaC"));
-    EXPECT_NE(0, Cli(name, "--no-strict --audio-track-id 99").status);
+    if (std::string(name) == "generic_audio_children.mp4")
+      EXPECT_NE(std::string::npos, result.output.find("fLaC"));
+    else
+      EXPECT_NE(std::string::npos, result.output.find("none"));
+    EXPECT_EQ(0, Cli(name, "--no-strict --audio-track-id 99").status);
   }
 }
 
@@ -156,7 +162,7 @@ TEST(LiblcvmStrictCliTest, SkipOmitsAllAudioInEitherToolMode) {
 }
 
 TEST(LiblcvmStrictCliTest,
-     GenericFirstVideoUsesSupportedTimelineForTimestamps) {
+     GenericTimestampSelectionIsEmptyUnlessSupportedIdIsExplicit) {
   const auto dir =
       std::filesystem::temp_directory_path() /
       ("lcvm-strict-ts-" +
@@ -173,13 +179,24 @@ TEST(LiblcvmStrictCliTest,
   size_t lines = 0;
   while (std::getline(in, line))
     ++lines;
-  EXPECT_EQ(121u, lines);
+  EXPECT_EQ(1u, lines);
   in.close();
+  const auto supported =
+      Cli("unknown_video_first.mp4",
+          "--no-strict --video-track-id 11 --outfile-timestamps " +
+              Quote(path.string()));
+  ASSERT_EQ(0, supported.status);
+  std::ifstream selected(path);
+  lines = 0;
+  while (std::getline(selected, line))
+    ++lines;
+  EXPECT_EQ(121u, lines);
+  selected.close();
   std::filesystem::remove_all(dir);
 }
 
 #if ADD_POLICY
-TEST(LiblcvmStrictCliTest, PolicyNeverSeesOmittedGenericTracks) {
+TEST(LiblcvmStrictCliTest, PolicySeesReportedGenericRecordsWithInvalidValues) {
   const auto dir =
       std::filesystem::temp_directory_path() /
       ("lcvm-strict-policy-" +
@@ -195,7 +212,7 @@ TEST(LiblcvmStrictCliTest, PolicyNeverSeesOmittedGenericTracks) {
   auto result =
       Cli("unknown_video_first.mp4", "--no-strict -p " + Quote(path.string()));
   ASSERT_EQ(0, result.status);
-  EXPECT_EQ(std::string::npos, result.output.find("IGNORED_GENERIC_VIDEO"));
+  EXPECT_NE(std::string::npos, result.output.find("IGNORED_GENERIC_VIDEO"));
   EXPECT_NE(std::string::npos, result.output.find("KNOWN_VIDEO"));
   {
     std::ofstream out(path);
@@ -206,9 +223,22 @@ TEST(LiblcvmStrictCliTest, PolicyNeverSeesOmittedGenericTracks) {
   result =
       Cli("only_unknown_audio.mp4", "--no-strict -p " + Quote(path.string()));
   ASSERT_EQ(0, result.status);
-  EXPECT_EQ(std::string::npos, result.output.find("GENERIC_AUDIO_ALIAS"));
-  EXPECT_EQ(std::string::npos, result.output.find("GENERIC_AUDIO_ID"));
-  EXPECT_NE(std::string::npos, result.output.find("ABSENT_AUDIO"));
+  EXPECT_NE(std::string::npos, result.output.find("GENERIC_AUDIO_ALIAS"));
+  EXPECT_NE(std::string::npos, result.output.find("GENERIC_AUDIO_ID"));
+  EXPECT_EQ(std::string::npos, result.output.find("ABSENT_AUDIO"));
   std::filesystem::remove_all(dir);
 }
 #endif
+
+TEST(LiblcvmStrictCliTest, UnknownOnlyVideoProducesARecordNotAnError) {
+  const auto result = Cli("only_unknown_video.mp4", "--no-strict");
+  ASSERT_EQ(0, result.status);
+  EXPECT_NE(std::string::npos, result.output.find("video_codec_type"));
+  EXPECT_NE(std::string::npos, result.output.find("zzzz"));
+  EXPECT_NE(std::string::npos, result.output.find("duration_video_sec"));
+  EXPECT_EQ(std::string::npos, result.output.find("_v77"));
+  EXPECT_NE(0, Cli("only_unknown_video.mp4", "--strict").status);
+  EXPECT_NE(0,
+            Cli("only_unknown_video.mp4", "--no-strict --video-track-id 12345")
+                .status);
+}
