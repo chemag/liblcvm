@@ -1,4 +1,4 @@
-# CLAUDE.md - liblcvm Analysis
+# AGENTS.md - liblcvm Analysis
 
 ## Project Overview
 
