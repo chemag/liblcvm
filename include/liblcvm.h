@@ -203,7 +203,7 @@ class AudioInformation {
   friend class IsobmffFileInformation;
 };
 
-class FrameInformation {
+class VideoInformation {
  private:
   // track_id: Stored tkhd ID of the analyzed video track, not its index.
   uint32_t track_id = 0;
@@ -276,11 +276,11 @@ class FrameInformation {
   DECL_GETTER(level_idc, int)
   DECL_GETTER(profile_type_str, std::string)
 
-  int parse_frame_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
+  int parse_video_information(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
                               std::shared_ptr<IsobmffFileInformation> ptr,
                               int debug);
 
-  static int derive_frame_info(std::shared_ptr<IsobmffFileInformation> ptr,
+  static int derive_video_info(std::shared_ptr<IsobmffFileInformation> ptr,
                                bool sort_by_pts, int debug);
 
   friend class IsobmffFileInformation;
@@ -368,21 +368,21 @@ class IsobmffFileInformation {
   std::string filename;
   std::string policy;
   TimingInformation timing;
-  FrameInformation frame;
+  VideoInformation video;
   AudioInformation audio;
   // Keep all audio tracks in container order. The default audio/timing view
   // uses the FIRST audio track, independently of its stored tkhd ID.
   std::vector<AudioInformation> audio_tracks;
-  // The first video's analysis lives in frame/timing for legacy helper
+  // The first video's analysis lives in video/timing for legacy helper
   // compatibility. Store only additional analyses, avoiding a duplicate copy
   // of the first video's per-frame lists.
   struct VideoAnalysis {
-    FrameInformation frame;
+    VideoInformation video;
     TimingInformation timing;
   };
   bool has_video_track = false;
   std::vector<VideoAnalysis> additional_video_tracks;
-  std::pair<const FrameInformation*, const TimingInformation*> video_view(
+  std::pair<const VideoInformation*, const TimingInformation*> video_view(
       int64_t video_track_id) const;
 
  public:
@@ -396,7 +396,7 @@ class IsobmffFileInformation {
   // get_timing(audio_id) calls keep their meaning.
   TimingInformation get_timing(int64_t audio_track_id = -1,
                                int64_t video_track_id = -1) const;
-  FrameInformation get_frame(int64_t video_track_id = -1) const;
+  VideoInformation get_video_info(int64_t video_track_id = -1) const;
   std::vector<uint32_t> get_video_track_ids() const;
   std::vector<uint32_t> get_audio_track_ids() const;
   size_t get_num_video_tracks() const {
@@ -456,7 +456,7 @@ class IsobmffFileInformation {
   IsobmffFileInformation() = default;
 
   friend class TimingInformation;
-  friend class FrameInformation;
+  friend class VideoInformation;
   friend class AudioInformation;
 };
 

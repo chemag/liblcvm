@@ -10,7 +10,7 @@
 namespace py = pybind11;
 
 // Define the macro to bind frame getters
-#define FRAME_GETTERS(class_name)                                     \
+#define VIDEO_GETTERS(class_name)                                     \
   .def("get_track_id", &class_name::get_track_id)                     \
       .def("get_filesize", &class_name::get_filesize)                 \
       .def("get_bitrate_bps", &class_name::get_bitrate_bps)           \
@@ -114,7 +114,7 @@ PYBIND11_MODULE(liblcvm, m) {
       .def("get_filename", &IsobmffFileInformation::get_filename)
       .def("get_timing", &IsobmffFileInformation::get_timing,
            py::arg("audio_track_id") = -1, py::arg("video_track_id") = -1)
-      .def("get_frame", &IsobmffFileInformation::get_frame,
+      .def("get_video_info", &IsobmffFileInformation::get_video_info,
            py::arg("video_track_id") = -1)
       .def("get_audio", &IsobmffFileInformation::get_audio,
            py::arg("audio_track_id") = -1)
@@ -131,11 +131,11 @@ PYBIND11_MODULE(liblcvm, m) {
         py::arg("liblcvm_config"),
         "Parse an ISOBMFF file and return file information.");
 
-  // Expose the FrameInformation class
-  py::class_<FrameInformation>(m, "FrameInformation")
+  // Expose the VideoInformation class
+  py::class_<VideoInformation>(m, "VideoInformation")
       .def(py::init<>())
-      // Automatically bind all FrameInformation class getters
-      FRAME_GETTERS(FrameInformation);
+      // Automatically bind all VideoInformation class getters
+      VIDEO_GETTERS(VideoInformation);
 
   // Expose the TimingInformation class
   py::class_<TimingInformation>(m, "TimingInformation")

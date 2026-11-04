@@ -296,7 +296,7 @@ TEST(LiblcvmMultiAudioTest,
 TEST(LiblcvmMultiAudioTest, VideoQualificationUsesStoredIdNotPosition) {
   auto file = Parse("multi_audio_video_id7.mp4");
   ASSERT_NE(nullptr, file);
-  EXPECT_EQ(7u, file->get_frame().get_track_id());
+  EXPECT_EQ(7u, file->get_video_info().get_track_id());
   auto fields = Fields(file);
   EXPECT_NE(0u, fields.count("chroma_format_v7"));
   EXPECT_NE(0u, fields.count("audio_video_ratio_v7_a23"));

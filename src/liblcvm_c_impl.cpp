@@ -185,9 +185,9 @@ liblcvm_error_t liblcvm_analyze_video_simple(
     info->video_duration_ms = static_cast<int>(timing.get_duration_video_sec() * 1000.0);
     info->audio_duration_ms = static_cast<int>(timing.get_duration_audio_sec() * 1000.0);
 
-    // Get frame info for bit depth
-    const auto& frame = cpp_info->get_frame();
-    info->bit_depth = frame.get_bit_depth_luma();
+    // Get video info for bit depth
+    const auto& video = cpp_info->get_video_info();
+    info->bit_depth = video.get_bit_depth_luma();
 
     liblcvm_free_file_info(handle);
     return LIBLCVM_SUCCESS;
@@ -217,10 +217,10 @@ liblcvm_error_t liblcvm_get_timing_info(liblcvm_file_info_t handle, liblcvm_timi
   return LIBLCVM_ERROR_PARSE_FAILED; // Not implemented
 }
 
-liblcvm_error_t liblcvm_get_frame_info(liblcvm_file_info_t handle, liblcvm_frame_info_t* frame) {
+liblcvm_error_t liblcvm_get_video_info(liblcvm_file_info_t handle, liblcvm_video_info_t* video) {
   // Not needed for the simple use case but required for linking
   (void)handle;
-  (void)frame;
+  (void)video;
   return LIBLCVM_ERROR_PARSE_FAILED; // Not implemented
 }
 

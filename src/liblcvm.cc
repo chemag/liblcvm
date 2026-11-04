@@ -68,27 +68,27 @@ AudioInformation IsobmffFileInformation::get_audio(
                           std::to_string(audio_track_id));
 }
 
-std::pair<const FrameInformation*, const TimingInformation*>
+std::pair<const VideoInformation*, const TimingInformation*>
 IsobmffFileInformation::video_view(int64_t video_track_id) const {
   if (video_track_id == -1)
-    return {&frame, &timing};
+    return {&video, &timing};
   if (video_track_id < 0 ||
       static_cast<uint64_t>(video_track_id) > UINT32_MAX) {
     throw std::out_of_range("invalid video track selector: " +
                             std::to_string(video_track_id));
   }
   const auto id = static_cast<uint32_t>(video_track_id);
-  if (has_video_track && frame.get_track_id() == id)
-    return {&frame, &timing};
+  if (has_video_track && video.get_track_id() == id)
+    return {&video, &timing};
   for (const auto& track : additional_video_tracks) {
-    if (track.frame.get_track_id() == id)
-      return {&track.frame, &track.timing};
+    if (track.video.get_track_id() == id)
+      return {&track.video, &track.timing};
   }
   throw std::out_of_range("video track ID not found: " +
                           std::to_string(video_track_id));
 }
 
-FrameInformation IsobmffFileInformation::get_frame(
+VideoInformation IsobmffFileInformation::get_video_info(
     int64_t video_track_id) const {
   return *video_view(video_track_id).first;
 }
@@ -96,9 +96,9 @@ FrameInformation IsobmffFileInformation::get_frame(
 std::vector<uint32_t> IsobmffFileInformation::get_video_track_ids() const {
   std::vector<uint32_t> ids;
   if (has_video_track)
-    ids.push_back(frame.get_track_id());
+    ids.push_back(video.get_track_id());
   for (const auto& track : additional_video_tracks)
-    ids.push_back(track.frame.get_track_id());
+    ids.push_back(track.video.get_track_id());
   return ids;
 }
 
@@ -201,47 +201,47 @@ int IsobmffFileInformation::parse_to_lists(const char* infile,
 
 static void fill_base_fields(
     const std::shared_ptr<IsobmffFileInformation>& pobj,
-    const FrameInformation& selected_frame, TimingInformation& selected_timing,
+    const VideoInformation& selected_video, TimingInformation& selected_timing,
     const AudioInformation& selected_audio, LiblcvmKeyList* pkeys,
     LiblcvmValList* pvals, int debug) {
   pkeys->push_back("infile");
   pvals->push_back(pobj->get_filename());
   pkeys->push_back("filesize");
-  pvals->push_back(selected_frame.get_filesize());
+  pvals->push_back(selected_video.get_filesize());
   pkeys->push_back("bitrate_bps");
-  pvals->push_back(selected_frame.get_bitrate_bps());
+  pvals->push_back(selected_video.get_bitrate_bps());
   pkeys->push_back("width");
-  pvals->push_back(selected_frame.get_width());
+  pvals->push_back(selected_video.get_width());
   pkeys->push_back("height");
-  pvals->push_back(selected_frame.get_height());
+  pvals->push_back(selected_video.get_height());
   pkeys->push_back("video_codec_type");
-  pvals->push_back(selected_frame.get_video_codec_type());
+  pvals->push_back(selected_video.get_video_codec_type());
   pkeys->push_back("horizresolution");
-  pvals->push_back(selected_frame.get_horizresolution());
+  pvals->push_back(selected_video.get_horizresolution());
   pkeys->push_back("vertresolution");
-  pvals->push_back(selected_frame.get_vertresolution());
+  pvals->push_back(selected_video.get_vertresolution());
   pkeys->push_back("depth");
-  pvals->push_back(selected_frame.get_depth());
+  pvals->push_back(selected_video.get_depth());
   pkeys->push_back("chroma_format");
-  pvals->push_back(selected_frame.get_chroma_format());
+  pvals->push_back(selected_video.get_chroma_format());
   pkeys->push_back("bit_depth_luma");
-  pvals->push_back(selected_frame.get_bit_depth_luma());
+  pvals->push_back(selected_video.get_bit_depth_luma());
   pkeys->push_back("bit_depth_chroma");
-  pvals->push_back(selected_frame.get_bit_depth_chroma());
+  pvals->push_back(selected_video.get_bit_depth_chroma());
   pkeys->push_back("video_full_range_flag");
-  pvals->push_back(selected_frame.get_video_full_range_flag());
+  pvals->push_back(selected_video.get_video_full_range_flag());
   pkeys->push_back("colour_primaries");
-  pvals->push_back(selected_frame.get_colour_primaries());
+  pvals->push_back(selected_video.get_colour_primaries());
   pkeys->push_back("transfer_characteristics");
-  pvals->push_back(selected_frame.get_transfer_characteristics());
+  pvals->push_back(selected_video.get_transfer_characteristics());
   pkeys->push_back("matrix_coeffs");
-  pvals->push_back(selected_frame.get_matrix_coeffs());
+  pvals->push_back(selected_video.get_matrix_coeffs());
   pkeys->push_back("profile_idc");
-  pvals->push_back(selected_frame.get_profile_idc());
+  pvals->push_back(selected_video.get_profile_idc());
   pkeys->push_back("level_idc");
-  pvals->push_back(selected_frame.get_level_idc());
+  pvals->push_back(selected_video.get_level_idc());
   pkeys->push_back("profile_type_str");
-  pvals->push_back(selected_frame.get_profile_type_str());
+  pvals->push_back(selected_video.get_profile_type_str());
   pkeys->push_back("num_video_frames");
   pvals->push_back(selected_timing.get_num_video_frames());
   pkeys->push_back("frame_rate_fps_median");
@@ -317,11 +317,11 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
   pkeys_timing->clear();
   pvals_timing->clear();
   AudioInformation selected_audio;
-  FrameInformation selected_frame;
+  VideoInformation selected_video;
   TimingInformation selected_timing;
   try {
     selected_audio = pobj->get_audio(audio_track_id);
-    selected_frame = pobj->get_frame(video_track_id);
+    selected_video = pobj->get_video_info(video_track_id);
     selected_timing = pobj->get_timing(audio_track_id, video_track_id);
   } catch (const std::out_of_range& error) {
     fprintf(stderr, "error: %s\n", error.what());
@@ -329,7 +329,7 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
   }
 
   // Preserve the existing flat key order for the selected/default view.
-  fill_base_fields(pobj, selected_frame, selected_timing, selected_audio, pkeys,
+  fill_base_fields(pobj, selected_video, selected_timing, selected_audio, pkeys,
                    pvals, debug);
 
   if (include_track_keys) {
@@ -345,7 +345,7 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
     for (const auto id : video_ids) {
       LiblcvmKeyList video_keys;
       LiblcvmValList video_values;
-      if (id == selected_frame.get_track_id()) {
+      if (id == selected_video.get_track_id()) {
         // Reuse the original selected view rather than copy its frame arrays
         // again.
         video_keys.assign(pkeys->begin(),
@@ -353,9 +353,9 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
         video_values.assign(pvals->begin(),
                             pvals->begin() + static_cast<ptrdiff_t>(base_size));
       } else {
-        const auto video_frame = pobj->get_frame(id);
+        const auto video_info = pobj->get_video_info(id);
         auto video_timing = pobj->get_timing(audio_track_id, id);
-        fill_base_fields(pobj, video_frame, video_timing, selected_audio,
+        fill_base_fields(pobj, video_info, video_timing, selected_audio,
                          &video_keys, &video_values, debug);
       }
       const auto suffix = "_v" + std::to_string(id);
@@ -379,7 +379,7 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
     pkeys->push_back("video_track_id");
     pvals->push_back(video_ids.empty()
                          ? LiblcvmValue(-1)
-                         : LiblcvmValue(selected_frame.get_track_id()));
+                         : LiblcvmValue(selected_video.get_track_id()));
     for (const auto& audio : tracks) {
       const auto suffix = "_a" + std::to_string(audio.get_track_id());
       const LiblcvmValList values = {
@@ -592,9 +592,9 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
                       ? std::make_shared<IsobmffFileInformation>()
                       : ptr;
       video_ptr->filename = ptr->filename;
-      // Every video gets independent frame/timing state, including drop and
+      // Every video gets independent video/timing state, including drop and
       // keyframe lists. Keep the first analysis in the legacy default members.
-      video_ptr->frame = FrameInformation{};
+      video_ptr->video = VideoInformation{};
       video_ptr->timing = TimingInformation{};
       video_ptr->timing.timescale_movie_hz = timescale_movie_hz;
       video_ptr->timing.duration_audio_sec = -1.0;
@@ -682,9 +682,9 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     if (handler_type.compare("vide") == 0) {
       const auto id = tkhd->GetTrackID();
       if (ptr->has_video_track) {
-        bool duplicate = ptr->frame.get_track_id() == id;
+        bool duplicate = ptr->video.get_track_id() == id;
         for (const auto& video : ptr->additional_video_tracks) {
-          duplicate = duplicate || video.frame.get_track_id() == id;
+          duplicate = duplicate || video.video.get_track_id() == id;
         }
         if (duplicate) {
           if (liblcvm_config.get_debug() > 0) {
@@ -693,9 +693,9 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
           return nullptr;
         }
       }
-      video_ptr->frame.track_id = id;
-      video_ptr->frame.width = tkhd->GetWidth();
-      video_ptr->frame.height = tkhd->GetHeight();
+      video_ptr->video.track_id = id;
+      video_ptr->video.width = tkhd->GetWidth();
+      video_ptr->video.height = tkhd->GetHeight();
     }
 
     // tkhd-based track duration
@@ -773,7 +773,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     }
 
     // 12. get video frame information
-    if (video_ptr->frame.parse_frame_information(
+    if (video_ptr->video.parse_video_information(
             stbl, video_ptr, liblcvm_config.get_debug()) < 0) {
       if (liblcvm_config.get_debug() > 0) {
         fprintf(stderr, "error: no frame information in %s\n",
@@ -784,7 +784,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     if (video_ptr->timing.derive_timing_info(video_ptr,
                                              liblcvm_config.get_sort_by_pts(),
                                              liblcvm_config.get_debug()) < 0 ||
-        video_ptr->frame.derive_frame_info(video_ptr,
+        video_ptr->video.derive_video_info(video_ptr,
                                            liblcvm_config.get_sort_by_pts(),
                                            liblcvm_config.get_debug()) < 0) {
       return nullptr;
@@ -795,7 +795,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
       ptr->has_video_track = true;
     } else {
       ptr->additional_video_tracks.push_back(
-          {std::move(video_ptr->frame), std::move(video_ptr->timing)});
+          {std::move(video_ptr->video), std::move(video_ptr->timing)});
     }
   }
 
@@ -811,7 +811,7 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
   if (!ptr->has_video_track) {
     if (ptr->timing.derive_timing_info(ptr, liblcvm_config.get_sort_by_pts(),
                                        liblcvm_config.get_debug()) < 0 ||
-        ptr->frame.derive_frame_info(ptr, liblcvm_config.get_sort_by_pts(),
+        ptr->video.derive_video_info(ptr, liblcvm_config.get_sort_by_pts(),
                                      liblcvm_config.get_debug()) < 0) {
       return nullptr;
     }
@@ -1308,7 +1308,7 @@ void TimingInformation::calculate_consecutive_list(
   }
 }
 
-int FrameInformation::derive_frame_info(
+int VideoInformation::derive_video_info(
     std::shared_ptr<IsobmffFileInformation> ptr, bool sort_by_pts, int debug) {
   // 1. get basic file info
   struct stat stat_buf;
@@ -1317,14 +1317,14 @@ int FrameInformation::derive_frame_info(
     fprintf(stderr, "error: cannot access %s\n", ptr->filename.c_str());
     return -1;
   }
-  ptr->frame.filesize = stat_buf.st_size;
-  ptr->frame.bitrate_bps = 8.0 * ((double)(ptr->frame.filesize)) /
+  ptr->video.filesize = stat_buf.st_size;
+  ptr->video.bitrate_bps = 8.0 * ((double)(ptr->video.filesize)) /
                            ((double)ptr->get_timing().get_duration_video_sec());
 
   return 0;
 }
 
-void FrameInformation::parse_avcc(std::shared_ptr<ISOBMFF::AVCC> avcc,
+void VideoInformation::parse_avcc(std::shared_ptr<ISOBMFF::AVCC> avcc,
                                   int debug) {
   // define an avcc parser state
   h264nal::H264BitstreamParserState bitstream_parser_state;
@@ -1386,7 +1386,7 @@ void FrameInformation::parse_avcc(std::shared_ptr<ISOBMFF::AVCC> avcc,
   }
 }
 
-void FrameInformation::parse_hvcc(std::shared_ptr<ISOBMFF::HVCC> hvcc,
+void VideoInformation::parse_hvcc(std::shared_ptr<ISOBMFF::HVCC> hvcc,
                                   int debug) {
   // define an hevc parser state
   h265nal::H265BitstreamParserState bitstream_parser_state;
@@ -1537,7 +1537,7 @@ int AudioInformation::parse_sample_entry(
   return -1;
 }
 
-int FrameInformation::parse_frame_information(
+int VideoInformation::parse_video_information(
     std::shared_ptr<ISOBMFF::ContainerBox> stbl,
     std::shared_ptr<IsobmffFileInformation> ptr, int debug) {
   // 1. look for a stsd container box
@@ -1574,20 +1574,20 @@ int FrameInformation::parse_frame_information(
       }
       return -1;
     }
-    ptr->frame.video_codec_type = (hvc1 != nullptr) ? "hvc1" : "hev1";
-    ptr->frame.width2 = hevc_box->GetWidth();
-    ptr->frame.height2 = hevc_box->GetHeight();
-    ptr->frame.horizresolution = hevc_box->GetHorizResolution();
-    ptr->frame.vertresolution = hevc_box->GetVertResolution();
-    ptr->frame.depth = hevc_box->GetDepth();
-    ptr->frame.chroma_format = hvcc->GetChromaFormat();
-    ptr->frame.bit_depth_luma = 8 + hvcc->GetBitDepthLumaMinus8();
-    ptr->frame.bit_depth_chroma = 8 + hvcc->GetBitDepthChromaMinus8();
-    ptr->frame.colour_primaries = -1;
-    ptr->frame.transfer_characteristics = -1;
-    ptr->frame.matrix_coeffs = -1;
-    ptr->frame.video_full_range_flag = -1;
-    ptr->frame.parse_hvcc(hvcc, debug);
+    ptr->video.video_codec_type = (hvc1 != nullptr) ? "hvc1" : "hev1";
+    ptr->video.width2 = hevc_box->GetWidth();
+    ptr->video.height2 = hevc_box->GetHeight();
+    ptr->video.horizresolution = hevc_box->GetHorizResolution();
+    ptr->video.vertresolution = hevc_box->GetVertResolution();
+    ptr->video.depth = hevc_box->GetDepth();
+    ptr->video.chroma_format = hvcc->GetChromaFormat();
+    ptr->video.bit_depth_luma = 8 + hvcc->GetBitDepthLumaMinus8();
+    ptr->video.bit_depth_chroma = 8 + hvcc->GetBitDepthChromaMinus8();
+    ptr->video.colour_primaries = -1;
+    ptr->video.transfer_characteristics = -1;
+    ptr->video.matrix_coeffs = -1;
+    ptr->video.video_full_range_flag = -1;
+    ptr->video.parse_hvcc(hvcc, debug);
 
   } else if (avc1 != nullptr || avc3 != nullptr) {
     auto avc_box = (avc1 != nullptr) ? avc1 : avc3;
@@ -1602,16 +1602,16 @@ int FrameInformation::parse_frame_information(
       }
       return -1;
     }
-    ptr->frame.video_codec_type = (avc1 != nullptr) ? "avc1" : "avc3";
-    ptr->frame.width2 = avc_box->GetWidth();
-    ptr->frame.height2 = avc_box->GetHeight();
-    ptr->frame.horizresolution = avc_box->GetHorizResolution();
-    ptr->frame.vertresolution = avc_box->GetVertResolution();
-    ptr->frame.depth = avc_box->GetDepth();
-    ptr->frame.chroma_format = -1;
-    ptr->frame.bit_depth_luma = -1;
-    ptr->frame.bit_depth_chroma = -1;
-    ptr->frame.parse_avcc(avcc, debug);
+    ptr->video.video_codec_type = (avc1 != nullptr) ? "avc1" : "avc3";
+    ptr->video.width2 = avc_box->GetWidth();
+    ptr->video.height2 = avc_box->GetHeight();
+    ptr->video.horizresolution = avc_box->GetHorizResolution();
+    ptr->video.vertresolution = avc_box->GetVertResolution();
+    ptr->video.depth = avc_box->GetDepth();
+    ptr->video.chroma_format = -1;
+    ptr->video.bit_depth_luma = -1;
+    ptr->video.bit_depth_chroma = -1;
+    ptr->video.parse_avcc(avcc, debug);
 
   } else {
     if (debug > 0) {

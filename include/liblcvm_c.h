@@ -77,7 +77,7 @@ typedef struct {
   double pts_duration_sec_mad;
 } liblcvm_timing_info_t;
 
-// Frame information structure
+// Video information structure
 typedef struct {
   int filesize;
   double bitrate_bps;
@@ -96,7 +96,7 @@ typedef struct {
   int colour_primaries;
   int transfer_characteristics;
   int matrix_coeffs;
-} liblcvm_frame_info_t;
+} liblcvm_video_info_t;
 
 // Audio information structure
 typedef struct {
@@ -109,7 +109,7 @@ typedef struct {
 // Combined information structure for convenience
 typedef struct {
   liblcvm_timing_info_t timing;
-  liblcvm_frame_info_t frame;
+  liblcvm_video_info_t video;
   liblcvm_audio_info_t audio;
   char filename[1024];
   char policy[256];
@@ -162,9 +162,9 @@ LIBLCVM_C_API liblcvm_error_t liblcvm_get_video_analysis(
 LIBLCVM_C_API liblcvm_error_t liblcvm_get_timing_info(
     liblcvm_file_info_t handle, liblcvm_timing_info_t* timing);
 
-// Get frame information
+// Get video information
 LIBLCVM_C_API liblcvm_error_t
-liblcvm_get_frame_info(liblcvm_file_info_t handle, liblcvm_frame_info_t* frame);
+liblcvm_get_video_info(liblcvm_file_info_t handle, liblcvm_video_info_t* video);
 
 // Get audio information
 LIBLCVM_C_API liblcvm_error_t
