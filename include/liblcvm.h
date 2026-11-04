@@ -30,7 +30,7 @@
 
 class IsobmffFileInformation;
 
-// Declaration of IsobmffFileInforrmation structure.
+// Declaration of IsobmffFileInformation structure.
 class TimingInformation {
  public:
   struct SampleTimingEntry {
