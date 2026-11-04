@@ -242,7 +242,7 @@ def dump_output(infile, outfp, file_info, debug, policy_str=None):
     key_frame_ratio = timing_info.get_key_frame_ratio()
 
     # Access the audio information
-    audio_info = file_info.get_audio()
+    audio_info = file_info.get_audio_info()
     audio_type = audio_info.get_audio_type()
     channel_count = audio_info.get_channel_count()
     sample_rate = audio_info.get_sample_rate()

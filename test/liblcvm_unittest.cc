@@ -360,7 +360,7 @@ TEST_F(LiblcvmTest, TestSkipAudioParsing) {
       doubles_are_close(1.0058076193907575, timing.get_audio_video_ratio()));
 
   // the audio sample entry is not parsed
-  const AudioInformation& audio = ptr->get_audio();
+  const AudioInformation& audio = ptr->get_audio_info();
   EXPECT_EQ("", audio.get_audio_type());
   EXPECT_EQ(0, audio.get_channel_count());
   EXPECT_EQ(0, audio.get_sample_rate());

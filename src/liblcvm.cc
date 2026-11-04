@@ -50,7 +50,7 @@ static void derive_audio_video_metrics(double video_sec, double audio_sec,
   }
 }
 
-AudioInformation IsobmffFileInformation::get_audio(
+AudioInformation IsobmffFileInformation::get_audio_info(
     int64_t audio_track_id) const {
   if (audio_track_id == -1)
     return audio;
@@ -113,7 +113,7 @@ TimingInformation IsobmffFileInformation::get_timing(
     int64_t audio_track_id, int64_t video_track_id) const {
   if (audio_track_id == -1 && video_track_id == -1)
     return timing;
-  const auto selected = get_audio(audio_track_id);
+  const auto selected = get_audio_info(audio_track_id);
   auto result = *video_view(video_track_id).second;
   result.duration_audio_sec = selected.get_duration_sec();
   result.timescale_audio_hz = selected.get_timescale_hz();
@@ -320,7 +320,7 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
   VideoInformation selected_video;
   TimingInformation selected_timing;
   try {
-    selected_audio = pobj->get_audio(audio_track_id);
+    selected_audio = pobj->get_audio_info(audio_track_id);
     selected_video = pobj->get_video_info(video_track_id);
     selected_timing = pobj->get_timing(audio_track_id, video_track_id);
   } catch (const std::out_of_range& error) {

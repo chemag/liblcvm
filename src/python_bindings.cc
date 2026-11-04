@@ -116,7 +116,7 @@ PYBIND11_MODULE(liblcvm, m) {
            py::arg("audio_track_id") = -1, py::arg("video_track_id") = -1)
       .def("get_video_info", &IsobmffFileInformation::get_video_info,
            py::arg("video_track_id") = -1)
-      .def("get_audio", &IsobmffFileInformation::get_audio,
+      .def("get_audio_info", &IsobmffFileInformation::get_audio_info,
            py::arg("audio_track_id") = -1)
       .def("get_audio_tracks", &IsobmffFileInformation::get_audio_tracks)
       .def("get_video_track_ids", &IsobmffFileInformation::get_video_track_ids)

@@ -150,7 +150,7 @@ TEST(LiblcvmMultivideoTest,
   ASSERT_NE(nullptr, file);
   // Export selectors do not alter the object's first-track default.
   EXPECT_EQ(11u, file->get_video_info().get_track_id());
-  EXPECT_EQ(31u, file->get_audio().get_track_id());
+  EXPECT_EQ(31u, file->get_audio_info().get_track_id());
 }
 
 TEST(LiblcvmMultivideoTest, MaxUint32VideoIdAndInvalidSelectors) {
@@ -200,7 +200,7 @@ TEST(LiblcvmMultivideoTest, SkippedAudioPreservesEveryVideoAndMdhdPairing) {
   ASSERT_NE(nullptr, file);
   EXPECT_EQ(2u, file->get_num_video_tracks());
   EXPECT_EQ(2u, file->get_num_audio_tracks());
-  EXPECT_EQ("", file->get_audio(41).get_audio_type());
+  EXPECT_EQ("", file->get_audio_info(41).get_audio_type());
   EXPECT_DOUBLE_EQ(3.2, file->get_timing(41, 21).get_duration_audio_sec());
   EXPECT_DOUBLE_EQ(3, file->get_timing(41, 21).get_duration_video_sec());
   EXPECT_TRUE(file->get_timing(41, 21).get_video_freeze());

@@ -22,7 +22,7 @@ TEST(LiblcvmEac3Test, ConfigurationNotSampleEntryPlaceholder) {
   for (const auto& name : {"eac3_joc.mp4", "eac3_plain.mp4"}) {
     auto file = ParseEac3(name);
     ASSERT_NE(nullptr, file);
-    auto audio = file->get_audio();
+    auto audio = file->get_audio_info();
     EXPECT_EQ("ec-3", audio.get_audio_type());
     EXPECT_EQ(6, audio.get_channel_count());
     EXPECT_EQ(48000, audio.get_sample_rate());
@@ -68,8 +68,10 @@ TEST(LiblcvmEac3Test, RealTrackIdsAndAllAudioRetainedInBothOrders) {
     EXPECT_DOUBLE_EQ(4.125, aac.get_mdhd_duration_sec());
     // Select consistently: -1 means the first audio in container order,
     // even when its actual ID is much larger than the second audio ID.
-    EXPECT_EQ(tracks.front().get_track_id(), file->get_audio().get_track_id());
-    EXPECT_EQ(ec3_first ? "ec-3" : "mp4a", file->get_audio().get_audio_type());
+    EXPECT_EQ(tracks.front().get_track_id(),
+              file->get_audio_info().get_track_id());
+    EXPECT_EQ(ec3_first ? "ec-3" : "mp4a",
+              file->get_audio_info().get_audio_type());
     EXPECT_DOUBLE_EQ(ec3_first ? 4.5 : 4.0,
                      file->get_timing().get_duration_audio_sec());
     EXPECT_DOUBLE_EQ(ec3_first ? 1.125 : 1.0,
@@ -95,11 +97,11 @@ TEST(LiblcvmEac3Test, RealTrackIdsAndAllAudioRetainedInBothOrders) {
 TEST(LiblcvmEac3Test, DependentChannelsAndIndependentServicesNotSummed) {
   auto dependent = ParseEac3("eac3_dependent.mp4");
   ASSERT_NE(nullptr, dependent);
-  EXPECT_EQ(8, dependent->get_audio().get_channel_count());
+  EXPECT_EQ(8, dependent->get_audio_info().get_channel_count());
   auto multiple = ParseEac3("eac3_multi_service.mp4");
   ASSERT_NE(nullptr, multiple);
-  EXPECT_EQ(6, multiple->get_audio().get_channel_count());
-  auto subs = multiple->get_audio()
+  EXPECT_EQ(6, multiple->get_audio_info().get_channel_count());
+  auto subs = multiple->get_audio_info()
                   .get_eac3_configuration()
                   ->GetIndependentSubstreams();
   ASSERT_EQ(2u, subs.size());
@@ -111,26 +113,26 @@ TEST(LiblcvmEac3Test, DependentChannelsAndIndependentServicesNotSummed) {
 TEST(LiblcvmEac3Test, HalfRateFallbackAndUnknownRate) {
   auto half = ParseEac3("eac3_half_rate.mp4");
   ASSERT_NE(nullptr, half);
-  EXPECT_EQ(24000, half->get_audio().get_sample_rate());
-  EXPECT_EQ(0u, half->get_audio()
+  EXPECT_EQ(24000, half->get_audio_info().get_sample_rate());
+  EXPECT_EQ(0u, half->get_audio_info()
                     .get_eac3_configuration()
                     ->GetIndependentSubstreams()[0]
                     .GetSampleRate());
   auto unknown = ParseEac3("eac3_unknown_rate.mp4");
   ASSERT_NE(nullptr, unknown);
-  EXPECT_EQ(-1, unknown->get_audio().get_sample_rate());
+  EXPECT_EQ(-1, unknown->get_audio_info().get_sample_rate());
 }
 
 TEST(LiblcvmEac3Test, SkipRetainsIdentityButSuppressesCodecDetails) {
   auto file = ParseEac3("eac3_then_aac.mp4", true);
   ASSERT_NE(nullptr, file);
   ASSERT_EQ(2u, file->get_audio_tracks().size());
-  EXPECT_EQ(0xf1234567u, file->get_audio().get_track_id());
-  EXPECT_EQ("", file->get_audio().get_audio_type());
-  EXPECT_EQ(0, file->get_audio().get_channel_count());
-  EXPECT_EQ(0, file->get_audio().get_sample_rate());
-  EXPECT_EQ(0, file->get_audio().get_sample_size());
-  EXPECT_EQ(nullptr, file->get_audio().get_eac3_configuration());
+  EXPECT_EQ(0xf1234567u, file->get_audio_info().get_track_id());
+  EXPECT_EQ("", file->get_audio_info().get_audio_type());
+  EXPECT_EQ(0, file->get_audio_info().get_channel_count());
+  EXPECT_EQ(0, file->get_audio_info().get_sample_rate());
+  EXPECT_EQ(0, file->get_audio_info().get_sample_size());
+  EXPECT_EQ(nullptr, file->get_audio_info().get_eac3_configuration());
   // Skip still uses mdhd duration for whichever track is selected.
   EXPECT_DOUBLE_EQ(4.5, file->get_timing().get_duration_audio_sec());
   EXPECT_DOUBLE_EQ(1.125, file->get_timing().get_audio_video_ratio());
@@ -162,8 +164,8 @@ TEST(LiblcvmEac3Test, PublicHelperStillUpdatesOwnerNotReceiver) {
   stbl->AddBox(stsd);
   AudioInformation receiver;
   ASSERT_EQ(0, receiver.parse_audio_information(stbl, owner, 0));
-  EXPECT_EQ("mp4a", owner->get_audio().get_audio_type());
-  EXPECT_EQ(48000, owner->get_audio().get_sample_rate());
+  EXPECT_EQ("mp4a", owner->get_audio_info().get_audio_type());
+  EXPECT_EQ(48000, owner->get_audio_info().get_sample_rate());
   EXPECT_EQ("", receiver.get_audio_type());
 
   auto opus_stbl = std::make_shared<ISOBMFF::ContainerBox>("stbl");
@@ -174,9 +176,10 @@ TEST(LiblcvmEac3Test, PublicHelperStillUpdatesOwnerNotReceiver) {
   opus->SetSampleRateRaw(48000u << 16);
   opus_stsd->AddBox(opus);
   opus_stbl->AddBox(opus_stsd);
-  ASSERT_EQ(0, owner->get_audio().parse_audio_information(opus_stbl, owner, 0));
-  EXPECT_EQ("Opus", owner->get_audio().get_audio_type());
-  EXPECT_EQ(5, owner->get_audio().get_channel_count());
+  ASSERT_EQ(
+      0, owner->get_audio_info().parse_audio_information(opus_stbl, owner, 0));
+  EXPECT_EQ("Opus", owner->get_audio_info().get_audio_type());
+  EXPECT_EQ(5, owner->get_audio_info().get_channel_count());
 }
 
 TEST(LiblcvmEac3Test, OtherUnsupportedAudioStillFailsInEitherOrder) {

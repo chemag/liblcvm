@@ -391,7 +391,7 @@ class IsobmffFileInformation {
   // -1 selects the first audio track. No audio with -1 returns the legacy
   // empty/default audio view; an invalid explicit selector throws out_of_range.
   // The int64_t selector can represent -1 and every uint32 tkhd ID.
-  AudioInformation get_audio(int64_t audio_track_id = -1) const;
+  AudioInformation get_audio_info(int64_t audio_track_id = -1) const;
   // -1 selects the first video. Audio remains the first argument so existing
   // get_timing(audio_id) calls keep their meaning.
   TimingInformation get_timing(int64_t audio_track_id = -1,
