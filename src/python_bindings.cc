@@ -57,6 +57,8 @@ namespace py = pybind11;
            &class_name::get_frame_rate_fps_stddev)                            \
       .def("get_frame_drop_count", &class_name::get_frame_drop_count)         \
       .def("get_frame_drop_ratio", &class_name::get_frame_drop_ratio)         \
+      .def("get_frame_drop_length_sec_list",                                  \
+           &class_name::get_frame_drop_length_sec_list)                       \
       .def("get_normalized_frame_drop_average_length",                        \
            &class_name::get_normalized_frame_drop_average_length)             \
       .def(                                                                   \
@@ -112,12 +114,15 @@ PYBIND11_MODULE(liblcvm, m) {
       .def(py::init<>())
       // Expose all getter methods
       .def("get_filename", &IsobmffFileInformation::get_filename)
+      .def("get_filesize", &IsobmffFileInformation::get_filesize)
       .def("get_timing", &IsobmffFileInformation::get_timing,
            py::arg("audio_track_id") = -1, py::arg("video_track_id") = -1)
-      .def("get_video_info", &IsobmffFileInformation::get_video_info,
-           py::arg("video_track_id") = -1)
-      .def("get_audio_info", &IsobmffFileInformation::get_audio_info,
-           py::arg("audio_track_id") = -1)
+      .def("get_video_track", &IsobmffFileInformation::get_video_track,
+           py::arg("video_track_id") = -1,
+           py::return_value_policy::reference_internal)
+      .def("get_audio_track", &IsobmffFileInformation::get_audio_track,
+           py::arg("audio_track_id") = -1,
+           py::return_value_policy::reference_internal)
       .def("get_audio_tracks", &IsobmffFileInformation::get_audio_tracks)
       .def("get_video_tracks", &IsobmffFileInformation::get_video_tracks)
       .def("get_video_track_ids", &IsobmffFileInformation::get_video_track_ids)
@@ -132,11 +137,13 @@ PYBIND11_MODULE(liblcvm, m) {
         py::arg("liblcvm_config"),
         "Parse an ISOBMFF file and return file information.");
 
-  // Expose the VideoInformation class
-  py::class_<VideoInformation>(m, "VideoInformation")
+  // Expose the VideoTrack class
+  py::class_<VideoTrack>(m, "VideoTrack")
       .def(py::init<>())
-      // Automatically bind all VideoInformation class getters
-      VIDEO_GETTERS(VideoInformation);
+      // Automatically bind all VideoTrack class getters
+      VIDEO_GETTERS(VideoTrack)
+      .def("get_timing", &VideoTrack::get_timing,
+           py::return_value_policy::reference_internal);
 
   // Expose the TimingInformation class
   py::class_<TimingInformation>(m, "TimingInformation")
@@ -144,18 +151,13 @@ PYBIND11_MODULE(liblcvm, m) {
       // Automatically bind all TimingInformation class getters
       TIMING_GETTERS(TimingInformation);
 
-  // Expose the AudioInformation class
-  py::class_<AudioInformation>(m, "AudioInformation")
+  // Expose the AudioTrack class
+  py::class_<AudioTrack>(m, "AudioTrack")
       .def(py::init<>())
-      // Automatically bind all AudioInformation class getters
-      AUDIO_GETTERS(AudioInformation);
-
-  py::class_<IsobmffFileInformation::AudioTrack>(m, "AudioTrack")
-      .def_readonly("audio", &IsobmffFileInformation::AudioTrack::audio)
-      .def_readonly("timing", &IsobmffFileInformation::AudioTrack::timing);
-  py::class_<IsobmffFileInformation::VideoTrack>(m, "VideoTrack")
-      .def_readonly("video", &IsobmffFileInformation::VideoTrack::video)
-      .def_readonly("timing", &IsobmffFileInformation::VideoTrack::timing);
+      // Automatically bind all AudioTrack class getters
+      AUDIO_GETTERS(AudioTrack)
+      .def("get_timing", &AudioTrack::get_timing,
+           py::return_value_policy::reference_internal);
 
   // Expose the LiblcvmConfig class
   py::class_<LiblcvmConfig>(m, "LiblcvmConfig").def(py::init<>());

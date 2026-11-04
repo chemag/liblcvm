@@ -13,8 +13,8 @@ The core library providing the main API with several key classes:
 
 - **`IsobmffFileInformation`**: Main class with factory method `parse()` for full video analysis
 - **`TimingInformation`**: Handles frame timing, PTS/DTS calculations, frame rate analysis, and frame drop detection
-- **`VideoInformation`**: Manages video codec information (H.264/H.265), resolution, bitrate, and colorimetry
-- **`AudioInformation`**: Processes audio track metadata
+- **`VideoTrack`**: Manages video codec information (H.264/H.265), resolution, bitrate, and colorimetry
+- **`AudioTrack`**: Processes audio track metadata
 - **`LiblcvmConfig`**: Configuration object for parsing parameters
 
 #### 2. Command Line Tool (`tools/lcvm.cc`)

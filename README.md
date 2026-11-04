@@ -107,6 +107,26 @@ uint32_t timescale_video_hz = pts->get_timing()->get_timescale_video_hz();
 Note: `timescale_movie_hz` is the movie-level timescale from the mvhd box,
 while `timescale_video_hz` is the track-level timescale from the mdhd box.
 
+## 4.1. Full Track Access
+
+`IsobmffFileInformation` owns one `video_tracks` collection and one
+`audio_tracks` collection. Each `VideoTrack` or `AudioTrack` owns both its
+metadata and its `TimingInformation`; there is no separate metadata wrapper.
+
+`get_video_track(id)` and `get_audio_track(id)` return borrowed const pointers.
+`-1` selects the first record in container order. Missing or invalid IDs return
+`nullptr`; they never select another record. Pointers require their owning
+storage to remain alive: Owner assignment invalidates them, and moves transfer
+storage ownership. The old information classes/getters have no aliases.
+
+Use a track's `get_timing()` const reference for intrinsic timing. The file's
+`get_timing(audio_id, video_id)` still returns a selected AV view, with audio
+first for compatibility. AV ratios are derived for that pair rather than
+stored as an audio association in the video track. Python maps absent pointers
+to `None` and retains the owner for borrowed track/timing objects.
+
+This patch does not redesign the timing parser, derivation, or codec policy.
+
 As an alternative, and to keep backwards compatibility, we will keep for
 a while the old API that returned a set of variables at the same time. These
 include:

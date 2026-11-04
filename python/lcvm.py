@@ -182,22 +182,22 @@ def run_policy(policy_str, keys, vals, debug):
 def dump_output(infile, outfp, file_info, debug, policy_str=None):
 
     # Access the frame information
-    video_info = file_info.get_video_info()
-    filesize = video_info.get_filesize()
-    bitrate_bps = video_info.get_bitrate_bps()
-    width = video_info.get_width()
-    height = video_info.get_height()
-    video_codec_type = video_info.get_video_codec_type()
-    horizresolution = video_info.get_horizresolution()
-    vertresolution = video_info.get_vertresolution()
-    depth = video_info.get_depth()
-    chroma_format = video_info.get_chroma_format()
-    bit_depth_luma = video_info.get_bit_depth_luma()
-    bit_depth_chroma = video_info.get_bit_depth_chroma()
-    video_full_range_flag = video_info.get_video_full_range_flag()
-    colour_primaries = video_info.get_colour_primaries()
-    transfer_characteristics = video_info.get_transfer_characteristics()
-    matrix_coeffs = video_info.get_matrix_coeffs()
+    video_track = file_info.get_video_track()
+    filesize = file_info.get_filesize()
+    bitrate_bps = video_track.get_bitrate_bps() if video_track is not None else -8.0 * filesize
+    width = video_track.get_width() if video_track is not None else 0
+    height = video_track.get_height() if video_track is not None else 0
+    video_codec_type = video_track.get_video_codec_type() if video_track is not None else ""
+    horizresolution = video_track.get_horizresolution() if video_track is not None else 0
+    vertresolution = video_track.get_vertresolution() if video_track is not None else 0
+    depth = video_track.get_depth() if video_track is not None else 0
+    chroma_format = video_track.get_chroma_format() if video_track is not None else 0
+    bit_depth_luma = video_track.get_bit_depth_luma() if video_track is not None else 0
+    bit_depth_chroma = video_track.get_bit_depth_chroma() if video_track is not None else 0
+    video_full_range_flag = video_track.get_video_full_range_flag() if video_track is not None else 0
+    colour_primaries = video_track.get_colour_primaries() if video_track is not None else 0
+    transfer_characteristics = video_track.get_transfer_characteristics() if video_track is not None else 0
+    matrix_coeffs = video_track.get_matrix_coeffs() if video_track is not None else 0
 
     # Access the timing information
     timing_info = file_info.get_timing()
@@ -242,11 +242,11 @@ def dump_output(infile, outfp, file_info, debug, policy_str=None):
     key_frame_ratio = timing_info.get_key_frame_ratio()
 
     # Access the audio information
-    audio_info = file_info.get_audio_info()
-    audio_type = audio_info.get_audio_type()
-    channel_count = audio_info.get_channel_count()
-    sample_rate = audio_info.get_sample_rate()
-    sample_size = audio_info.get_sample_size()
+    audio_track = file_info.get_audio_track()
+    audio_type = audio_track.get_audio_type() if audio_track is not None else ""
+    channel_count = audio_track.get_channel_count() if audio_track is not None else 0
+    sample_rate = audio_track.get_sample_rate() if audio_track is not None else 0
+    sample_size = audio_track.get_sample_size() if audio_track is not None else 0
 
     # Run policy validation if policy string is provided
     policy_version = ""

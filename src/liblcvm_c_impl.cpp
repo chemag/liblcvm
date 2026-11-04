@@ -186,8 +186,8 @@ liblcvm_error_t liblcvm_analyze_video_simple(
     info->audio_duration_ms = static_cast<int>(timing.get_duration_audio_sec() * 1000.0);
 
     // Get video info for bit depth
-    const auto& video = cpp_info->get_video_info();
-    info->bit_depth = video.get_bit_depth_luma();
+    const auto* video = cpp_info->get_video_track();
+    info->bit_depth = video ? video->get_bit_depth_luma() : 0;
 
     liblcvm_free_file_info(handle);
     return LIBLCVM_SUCCESS;

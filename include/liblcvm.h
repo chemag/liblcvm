@@ -162,8 +162,9 @@ class TimingInformation {
   friend class IsobmffFileInformation;
 };
 
-class AudioInformation {
+class AudioTrack {
  private:
+  TimingInformation timing{};
   // audio_type: Exact audio sample entry type ("mp4a", "Opus", or "ec-3").
   std::string audio_type;
   // E-AC-3 values that cannot be resolved from metadata are -1. Keep the
@@ -175,14 +176,14 @@ class AudioInformation {
   // This is not elementary-stream validation or decoder configuration.
   std::shared_ptr<const ISOBMFF::DEC3> eac3_configuration;
   uint32_t track_id = 0;
-  uint32_t timescale_hz = 0;
   double mdhd_duration_sec = -1.0;
-  double duration_sec = -1.0;
 
   int parse_sample_entry(std::shared_ptr<ISOBMFF::ContainerBox> stbl,
                          const std::string& filename, int debug);
 
  public:
+  AudioTrack();
+  const TimingInformation& get_timing() const { return timing; }
   DECL_GETTER(audio_type, std::string)
   DECL_GETTER(channel_count, int)
   DECL_GETTER(sample_rate, int)
@@ -191,9 +192,9 @@ class AudioInformation {
   // skipped.
   DECL_GETTER(eac3_configuration, std::shared_ptr<const ISOBMFF::DEC3>)
   DECL_GETTER(track_id, uint32_t)
-  DECL_GETTER(timescale_hz, uint32_t)
+  uint32_t get_timescale_hz() const { return timing.get_timescale_audio_hz(); }
   DECL_GETTER(mdhd_duration_sec, double)
-  DECL_GETTER(duration_sec, double)
+  double get_duration_sec() const { return timing.get_duration_audio_sec(); }
 
   // Refresh the owner's first/default audio metadata. Registered track IDs
   // and durations are preserved, and the per-track/default views stay aligned.
@@ -201,51 +202,53 @@ class AudioInformation {
                               std::shared_ptr<IsobmffFileInformation> ptr,
                               int debug);
   friend class IsobmffFileInformation;
+  friend class TimingInformation;
 };
 
-class VideoInformation {
+class VideoTrack {
  private:
+  TimingInformation timing{};
   // track_id: Stored tkhd ID of the analyzed video track, not its index.
   uint32_t track_id = 0;
   // filesize: Video file size (bytes).
-  int filesize;
+  int filesize = 0;
   // bitrate_bps: Video bitrate (bps).
-  double bitrate_bps;
+  double bitrate_bps = 0.0;
   // width: Video width.
-  double width;
+  double width = 0.0;
   // height: Video height.
-  double height;
+  double height = 0.0;
   // video_codec_type: Video type ("hvc1", "hev1", "avc1", or "avc3").
   std::string video_codec_type;
   // width2: Video width (from hvc1/hev1/avc1/avc3).
-  int width2;
+  int width2 = 0;
   // height2: Video height (from hvc1/hev1/avc1/avc3).
-  int height2;
+  int height2 = 0;
   // horizresolution: Video horizresolution (from hvc1/hev1/avc1/avc3).
-  int horizresolution;
+  int horizresolution = 0;
   // vertresolution: Video vertresolution (from hvc1/hev1/avc1/avc3).
-  int vertresolution;
+  int vertresolution = 0;
   // depth: Video depth (from hvc1/hev1/avc1/avc3).
-  int depth;
+  int depth = 0;
   // chroma_format: Video chroma format (from hvcC/avcC).
-  int chroma_format;
+  int chroma_format = 0;
   // bit_depth_luma: Video luma bit depth (from hvcC/avcC).
-  int bit_depth_luma;
+  int bit_depth_luma = 0;
   // bit_depth_chroma: Video chroma bit depth (from hvcC/avcC).
-  int bit_depth_chroma;
+  int bit_depth_chroma = 0;
   // video_full_range_flag: Video range (from HEVC/AVC SPS).
-  int video_full_range_flag;
+  int video_full_range_flag = 0;
   // colour_primaries: Video color primaries (from HEVC/AVC SPS).
-  int colour_primaries;
+  int colour_primaries = 0;
   // transfer_characteristics: Video transfer characteristics (from
   // HEVC/AVC SPS).
-  int transfer_characteristics;
+  int transfer_characteristics = 0;
   // matrix_coeffs: Video matrix coefficients (from HEVC/AVC SPS).
-  int matrix_coeffs;
+  int matrix_coeffs = 0;
   // profile_idc: Video profile IDC (from HEVC/AVC SPS).
-  int profile_idc;
+  int profile_idc = 0;
   // level_idc: Video level IDC (from HEVC/AVC SPS).
-  int level_idc;
+  int level_idc = 0;
   // profile_type_str: Video profile type string (from HEVC/AVC SPS).
   std::string profile_type_str;
 
@@ -254,6 +257,8 @@ class VideoInformation {
   void parse_avcc(std::shared_ptr<ISOBMFF::AVCC> avcc, int debug);
 
  public:
+  VideoTrack();
+  const TimingInformation& get_timing() const { return timing; }
   DECL_GETTER(track_id, uint32_t)
   DECL_GETTER(filesize, int)
   DECL_GETTER(bitrate_bps, double)
@@ -284,6 +289,7 @@ class VideoInformation {
                                bool sort_by_pts, int debug);
 
   friend class IsobmffFileInformation;
+  friend class TimingInformation;
 };
 
 using LiblcvmValue =
@@ -364,16 +370,6 @@ class LiblcvmConfig {
 // Main class
 
 class IsobmffFileInformation {
- public:
-  struct VideoTrack {
-    VideoInformation video{};
-    TimingInformation timing{};
-  };
-  struct AudioTrack {
-    AudioInformation audio{};
-    TimingInformation timing{};
-  };
-
  private:
   std::string filename;
   std::string policy;
@@ -382,23 +378,21 @@ class IsobmffFileInformation {
   // Container order defines the default view, independently of stored IDs.
   std::vector<VideoTrack> video_tracks;
   std::vector<AudioTrack> audio_tracks;
-  const AudioTrack* audio_view(int64_t audio_track_id) const;
-  std::pair<const VideoInformation*, const TimingInformation*> video_view(
-      int64_t video_track_id) const;
   static TimingInformation empty_timing();
 
  public:
   DECL_GETTER(filename, std::string)
   DECL_GETTER(policy, std::string)
-  // -1 selects the first audio track. No audio with -1 returns the legacy
-  // empty/default audio view; an invalid explicit selector throws out_of_range.
-  // The int64_t selector can represent -1 and every uint32 tkhd ID.
-  AudioInformation get_audio_info(int64_t audio_track_id = -1) const;
+  DECL_GETTER(filesize, int)
+  // -1 selects the first record. Missing or invalid IDs return nullptr.
+  // Borrowed pointers require the owning storage to remain alive and unchanged.
+  // Owner assignment invalidates them; moves transfer their storage ownership.
+  const AudioTrack* get_audio_track(int64_t audio_track_id = -1) const;
   // -1 selects the first video. Audio remains the first argument so existing
   // get_timing(audio_id) calls keep their meaning.
   TimingInformation get_timing(int64_t audio_track_id = -1,
                                int64_t video_track_id = -1) const;
-  VideoInformation get_video_info(int64_t video_track_id = -1) const;
+  const VideoTrack* get_video_track(int64_t video_track_id = -1) const;
   std::vector<uint32_t> get_video_track_ids() const;
   std::vector<uint32_t> get_audio_track_ids() const;
   size_t get_num_video_tracks() const { return video_tracks.size(); }
@@ -461,8 +455,8 @@ class IsobmffFileInformation {
   IsobmffFileInformation() = default;
 
   friend class TimingInformation;
-  friend class VideoInformation;
-  friend class AudioInformation;
+  friend class VideoTrack;
+  friend class AudioTrack;
 };
 
 #if ADD_POLICY

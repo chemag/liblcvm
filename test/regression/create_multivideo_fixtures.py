@@ -10,13 +10,15 @@ ROOT = Path(__file__).resolve().parent
 
 
 def video(track_id, width, height, frames, rate, seconds, keys=(1,), ctts=None,
-          entry_type='avc1', config=True):
+          entry_type='avc1', config=True, stts_entries=None):
     header = (bytes(6) + m.u16(1) + bytes(16) + m.u16(width) + m.u16(height) +
               m.u32(0x480000) * 2 + m.u32(0) + m.u16(1) + bytes(32) +
               m.u16(24) + m.u16(0xffff))
     entry = m.box(entry_type, header + (m.box('avcC', bytes.fromhex('0142001effe000')) if config else b''))
     stsd = m.full('stsd', m.u32(1) + entry)
-    stts = m.full('stts', m.u32(1) + m.u32(frames) + m.u32(1000))
+    entries = stts_entries if stts_entries is not None else [(frames, 1000)]
+    stts = m.full('stts', m.u32(len(entries)) + b''.join(
+        m.u32(count) + m.u32(delta) for count, delta in entries))
     stss = m.full('stss', m.u32(len(keys)) + b''.join(m.u32(k) for k in keys))
     offsets = b''
     if ctts is not None:
@@ -58,6 +60,9 @@ def main():
     write('multivideo_missing_config.mp4', [v1,video(21,640,360,72,24,3,config=False),a1])
     write('multivideo_ctts.mp4', [video(11,320,240,4,1,4,(1,3),[0,2000,-1000,0]),
                                 video(21,640,360,3,1,3,(2,),[2000,0,-2000]),a1])
+    write('track_borrowed_timing.mp4', [video(
+        11, 320, 240, 8, 1, 4,
+        stts_entries=[(2,40), (1,120), (1,40), (1,80), (3,40)])])
 
 if __name__ == '__main__':
     main()

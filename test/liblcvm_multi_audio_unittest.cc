@@ -135,11 +135,11 @@ std::vector<std::map<std::string, std::string>> Rows(const std::string& csv) {
 TEST(LiblcvmMultiAudioTest, FirstMeansContainerOrderNotSmallestId) {
   auto file = Parse("eac3_then_aac.mp4");
   ASSERT_NE(nullptr, file);
-  EXPECT_EQ(0xf1234567u, file->get_audio_info().get_track_id());
-  EXPECT_EQ(file->get_audio_info().get_track_id(),
-            file->get_audio_info(-1).get_track_id());
-  EXPECT_EQ("ec-3", file->get_audio_info().get_audio_type());
-  EXPECT_EQ("mp4a", file->get_audio_info(23).get_audio_type());
+  EXPECT_EQ(0xf1234567u, file->get_audio_track()->get_track_id());
+  EXPECT_EQ(file->get_audio_track()->get_track_id(),
+            file->get_audio_track(-1)->get_track_id());
+  EXPECT_EQ("ec-3", file->get_audio_track()->get_audio_type());
+  EXPECT_EQ("mp4a", file->get_audio_track(23)->get_audio_type());
   EXPECT_DOUBLE_EQ(4.5, file->get_timing().get_duration_audio_sec());
   EXPECT_DOUBLE_EQ(4.0, file->get_timing(23).get_duration_audio_sec());
   EXPECT_DOUBLE_EQ(1.125, file->get_timing().get_audio_video_ratio());
@@ -152,11 +152,11 @@ TEST(LiblcvmMultiAudioTest, FirstMeansContainerOrderNotSmallestId) {
 TEST(LiblcvmMultiAudioTest, MaxUint32IdDoesNotCollideWithMinusOne) {
   auto file = Parse("multi_audio_max_id.mp4");
   ASSERT_NE(nullptr, file);
-  EXPECT_EQ(UINT32_MAX, file->get_audio_info().get_track_id());
+  EXPECT_EQ(UINT32_MAX, file->get_audio_track()->get_track_id());
   EXPECT_EQ(
       UINT32_MAX,
-      file->get_audio_info(static_cast<int64_t>(UINT32_MAX)).get_track_id());
-  EXPECT_EQ(44100, file->get_audio_info(23).get_sample_rate());
+      file->get_audio_track(static_cast<int64_t>(UINT32_MAX))->get_track_id());
+  EXPECT_EQ(44100, file->get_audio_track(23)->get_sample_rate());
   EXPECT_EQ(44100u, file->get_timing(23).get_timescale_audio_hz());
   EXPECT_EQ(48000u, file->get_timing().get_timescale_audio_hz());
 }
@@ -167,7 +167,7 @@ TEST(LiblcvmMultiAudioTest, MissingAndInvalidSelectorsNeverFallBack) {
   for (int64_t id : {int64_t(-2), int64_t(1), int64_t(UINT32_MAX) + 1,
                      std::numeric_limits<int64_t>::min(),
                      std::numeric_limits<int64_t>::max()}) {
-    EXPECT_THROW(file->get_audio_info(id), std::out_of_range);
+    EXPECT_EQ(nullptr, file->get_audio_track(id));
     EXPECT_THROW(file->get_timing(id), std::out_of_range);
     LiblcvmKeyList keys = {"stale"}, tk;
     LiblcvmValList vals = {1};
@@ -218,10 +218,10 @@ TEST(LiblcvmMultiAudioTest, SkipRetainsEachMdhdDurationAndIdentity) {
   auto file = Parse("multi_audio_max_id.mp4", true);
   ASSERT_NE(nullptr, file);
   ASSERT_EQ(2u, file->get_audio_tracks().size());
-  EXPECT_EQ(UINT32_MAX, file->get_audio_info().get_track_id());
-  EXPECT_EQ(23u, file->get_audio_info(23).get_track_id());
-  EXPECT_EQ("", file->get_audio_info(23).get_audio_type());
-  EXPECT_EQ(0, file->get_audio_info(23).get_channel_count());
+  EXPECT_EQ(UINT32_MAX, file->get_audio_track()->get_track_id());
+  EXPECT_EQ(23u, file->get_audio_track(23)->get_track_id());
+  EXPECT_EQ("", file->get_audio_track(23)->get_audio_type());
+  EXPECT_EQ(0, file->get_audio_track(23)->get_channel_count());
   EXPECT_DOUBLE_EQ(4.5, file->get_timing().get_duration_audio_sec());
   EXPECT_DOUBLE_EQ(5.0, file->get_timing(23).get_duration_audio_sec());
   auto fields = Fields(file);
@@ -233,11 +233,11 @@ TEST(LiblcvmMultiAudioTest, NoAudioKeepsDefaultButRejectsExplicitId) {
   auto file = Parse("multi_audio_no_audio.mp4");
   ASSERT_NE(nullptr, file);
   EXPECT_TRUE(file->get_audio_tracks().empty());
-  EXPECT_EQ("", file->get_audio_info().get_audio_type());
+  EXPECT_EQ(nullptr, file->get_audio_track());
   EXPECT_DOUBLE_EQ(-1.0, file->get_timing().get_duration_audio_sec());
   EXPECT_DOUBLE_EQ(-1.0, file->get_timing().get_audio_video_ratio());
   EXPECT_FALSE(file->get_timing().get_video_freeze());
-  EXPECT_THROW(file->get_audio_info(0), std::out_of_range);
+  EXPECT_EQ(nullptr, file->get_audio_track(0));
   auto fields = Fields(file);
   EXPECT_EQ("-1", Text(fields.at("audio_track_id")));
   EXPECT_NE(0u, fields.count("chroma_format_v1"));
@@ -266,30 +266,33 @@ TEST(LiblcvmMultiAudioTest, PublicHelperRefreshesParsedFirstTrackConsistently) {
   aac->SetSampleRateRaw(32000u << 16);
   stsd->AddBox(aac);
   stbl->AddBox(stsd);
-  ASSERT_EQ(0, file->get_audio_info().parse_audio_information(stbl, file, 0));
-  EXPECT_EQ(UINT32_MAX, file->get_audio_info().get_track_id());
-  EXPECT_EQ(32000, file->get_audio_info().get_sample_rate());
-  EXPECT_EQ(32000, file->get_audio_info(int64_t(UINT32_MAX)).get_sample_rate());
-  EXPECT_EQ(44100, file->get_audio_info(23).get_sample_rate());
-  EXPECT_EQ(nullptr, file->get_audio_info().get_eac3_configuration());
-  EXPECT_DOUBLE_EQ(4.5, file->get_audio_info().get_duration_sec());
+  AudioTrack receiver;
+  ASSERT_EQ(0, receiver.parse_audio_information(stbl, file, 0));
+  EXPECT_EQ(UINT32_MAX, file->get_audio_track()->get_track_id());
+  EXPECT_EQ(32000, file->get_audio_track()->get_sample_rate());
+  EXPECT_EQ(32000,
+            file->get_audio_track(int64_t(UINT32_MAX))->get_sample_rate());
+  EXPECT_EQ(44100, file->get_audio_track(23)->get_sample_rate());
+  EXPECT_EQ(nullptr, file->get_audio_track()->get_eac3_configuration());
+  EXPECT_DOUBLE_EQ(4.5, file->get_audio_track()->get_duration_sec());
   EXPECT_DOUBLE_EQ(4.5, file->get_timing().get_duration_audio_sec());
   auto fields = Fields(file);
   EXPECT_EQ(Text(fields.at("sample_rate")),
             Text(fields.at("sample_rate_a4294967295")));
   auto empty = std::make_shared<ISOBMFF::ContainerBox>("stbl");
-  EXPECT_NE(0, file->get_audio_info().parse_audio_information(empty, file, 0));
-  EXPECT_EQ(32000, file->get_audio_info().get_sample_rate());
-  EXPECT_EQ(32000, file->get_audio_info(int64_t(UINT32_MAX)).get_sample_rate());
+  EXPECT_NE(0, receiver.parse_audio_information(empty, file, 0));
+  EXPECT_EQ(32000, file->get_audio_track()->get_sample_rate());
+  EXPECT_EQ(32000,
+            file->get_audio_track(int64_t(UINT32_MAX))->get_sample_rate());
 }
 
 TEST(LiblcvmMultiAudioTest,
      SkippedUnsupportedAudioCanBeSelectedWithoutFakeMetadata) {
   auto file = Parse("unsupported_then_aac.mp4", true);
   ASSERT_NE(nullptr, file);
-  EXPECT_EQ(2u, file->get_audio_info(2).get_track_id());
-  EXPECT_EQ("", file->get_audio_info(2).get_audio_type());
-  EXPECT_EQ(0, file->get_audio_info(2).get_sample_rate());
+  EXPECT_EQ(2u, file->get_audio_track(2)->get_track_id());
+  EXPECT_EQ("", file->get_audio_track(2)->get_audio_type());
+  EXPECT_EQ(0, file->get_audio_track(2)->get_sample_rate());
   EXPECT_DOUBLE_EQ(4.5, file->get_timing(2).get_duration_audio_sec());
   EXPECT_EQ(nullptr, Parse("unsupported_then_aac.mp4", false));
 }
@@ -297,7 +300,7 @@ TEST(LiblcvmMultiAudioTest,
 TEST(LiblcvmMultiAudioTest, VideoQualificationUsesStoredIdNotPosition) {
   auto file = Parse("multi_audio_video_id7.mp4");
   ASSERT_NE(nullptr, file);
-  EXPECT_EQ(7u, file->get_video_info().get_track_id());
+  EXPECT_EQ(7u, file->get_video_track()->get_track_id());
   auto fields = Fields(file);
   EXPECT_NE(0u, fields.count("chroma_format_v7"));
   EXPECT_NE(0u, fields.count("audio_video_ratio_v7_a23"));
@@ -309,8 +312,8 @@ TEST(LiblcvmMultiAudioTest, MdhdFallbackPreservedForEverySelectedTrack) {
   auto file = Parse("multi_audio_mdhd_fallback.mp4");
   ASSERT_NE(nullptr, file);
   EXPECT_EQ(0u, file->get_timing().get_timescale_movie_hz());
-  EXPECT_DOUBLE_EQ(4.5, file->get_audio_info().get_duration_sec());
-  EXPECT_DOUBLE_EQ(5.0, file->get_audio_info(23).get_duration_sec());
+  EXPECT_DOUBLE_EQ(4.5, file->get_audio_track()->get_duration_sec());
+  EXPECT_DOUBLE_EQ(5.0, file->get_audio_track(23)->get_duration_sec());
   EXPECT_DOUBLE_EQ(5.0, file->get_timing(23).get_duration_audio_sec());
 }
 
