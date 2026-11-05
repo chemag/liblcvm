@@ -31,6 +31,7 @@
 #include <vector>       // for vector
 
 #include "config.h"
+#include "timestamp_math.h"
 
 #if ADD_POLICY
 #include "policy_protovisitor.h"
@@ -656,15 +657,6 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
   return ptr;
 }
 
-// Add two int32_t timestamps (units) with two's-complement wraparound.
-// pts values are stored as int32_t, starting from the uint32_t dts, so a
-// large dts plus a ctts offset can exceed the int32_t range. Signed
-// overflow is undefined behavior, so add as uint32_t instead.
-static int32_t add_int32_wraparound(int32_t a, int32_t b) {
-  return static_cast<int32_t>(static_cast<uint32_t>(a) +
-                              static_cast<uint32_t>(b));
-}
-
 int TimingInformation::parse_timing_information(
     std::shared_ptr<ISOBMFF::ContainerBox> stbl, uint32_t track_hz,
     uint32_t max_num_frames, bool want_per_frame_info,
@@ -716,22 +708,16 @@ int TimingInformation::parse_timing_information(
   return 0;
 }
 
-// Function derives an (N-1)-element vector from an N-element vector by
-// setting element i-th as:
-//   out[i] = in[i] - in[i-1]
-//
-// The function will allocate all the N-1 elements.
-void calculate_vector_deltas_int32_t(const std::vector<int32_t> in,
-                                     std::vector<int32_t>& out) {
+static int calculate_timestamp_differences(const std::vector<int64_t>& in,
+                                           std::vector<int64_t>& out) {
   out.clear();
-  // Use the index (not a -1 "no previous value" sentinel, which is also a
-  // valid pts), and subtract with two's-complement wraparound, as the
-  // int32_t pts values can be far apart (signed overflow is undefined
-  // behavior). See add_int32_wraparound().
   for (size_t i = 1; i < in.size(); ++i) {
-    out.push_back(static_cast<int32_t>(static_cast<uint32_t>(in[i]) -
-                                       static_cast<uint32_t>(in[i - 1])));
+    int64_t difference;
+    if (!liblcvm_detail::diff_timestamp(in[i - 1], in[i], difference))
+      return -1;
+    out.push_back(difference);
   }
+  return 0;
 }
 
 double calculate_median(const std::vector<double>& vec) {
@@ -846,77 +832,73 @@ int TimingInformation::derive_timing_info(bool sort_by_pts,
     *this = std::move(derived);
     return 0;
   }
+  if (derived.num_samples > static_cast<uint64_t>(INT_MAX) ||
+      derived.stts_duration_units > static_cast<uint64_t>(INT64_MAX))
+    return -1;
   derived.num_frames = static_cast<int>(derived.num_samples);
-  derived.dts_sec_list.push_back(0.0);
-  derived.pts_unit_list.push_back(0);
-  derived.pts_sec_list.push_back(0.0);
-  uint32_t last_dts_unit = 0;
+  // Transient unwrapped values retain wrap epochs; public PTS remains int32_t.
+  std::vector<int64_t> unwrapped_pts;
+  int64_t last_dts_unit = 0;
   for (const auto& entry : stts_entries) {
     for (uint32_t sample = 0; sample < entry.sample_count; ++sample) {
       derived.stts_unit_list.push_back(entry.sample_delta);
-      last_dts_unit += entry.sample_delta;
       derived.dts_sec_list.push_back(static_cast<double>(last_dts_unit) /
                                      timescale_hz);
-      derived.pts_unit_list.push_back(last_dts_unit);
-      derived.pts_sec_list.push_back(static_cast<double>(last_dts_unit) /
-                                     timescale_hz);
+      unwrapped_pts.push_back(last_dts_unit);
+      if (!liblcvm_detail::add_timestamp(last_dts_unit, entry.sample_delta,
+                                         last_dts_unit))
+        return -1;
     }
   }
-  derived.dts_sec_list.pop_back();
-  derived.pts_unit_list.pop_back();
-  derived.pts_sec_list.pop_back();
   if (has_ctts) {
     size_t current = 0;
     int32_t last_offset = 0;
     for (const auto& entry : ctts_entries) {
       last_offset = entry.sample_offset;
-      for (uint32_t sample = 0; sample < entry.sample_count &&
-                                current < derived.pts_unit_list.size();
+      for (uint32_t sample = 0;
+           sample < entry.sample_count && current < unwrapped_pts.size();
            ++sample) {
         derived.ctts_unit_list.push_back(last_offset);
-        derived.pts_unit_list[current] =
-            add_int32_wraparound(derived.pts_unit_list[current], last_offset);
-        derived.pts_sec_list[current] =
-            static_cast<double>(derived.pts_unit_list[current]) / timescale_hz;
+        if (!liblcvm_detail::add_timestamp(unwrapped_pts[current], last_offset,
+                                           unwrapped_pts[current]))
+          return -1;
         ++current;
       }
     }
-    while (current < derived.pts_unit_list.size()) {
+    while (current < unwrapped_pts.size()) {
       derived.ctts_unit_list.push_back(last_offset);
-      derived.pts_unit_list[current] =
-          add_int32_wraparound(derived.pts_unit_list[current], last_offset);
-      derived.pts_sec_list[current] =
-          static_cast<double>(derived.pts_unit_list[current]) / timescale_hz;
+      if (!liblcvm_detail::add_timestamp(unwrapped_pts[current], last_offset,
+                                         unwrapped_pts[current]))
+        return -1;
       ++current;
     }
   }
   derived.keyframe_sample_number_list = raw_keyframe_sample_number_list;
-  *this = std::move(derived);
   // 1. set the frame_num_orig_list vector
-  this->frame_num_orig_list.resize(this->pts_sec_list.size());
-  for (uint32_t i = 0; i < this->pts_sec_list.size(); ++i) {
-    this->frame_num_orig_list[i] = i;
+  derived.frame_num_orig_list.resize(unwrapped_pts.size());
+  for (uint32_t i = 0; i < unwrapped_pts.size(); ++i) {
+    derived.frame_num_orig_list[i] = i;
   }
 
   // 2. sort the frames by pts value
   if (sort_by_pts) {
-    // sort frame_num_orig_list elements based on the values in pts_sec_list
-    // TODO(chema): there should be a clear way to access the struct element
-    const auto& pts_sec_list = this->pts_sec_list;
-    std::stable_sort(this->frame_num_orig_list.begin(),
-                     this->frame_num_orig_list.end(),
-                     [&pts_sec_list](int a, int b) {
-                       return pts_sec_list[a] < pts_sec_list[b];
+    // Sort by the temporary tick values without losing wrap epochs.
+    std::stable_sort(derived.frame_num_orig_list.begin(),
+                     derived.frame_num_orig_list.end(),
+                     [&unwrapped_pts](int a, int b) {
+                       return unwrapped_pts[a] < unwrapped_pts[b];
                      });
     // sort all the others based in the new order
     // All the per-frame lists must have one entry per frame (ctts_unit_list
     // may also be empty, when there is no ctts box): indexing a shorter list
     // with frame_num_orig_list would read past its end.
-    if (reorder_by_index(this->stts_unit_list, this->frame_num_orig_list) < 0 ||
-        reorder_by_index(this->ctts_unit_list, this->frame_num_orig_list) < 0 ||
-        reorder_by_index(this->dts_sec_list, this->frame_num_orig_list) < 0 ||
-        reorder_by_index(this->pts_unit_list, this->frame_num_orig_list) < 0 ||
-        reorder_by_index(this->pts_sec_list, this->frame_num_orig_list) < 0) {
+    if (reorder_by_index(derived.stts_unit_list, derived.frame_num_orig_list) <
+            0 ||
+        reorder_by_index(derived.ctts_unit_list, derived.frame_num_orig_list) <
+            0 ||
+        reorder_by_index(derived.dts_sec_list, derived.frame_num_orig_list) <
+            0 ||
+        reorder_by_index(unwrapped_pts, derived.frame_num_orig_list) < 0) {
       if (debug > 0) {
         fprintf(stderr,
                 "error: inconsistent per-frame timing list sizes in %s\n",
@@ -926,57 +908,69 @@ int TimingInformation::derive_timing_info(bool sort_by_pts,
     }
   }
 
+  for (const int64_t value : unwrapped_pts) {
+    derived.pts_unit_list.push_back(liblcvm_detail::wrap_timestamp(value));
+    derived.pts_sec_list.push_back(static_cast<double>(value) / timescale_hz);
+  }
+
   // 3. derived timing values
   // 3.1. calculate the duration (inter-frame distance)
-  std::vector<int32_t> pts_duration_unit_list;
-  calculate_vector_deltas_int32_t(this->pts_unit_list, pts_duration_unit_list);
-  this->pts_duration_sec_list.resize(pts_duration_unit_list.size());
+  std::vector<int64_t> pts_duration_unit_list;
+  if (calculate_timestamp_differences(unwrapped_pts, pts_duration_unit_list) <
+      0)
+    return -1;
+  derived.pts_duration_sec_list.resize(pts_duration_unit_list.size());
   for (uint32_t i = 0; i < pts_duration_unit_list.size(); ++i) {
-    this->pts_duration_sec_list[i] =
-        ((double)pts_duration_unit_list[i]) / this->timescale_hz;
+    derived.pts_duration_sec_list[i] =
+        ((double)pts_duration_unit_list[i]) / derived.timescale_hz;
   }
   // 3.2. calculate the duration average/median
-  this->pts_duration_sec_average =
-      calculate_average(this->pts_duration_sec_list);
-  this->pts_duration_sec_median = calculate_median(this->pts_duration_sec_list);
+  derived.pts_duration_sec_average =
+      calculate_average(derived.pts_duration_sec_list);
+  derived.pts_duration_sec_median =
+      calculate_median(derived.pts_duration_sec_list);
   // 3.3. calculate the duration stddev and median absolute difference (MAD)
-  this->pts_duration_sec_stddev =
-      calculate_standard_deviation(this->pts_duration_sec_list);
-  this->pts_duration_sec_mad =
-      calculate_median_absolute_deviation(this->pts_duration_sec_list);
+  derived.pts_duration_sec_stddev =
+      calculate_standard_deviation(derived.pts_duration_sec_list);
+  derived.pts_duration_sec_mad =
+      calculate_median_absolute_deviation(derived.pts_duration_sec_list);
   // 3.4. derive the pts_duration_delta_sec_list
-  this->pts_duration_delta_sec_list.resize(this->pts_duration_sec_list.size());
-  for (uint32_t i = 0; i < this->pts_duration_sec_list.size(); ++i) {
-    this->pts_duration_delta_sec_list[i] =
-        this->pts_duration_sec_list[i] - this->pts_duration_sec_average;
+  derived.pts_duration_delta_sec_list.resize(
+      derived.pts_duration_sec_list.size());
+  for (uint32_t i = 0; i < derived.pts_duration_sec_list.size(); ++i) {
+    derived.pts_duration_delta_sec_list[i] =
+        derived.pts_duration_sec_list[i] - derived.pts_duration_sec_average;
   }
   // 3.5 derive the pts_framerate_list (instantaneous framerate)
-  this->pts_framerate_list.resize(this->pts_duration_sec_list.size());
-  for (uint32_t i = 0; i < this->pts_duration_sec_list.size(); ++i) {
-    this->pts_framerate_list[i] = (this->pts_duration_sec_list[i] == 0.0)
-                                      ? std::nan("")
-                                      : 1.0 / this->pts_duration_sec_list[i];
+  derived.pts_framerate_list.resize(derived.pts_duration_sec_list.size());
+  for (uint32_t i = 0; i < derived.pts_duration_sec_list.size(); ++i) {
+    derived.pts_framerate_list[i] =
+        (derived.pts_duration_sec_list[i] == 0.0)
+            ? std::nan("")
+            : 1.0 / derived.pts_duration_sec_list[i];
   }
 
   // 4. derive keyframe-related values
-  this->num_keyframes = this->get_keyframe_sample_number_list().size();
-  this->key_frame_ratio = (this->num_keyframes > 0)
-                              ? (1.0 * this->num_frames) / this->num_keyframes
-                              : 0.0;
+  derived.num_keyframes = derived.get_keyframe_sample_number_list().size();
+  derived.key_frame_ratio =
+      (derived.num_keyframes > 0)
+          ? (1.0 * derived.num_frames) / derived.num_keyframes
+          : 0.0;
 
   // 6. calculate framerate statistics
   // 6.1. get the framerate series
-  this->frame_rate_fps_list.resize(this->pts_duration_sec_list.size());
-  std::transform(this->pts_duration_sec_list.begin(),
-                 this->pts_duration_sec_list.end(),
-                 this->frame_rate_fps_list.begin(), [](double val) {
+  derived.frame_rate_fps_list.resize(derived.pts_duration_sec_list.size());
+  std::transform(derived.pts_duration_sec_list.begin(),
+                 derived.pts_duration_sec_list.end(),
+                 derived.frame_rate_fps_list.begin(), [](double val) {
                    // Handle division by zero
                    return val != 0.0f ? 1.0f / static_cast<double>(val) : 0.0f;
                  });
   // 6.2. median
-  this->frame_rate_fps_median = calculate_median(this->frame_rate_fps_list);
+  derived.frame_rate_fps_median = calculate_median(derived.frame_rate_fps_list);
   // 6.3. average
-  this->frame_rate_fps_average = calculate_average(this->frame_rate_fps_list);
+  derived.frame_rate_fps_average =
+      calculate_average(derived.frame_rate_fps_list);
   // 6.4. reverse average
   // Considering the sample_duration of different frames inside boxes
   // as a series X: {x1, x2, ..., xn}, for calculating average FPS from this,
@@ -987,51 +981,53 @@ int TimingInformation::derive_timing_info(bool sort_by_pts,
   // extreme, leading to extreme values in frame_rate_fps_average calculation.
   // In contrast, the reverse of the average of X ($1/\hat{X}$) should not
   // have this biased to extreme value.
-  this->frame_rate_fps_reverse_average = 1.0 / this->pts_duration_sec_average;
+  derived.frame_rate_fps_reverse_average =
+      1.0 / derived.pts_duration_sec_average;
   // 6.5. stddev
-  this->frame_rate_fps_stddev =
-      calculate_standard_deviation(this->frame_rate_fps_list);
+  derived.frame_rate_fps_stddev =
+      calculate_standard_deviation(derived.frame_rate_fps_list);
 
   // 7. calculate the threshold to consider frame drop: This should be 2
   // times the median, minus a factor
   double FACTOR = 0.75;
   double pts_duration_sec_threshold =
-      this->pts_duration_sec_median * FACTOR * 2;
+      derived.pts_duration_sec_median * FACTOR * 2;
 
   // 8. get the list of all the drops (absolute inter-frame values)
-  for (const auto& pts_duration_sec : this->pts_duration_sec_list) {
+  for (const auto& pts_duration_sec : derived.pts_duration_sec_list) {
     if (pts_duration_sec > pts_duration_sec_threshold) {
-      this->frame_drop_length_sec_list.push_back(pts_duration_sec);
+      derived.frame_drop_length_sec_list.push_back(pts_duration_sec);
     }
   }
-  // this->frame_drop_length_sec_list:
+  // derived.frame_drop_length_sec_list:
   // {0.6668900000000022, 0.10025600000000168,
   // ...}
 
   // 9. sum all the drops, but adding only the length over 1x frame time
   double frame_drop_length_sec_list = 0.0;
-  for (const auto& drop_length_sec : this->frame_drop_length_sec_list) {
+  for (const auto& drop_length_sec : derived.frame_drop_length_sec_list) {
     frame_drop_length_sec_list += drop_length_sec;
   }
   double drop_length_duration_sec =
       frame_drop_length_sec_list -
-      this->pts_duration_sec_median * this->frame_drop_length_sec_list.size();
+      derived.pts_duration_sec_median *
+          derived.frame_drop_length_sec_list.size();
   // drop_length_duration_sec: sum({33.35900000000022, 66.92600000000168, ...})
 
   // 10. get the total duration as the sum of all the inter-frame distances
   double total_duration_sec = 0.0;
-  for (const auto& pts_duration_sec : this->pts_duration_sec_list) {
+  for (const auto& pts_duration_sec : derived.pts_duration_sec_list) {
     total_duration_sec += pts_duration_sec;
   }
 
   // 11. calculate frame drop ratio as extra drop length over total duration
-  this->frame_drop_ratio = drop_length_duration_sec / total_duration_sec;
+  derived.frame_drop_ratio = drop_length_duration_sec / total_duration_sec;
   // The ratio is NaN or infinite when there is no usable inter-frame
   // duration (e.g. a single frame, all frames with the same pts, or a zero
   // timescale), and converting NaN, infinity, or an out-of-range value to
   // int is undefined behavior. Report 0 frame drops in that case.
-  double frame_drop_count = this->frame_drop_ratio * this->num_frames;
-  this->frame_drop_count =
+  double frame_drop_count = derived.frame_drop_ratio * derived.num_frames;
+  derived.frame_drop_count =
       (std::isfinite(frame_drop_count) && frame_drop_count > INT_MIN &&
        frame_drop_count < INT_MAX)
           ? static_cast<int>(frame_drop_count)
@@ -1041,14 +1037,15 @@ int TimingInformation::derive_timing_info(bool sort_by_pts,
   // a single frame drop is a normalized frame drop length of 2. When
   // frame drops are uncorrelated, the normalized average drop length
   // should be close to 2
-  this->normalized_frame_drop_average_length = 0.0;
-  if (this->frame_drop_length_sec_list.size() > 0) {
+  derived.normalized_frame_drop_average_length = 0.0;
+  if (derived.frame_drop_length_sec_list.size() > 0) {
     double frame_drop_average_length =
-        frame_drop_length_sec_list / this->frame_drop_length_sec_list.size();
-    this->normalized_frame_drop_average_length =
-        (frame_drop_average_length / this->pts_duration_sec_median);
+        frame_drop_length_sec_list / derived.frame_drop_length_sec_list.size();
+    derived.normalized_frame_drop_average_length =
+        (frame_drop_average_length / derived.pts_duration_sec_median);
   }
 
+  *this = std::move(derived);
   return 0;
 }
 
