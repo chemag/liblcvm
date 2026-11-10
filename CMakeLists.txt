@@ -412,26 +412,35 @@ if(BUILD_PYBINDINGS)
 
   list(APPEND ALL_LINKER_FLAGS ${PYTHON_LDFLAGS} "-lpython${PYTHON_VERSION}")
   list(REMOVE_DUPLICATES ALL_LINKER_FLAGS)
-
-  list(APPEND LIBLCVM_SOURCES src/python_bindings.cc)
-  list(APPEND LIBLCVM_INCLUDE_DIRS ${PYBIND11_INCLUDE} ${PYTHON_INCLUDE})
-
-  if(APPLE)
-    list(APPEND LIBLCVM_LINK_LIBRARIES "-framework CoreFoundation" ${ALL_LINKER_FLAGS})
-  elseif(UNIX AND NOT APPLE)
-    list(APPEND LIBLCVM_LINK_LIBRARIES ${ALL_LINKER_FLAGS})
-  endif()
-
-  add_library(liblcvm SHARED ${LIBLCVM_SOURCES})
-  set_target_properties(liblcvm PROPERTIES OUTPUT_NAME "lcvm" SUFFIX ".so")
-else()
-  message(STATUS "Configuring Liblcvm library")
-  add_library(liblcvm ${LIBLCVM_SOURCES})
-  set_target_properties(liblcvm PROPERTIES OUTPUT_NAME "lcvm")
 endif()
+
+message(STATUS "Configuring Liblcvm library")
+add_library(liblcvm ${LIBLCVM_SOURCES})
+set_target_properties(liblcvm PROPERTIES OUTPUT_NAME "lcvm")
 
 target_include_directories(liblcvm PUBLIC ${LIBLCVM_INCLUDE_DIRS})
 target_link_libraries(liblcvm PRIVATE ${LIBLCVM_LINK_LIBRARIES})
+
+if(BUILD_PYBINDINGS)
+  # The Python extension module is its own target, so liblcvm keeps its
+  # normal library type: The C interface, tools and tests link liblcvm, not
+  # a Python module. The module file is still liblcvm.so, matching the
+  # PYBIND11_MODULE(liblcvm, ...) name.
+  message(STATUS "Configuring Liblcvm PyBind11 module")
+  set_target_properties(liblcvm PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  add_library(liblcvm_py MODULE src/python_bindings.cc)
+  set_target_properties(liblcvm_py PROPERTIES
+    OUTPUT_NAME "lcvm" PREFIX "lib" SUFFIX ".so")
+  target_include_directories(liblcvm_py PRIVATE
+    ${PYBIND11_INCLUDE} ${PYTHON_INCLUDE})
+  target_link_libraries(liblcvm_py PRIVATE liblcvm)
+  if(APPLE)
+    target_link_libraries(liblcvm_py PRIVATE
+      "-framework CoreFoundation" ${ALL_LINKER_FLAGS})
+  elseif(UNIX AND NOT APPLE)
+    target_link_libraries(liblcvm_py PRIVATE ${ALL_LINKER_FLAGS})
+  endif()
+endif()
 
 if(ADD_POLICY)
   # Define ADD_POLICY preprocessor macro for the C++ code
