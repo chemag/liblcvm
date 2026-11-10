@@ -49,15 +49,17 @@ Notes:
 $ CC=clang CXX=clang++ cmake ..
 ```
 
-* (b) Replace gcc with clang and add debug/gdb symbols:
+* (b) Replace gcc with clang and add debug/gdb symbols. Debug builds use the
+warning flags in CMakeLists.txt and treat warnings as errors. `make
+check-debug` runs Debug builds with gcc and clang, and the tests:
 ```
-$ CC=clang CXX=clang++ cmake -DCMAKE_BUILD_TYPE=DEBUG -DCMAKE_C_FLAGS_DEBUG="-g -O0" -DCMAKE_CXX_FLAGS_DEBUG="-g -O0" ..
+$ CC=clang CXX=clang++ cmake -DCMAKE_BUILD_TYPE=DEBUG ..
 ```
 
 * (c) Replace gcc with clang, add debug/gdb symbols, and add python (pybind11)
 bindings:
 ```
-$ CC=clang CXX=clang++ cmake -DCMAKE_BUILD_TYPE=DEBUG -DCMAKE_C_FLAGS_DEBUG="-g -O0" -DCMAKE_CXX_FLAGS_DEBUG="-g -O0" -DBUILD_PYBINDINGS=ON ..
+$ CC=clang CXX=clang++ cmake -DCMAKE_BUILD_TYPE=DEBUG -DBUILD_PYBINDINGS=ON ..
 ```
 
 

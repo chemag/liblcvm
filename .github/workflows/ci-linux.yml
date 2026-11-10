@@ -1,0 +1,74 @@
+name: ci-linux
+
+# Debug builds use the warning flags in CMakeLists.txt, with -Werror, so a
+# new warning fails CI instead of going unnoticed in Release builds.
+#
+# ADD_POLICY is not built yet: Its protobuf download cannot configure from a
+# clean build directory (protobuf's abseil-cpp submodule is missing), and the
+# abseil-cpp that protobuf v25.3 pins does not compile with current compilers.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  debug:
+    name: debug (${{ matrix.compiler }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: gcc
+            cc: gcc
+            cxx: g++
+          - compiler: clang
+            cc: clang
+            cxx: clang++
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build clang libgtest-dev \
+            python3-dev python3-pybind11
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_COMPILER=${{ matrix.cc }} \
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
+            -DADD_C_INTERFACE=ON \
+            -DBUILD_PYBINDINGS=ON
+      - name: Build
+        run: cmake --build build --parallel
+      - name: Test
+        run: ctest --test-dir build --output-on-failure --parallel 4
+
+  debug-32bit:
+    name: debug (gcc, 32-bit)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build gcc-multilib g++-multilib
+      # No 32-bit gtest package, so this job builds the libraries and the
+      # tool but not the tests.
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_FLAGS=-m32 \
+            -DCMAKE_CXX_FLAGS=-m32 \
+            -DADD_C_INTERFACE=ON \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_H264_TESTS=OFF \
+            -DBUILD_H265_TESTS=OFF
+      - name: Build
+        run: cmake --build build --parallel
