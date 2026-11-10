@@ -85,6 +85,7 @@ cc_library_headers {
 cc_library_shared {
     name: "liblcvm_c",
     defaults: ["liblcvm_defaults"],
+    host_supported: true,
     srcs: ["src/liblcvm_c_impl.cpp"],
     cflags: ["-DLIBLCVM_C_EXPORTS=1"],
     local_include_dirs: ["include"],
@@ -109,4 +110,30 @@ cc_binary {
         "libh265nal",
         "libh264nal",
     ],
+}
+
+// Tests for the C interface. The test media is installed next to the test
+// binary, keeping its path relative to the repository root.
+cc_test {
+    name: "liblcvm_c_api_unittest",
+    host_supported: true,
+    srcs: ["test/liblcvm_c_api_unittest.cc"],
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Wno-unused-parameter",
+        "-Wshadow",
+        "-Werror",
+    ],
+    local_include_dirs: ["include"],
+    generated_headers: ["liblcvm_config_h"],
+    shared_libs: ["liblcvm_c"],
+    data: [
+        "media/hevc_aac.mp4",
+        "media/hevc_opus.mp4",
+        "test/regression/multivideo_0v_1a.mp4",
+        "test/regression/multivideo_1v_0a.mp4",
+        "test/regression/only_unknown_audio.mp4",
+    ],
+    test_suites: ["general-tests"],
 }

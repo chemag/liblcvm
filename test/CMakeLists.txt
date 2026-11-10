@@ -50,6 +50,11 @@ if(NOT ADD_POLICY)
   list(FILTER TEST_FILES EXCLUDE REGEX ".*policy.*_unittest\\.cc$")
 endif()
 
+# The C interface test needs the C interface library
+if(NOT ADD_C_INTERFACE)
+  list(FILTER TEST_FILES EXCLUDE REGEX ".*liblcvm_c_api_unittest\\.cc$")
+endif()
+
 # Extract test names from file names
 foreach(test_file IN LISTS TEST_FILES)
   get_filename_component(test_name ${test_file} NAME_WE)
@@ -66,3 +71,10 @@ foreach(cli_test IN ITEMS liblcvm_multi_audio_unittest
     add_dependencies(${cli_test} lcvm)
   endif()
 endforeach()
+
+# The C interface test opens its media relative to the repository root.
+if(TARGET liblcvm_c_api_unittest)
+  target_link_libraries(liblcvm_c_api_unittest PRIVATE liblcvm_c)
+  target_compile_definitions(liblcvm_c_api_unittest PRIVATE
+    TEST_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
+endif()
