@@ -68,12 +68,15 @@ TEST(LiblcvmStrictCliTest, StrictIsDefaultAndOnlyToolPolicy) {
     EXPECT_NE(std::string::npos, result.output.find("audio_type_a41"));
     EXPECT_NE(std::string::npos, result.output.find("mp4a"));
     EXPECT_NE(std::string::npos, result.output.find("Opus"));
-    if (std::string(name) != "unknown_video_first.mp4")
+    if (std::string(name) != "unknown_video_first.mp4") {
       EXPECT_NE(std::string::npos, result.output.find("_a99"));
-    if (std::string(name) != "unknown_audio_last.mp4")
+    }
+    if (std::string(name) != "unknown_audio_last.mp4") {
       EXPECT_NE(std::string::npos, result.output.find("_v77"));
-    if (std::string(name) != "unknown_video_first.mp4")
+    }
+    if (std::string(name) != "unknown_video_first.mp4") {
       EXPECT_NE(std::string::npos, result.output.find("fLaC"));
+    }
   }
 }
 
