@@ -1,0 +1,112 @@
+// Soong build for AOSP imports of liblcvm (e.g. external/liblcvm). The
+// version comes from CMakeLists.txt, so this file does not change on a
+// release.
+
+package {
+    default_applicable_licenses: ["liblcvm_license"],
+}
+
+license {
+    name: "liblcvm_license",
+    visibility: [":__subpackages__"],
+    license_kinds: [
+        "SPDX-license-identifier-BSD-3-Clause",
+    ],
+    license_text: [
+        "LICENSE",
+    ],
+}
+
+cc_defaults {
+    name: "liblcvm_defaults",
+    vendor_available: true,
+    product_available: true,
+    rtti: true,
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Wno-unused-parameter",
+        "-Wshadow",
+        "-Werror",
+        "-fexceptions",
+    ],
+}
+
+// Generates config.h like CMake's configure_file(), with the project name
+// and version read from the project() line in CMakeLists.txt.
+genrule {
+    name: "liblcvm_config_h",
+    srcs: [
+        "CMakeLists.txt",
+        "include/config.h.in",
+    ],
+    out: ["config.h"],
+    cmd: "p=$$(grep -m1 '^project(' $(location CMakeLists.txt)) && " +
+        "name=$$(echo \"$$p\" | sed 's/^project(\\([^ )]*\\).*/\\1/') && " +
+        "ver=$$(echo \"$$p\" | sed -n 's/.* VERSION \\([0-9.]*\\).*/\\1/p') && " +
+        "major=$$(echo \"$$ver\" | cut -d. -f1) && " +
+        "minor=$$(echo \"$$ver\" | cut -s -d. -f2) && " +
+        "patch=$$(echo \"$$ver\" | cut -s -d. -f3) && " +
+        "sed -e \"s/@PROJECT_NAME@/$$name/g\" " +
+        "-e \"s/@PROJECT_VERSION@/$$ver/g\" " +
+        "-e \"s/@PROJECT_VERSION_MAJOR@/$$major/g\" " +
+        "-e \"s/@PROJECT_VERSION_MINOR@/$$minor/g\" " +
+        "-e \"s/@PROJECT_VERSION_PATCH@/$$patch/g\" " +
+        "$(location include/config.h.in) > $(out)",
+}
+
+cc_library_shared {
+    name: "liblcvm",
+    defaults: ["liblcvm_defaults"],
+    host_supported: true,
+    srcs: ["src/liblcvm.cc"],
+    local_include_dirs: ["include"],
+    export_include_dirs: ["include"],
+    shared_libs: [
+        "libisobmff",
+        "libh265nal",
+        "libh264nal",
+    ],
+    // Not exported: config.h is a generic name that would shadow a
+    // consumer's own config.h.
+    generated_headers: ["liblcvm_config_h"],
+}
+
+// Headers for C-only users of the liblcvm_c interface.
+cc_library_headers {
+    name: "liblcvm_c_headers",
+    vendor_available: true,
+    product_available: true,
+    export_include_dirs: ["include"],
+}
+
+// C interface. It uses exceptions internally but does not let them cross
+// the C API.
+cc_library_shared {
+    name: "liblcvm_c",
+    defaults: ["liblcvm_defaults"],
+    srcs: ["src/liblcvm_c_impl.cpp"],
+    cflags: ["-DLIBLCVM_C_EXPORTS=1"],
+    local_include_dirs: ["include"],
+    export_include_dirs: ["include"],
+    shared_libs: [
+        "liblcvm",
+        "libisobmff",
+        "libh265nal",
+        "libh264nal",
+    ],
+}
+
+cc_binary {
+    name: "lcvm",
+    defaults: ["liblcvm_defaults"],
+    host_supported: true,
+    srcs: ["tools/lcvm.cc"],
+    generated_headers: ["liblcvm_config_h"],
+    shared_libs: [
+        "liblcvm",
+        "libisobmff",
+        "libh265nal",
+        "libh264nal",
+    ],
+}
