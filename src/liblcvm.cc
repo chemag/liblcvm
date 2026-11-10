@@ -1004,14 +1004,13 @@ int TimingInformation::derive_timing_info(bool sort_by_pts,
   // ...}
 
   // 9. sum all the drops, but adding only the length over 1x frame time
-  double frame_drop_length_sec_list = 0.0;
+  double frame_drop_length_sec_sum = 0.0;
   for (const auto& drop_length_sec : derived.frame_drop_length_sec_list) {
-    frame_drop_length_sec_list += drop_length_sec;
+    frame_drop_length_sec_sum += drop_length_sec;
   }
   double drop_length_duration_sec =
-      frame_drop_length_sec_list -
-      derived.pts_duration_sec_median *
-          derived.frame_drop_length_sec_list.size();
+      frame_drop_length_sec_sum - derived.pts_duration_sec_median *
+                                      derived.frame_drop_length_sec_list.size();
   // drop_length_duration_sec: sum({33.35900000000022, 66.92600000000168, ...})
 
   // 10. get the total duration as the sum of all the inter-frame distances
@@ -1026,11 +1025,11 @@ int TimingInformation::derive_timing_info(bool sort_by_pts,
   // duration (e.g. a single frame, all frames with the same pts, or a zero
   // timescale), and converting NaN, infinity, or an out-of-range value to
   // int is undefined behavior. Report 0 frame drops in that case.
-  double frame_drop_count = derived.frame_drop_ratio * derived.num_frames;
+  double frame_drop_count_raw = derived.frame_drop_ratio * derived.num_frames;
   derived.frame_drop_count =
-      (std::isfinite(frame_drop_count) && frame_drop_count > INT_MIN &&
-       frame_drop_count < INT_MAX)
-          ? static_cast<int>(frame_drop_count)
+      (std::isfinite(frame_drop_count_raw) && frame_drop_count_raw > INT_MIN &&
+       frame_drop_count_raw < INT_MAX)
+          ? static_cast<int>(frame_drop_count_raw)
           : 0;
 
   // 12. calculate average drop length, normalized to framerate. Note that
@@ -1040,7 +1039,7 @@ int TimingInformation::derive_timing_info(bool sort_by_pts,
   derived.normalized_frame_drop_average_length = 0.0;
   if (derived.frame_drop_length_sec_list.size() > 0) {
     double frame_drop_average_length =
-        frame_drop_length_sec_list / derived.frame_drop_length_sec_list.size();
+        frame_drop_length_sec_sum / derived.frame_drop_length_sec_list.size();
     derived.normalized_frame_drop_average_length =
         (frame_drop_average_length / derived.pts_duration_sec_median);
   }
