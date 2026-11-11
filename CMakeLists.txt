@@ -431,7 +431,9 @@ if(BUILD_PYBINDINGS)
   add_library(liblcvm_py MODULE src/python_bindings.cc)
   set_target_properties(liblcvm_py PROPERTIES
     OUTPUT_NAME "lcvm" PREFIX "lib" SUFFIX ".so")
-  target_include_directories(liblcvm_py PRIVATE
+  # SYSTEM: Older pybind11 headers (2.11, in Ubuntu 24.04) trip gcc's
+  # -Wshadow, which -Werror would turn into errors in code we do not own.
+  target_include_directories(liblcvm_py SYSTEM PRIVATE
     ${PYBIND11_INCLUDE} ${PYTHON_INCLUDE})
   target_link_libraries(liblcvm_py PRIVATE liblcvm)
   if(APPLE)
