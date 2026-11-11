@@ -1,0 +1,31 @@
+name: ci-macos
+
+# Debug build with AppleClang, using the warning flags in CMakeLists.txt with
+# -Werror, with the C interface, plus the tests.
+#
+# BUILD_PYBINDINGS is not built yet on macOS, and ADD_POLICY is not built on
+# any platform (see ci-linux.yml).
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  debug:
+    name: debug (AppleClang)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install dependencies
+        run: brew install ninja googletest
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DADD_C_INTERFACE=ON
+      - name: Build
+        run: cmake --build build --parallel
+      - name: Test
+        run: ctest --test-dir build --output-on-failure --parallel 4
