@@ -354,6 +354,14 @@ if(LIBLCVM_BUILD_CLANG_FUZZER)
       -fno-sanitize-recover=undefined)
   add_compile_options(${LIBLCVM_SAN_FLAGS} -fsanitize=fuzzer-no-link)
   add_link_options(${LIBLCVM_SAN_FLAGS})
+  # Optimize the fuzz build (-O1), whatever CMAKE_BUILD_TYPE says. At -O0,
+  # with the sanitizers and coverage instrumentation, the inlined standard
+  # library helpers (vector, shared_ptr, string) are instrumented call by
+  # call, and the fuzzers run 5 to 13 times slower. -O1 keeps the code
+  # close enough to the source for usable sanitizer reports, and -g keeps
+  # their symbols. These come after the build type flags (e.g. -O0 in
+  # Debug), so they win. The submodules, added below, inherit them.
+  add_compile_options(-O1 -g)
 endif()
 
 # ---- Third-party subprojects -------------------------------------------------
