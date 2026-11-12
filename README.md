@@ -278,3 +278,11 @@ $ cd build
 $ cmake -DBUILD_CLANG_FUZZER=OFF -DADD_POLICY=ON -DCMAKE_BUILD_TYPE=DEBUG ..
 $ make
 ```
+
+
+# Appendix 6: Fuzzing
+
+The [fuzz](fuzz/README.md) directory contains information on fuzzing the
+library (`liblcvm_parse_fuzzer`). The fuzzing corpus lives in the
+[liblcvm-fuzzcorpus](https://github.com/chemag/liblcvm-fuzzcorpus) repo, as
+the `fuzz/corpus` submodule (not checked out by default).
