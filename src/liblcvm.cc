@@ -686,7 +686,7 @@ int TimingInformation::parse_timing_information(
         return -1;
       }
       count += samples;
-      parsed.stts_entries.push_back({samples, stts->GetSampleOffset(i)});
+      parsed.stts_entries.push_back({samples, stts->GetSampleDelta(i)});
     }
   }
   const auto ctts = stbl->GetTypedBox<ISOBMFF::CTTS>("ctts");
