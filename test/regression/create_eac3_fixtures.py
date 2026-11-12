@@ -34,8 +34,21 @@ VIDEO_ENTRY = box('avc1', VIDEO_HEADER + box('avcC', bytes.fromhex('0142001effe0
 STTS = full('stts', u32(1) + u32(120) + u32(1000))
 
 
+def stsz(count, sample_size=0):
+    """SampleSizeBox for count samples: all of sample_size bytes, or, when
+    sample_size is 0, one entry_size (of 1 byte) per sample.
+
+    ISO/IEC 14496-12 requires one stsz (or stz2) per track with samples, with
+    sample_count equal to the stts total, and liblcvm checks both.
+    """
+    entries = u32(1) * count if sample_size == 0 else b''
+    return full('stsz', u32(sample_size) + u32(count) + entries)
+
+STSZ = stsz(120)
+
+
 def track(track_id, handler, entry, mdhd_duration, tkhd_duration, timescale,
-          sample_timing=None):
+          sample_timing=None, sample_sizes=None):
     tkhd = full('tkhd', u32(0) * 2 + u32(track_id) + u32(0) +
                 u32(tkhd_duration) + bytes(8) + bytes(8) + MATRIX +
                 u32(16 << 16) * 2, 3)
@@ -44,7 +57,11 @@ def track(track_id, handler, entry, mdhd_duration, tkhd_duration, timescale,
     stsd = full('stsd', u32(1) + entry)
     timing = sample_timing if sample_timing is not None else (
         STTS if handler == 'vide' else b'')
-    stbl = box('stbl', stsd + timing)
+    # a track with sample timing needs a matching sample size box: callers
+    # passing their own sample_timing pass its sample_sizes too
+    sizes = sample_sizes if sample_sizes is not None else (
+        STSZ if handler == 'vide' and sample_timing is None else b'')
+    stbl = box('stbl', stsd + timing + sizes)
     return box('trak', tkhd + box('mdia', mdhd + hdlr + box('minf', stbl)))
 
 

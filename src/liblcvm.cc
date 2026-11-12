@@ -494,6 +494,165 @@ int IsobmffFileInformation::LiblcvmConfig_to_lists(
   return 0;
 }
 
+// Check that the sample tables of a video or audio track agree on the number
+// of samples, before liblcvm expands any of them into per-frame lists. Every
+// count used here comes straight from the file, and the sample tables are
+// run-length encoded: a few bytes of stts or ctts can declare billions of
+// samples. The only count the file backs with one value per sample is the
+// stsz/stz2 sample_count, so check the other tables against it.
+//
+// References are to ISO/IEC 14496-12:2026. Returns 0 if the sample tables
+// are consistent, and -1 (the file is invalid) otherwise.
+static int validate_sample_tables(
+    const std::shared_ptr<ISOBMFF::ContainerBox>& stbl, bool is_video,
+    uint64_t file_size, const std::string& filename, int debug) {
+  const char* track_type = is_video ? "video" : "audio";
+  std::shared_ptr<ISOBMFF::STTS> stts;
+  std::shared_ptr<ISOBMFF::STSZ> stsz;
+  std::shared_ptr<ISOBMFF::STZ2> stz2;
+  int num_size_boxes = 0;
+  for (const auto& box : stbl->GetBoxes()) {
+    if (box->GetName() == "stts" && !stts) {
+      stts = std::dynamic_pointer_cast<ISOBMFF::STTS>(box);
+    } else if (box->GetName() == "stsz") {
+      stsz = std::dynamic_pointer_cast<ISOBMFF::STSZ>(box);
+      num_size_boxes++;
+    } else if (box->GetName() == "stz2") {
+      stz2 = std::dynamic_pointer_cast<ISOBMFF::STZ2>(box);
+      num_size_boxes++;
+    }
+  }
+
+  // Section 8.5.1.1: "If the track that contains the SampleTableBox
+  // references no data, then the SampleTableBox does not need to contain any
+  // child boxes". A track with neither a stts nor a sample size box has no
+  // samples: there is nothing to check (and nothing to expand).
+  if (!stts && num_size_boxes == 0) {
+    return 0;
+  }
+
+  // Rule: there is exactly one sample size box.
+  // Section 8.7.3.1 (stsz, stz2): "Mandatory: Yes", "Quantity: Exactly one
+  // variant shall be present".
+  // Section 8.5.1.1: "If the track that the SampleTableBox is contained in
+  // does reference data, then the following child boxes are required:
+  // SampleDescriptionBox, SampleSizeBox (or CompactSampleSizeBox),
+  // SampleToChunkBox, and ChunkOffsetBox (or ChunkLargeOffsetBox)."
+  if (num_size_boxes != 1 || (!stsz && !stz2)) {
+    if (debug > 0) {
+      fprintf(stderr,
+              "error: %s track has %i stsz/stz2 boxes (must be exactly 1) in "
+              "%s\n",
+              track_type, num_size_boxes, filename.c_str());
+    }
+    return -1;
+  }
+  const uint64_t sample_count =
+      stsz ? stsz->GetSampleCount() : stz2->GetSampleCount();
+
+  // Rule: the stts total is the sample count.
+  // Section 8.7.3.1: "The total number of samples in the media is always
+  // indicated in the sample count."
+  uint64_t stts_total = 0;
+  if (stts) {
+    for (size_t i = 0; i < stts->GetEntryCount(); ++i) {
+      stts_total += stts->GetSampleCount(i);
+    }
+  }
+  if (stts_total != sample_count) {
+    if (debug > 0) {
+      fprintf(stderr,
+              "error: %s track stts describes %" PRIu64
+              " samples, but the sample count (%s) is %" PRIu64 " in %s\n",
+              track_type, stts_total, stsz ? "stsz" : "stz2", sample_count,
+              filename.c_str());
+    }
+    return -1;
+  }
+
+  // Rule: a constant-size stsz must fit in the file (video only).
+  // A constant-size stsz (sample_size != 0) has no entry_size table, so its
+  // sample_count is not backed by bytes in the file. Section 8.7.3.2.2: "If
+  // this field is not 0, it specifies the constant sample size, and no array
+  // follows." For video, sample_count samples of sample_size bytes must then
+  // fit in the file, so check that sample_count * sample_size <= file size:
+  // video is what liblcvm expands into per-frame lists.
+  //
+  // Do not check audio tracks. Legacy QuickTime files with a version 0 sound
+  // description count one sample per decoded PCM sample and use
+  // sample_size = 1 as a placeholder, not a byte count. A 2002 QuickTime file
+  // with GSM audio declares 1,690,400 samples (211.3 s at 8 kHz) of size 1 in
+  // a 467,785-byte file, because GSM packs 160 PCM samples into 33 bytes.
+  // Audio is not expanded into per-frame lists, so it does not need the
+  // bound.
+  if (is_video && stsz && stsz->GetSampleSize() != 0) {
+    // both factors are at most 2^32 - 1, so the product fits in 64 bits
+    const uint64_t media_size = sample_count * stsz->GetSampleSize();
+    if (media_size > file_size) {
+      if (debug > 0) {
+        fprintf(stderr,
+                "error: %s track stsz declares %" PRIu64 " samples of %" PRIu32
+                " bytes (%" PRIu64 " bytes), more than the file size (%" PRIu64
+                ") in %s\n",
+                track_type, sample_count, stsz->GetSampleSize(), media_size,
+                file_size, filename.c_str());
+      }
+      return -1;
+    }
+  }
+
+  // Rule: the ctts total is at most the sample count.
+  // Section 8.6.1.3.1: "if CT is the composition timestamp, CT[n] = DT[n] +
+  // sample_offset[n]": there is one composition offset per sample, so a ctts
+  // describing more samples than the track has is invalid. A ctts describing
+  // fewer samples is accepted: the last offset applies to the remaining
+  // samples.
+  const auto ctts = stbl->GetTypedBox<ISOBMFF::CTTS>("ctts");
+  if (ctts) {
+    uint64_t ctts_total = 0;
+    for (size_t i = 0; i < ctts->GetEntryCount(); ++i) {
+      ctts_total += ctts->GetSampleCount(i);
+    }
+    if (ctts_total > sample_count) {
+      if (debug > 0) {
+        fprintf(stderr,
+                "error: %s track ctts describes %" PRIu64
+                " samples, more than the sample count (%" PRIu64 ") in %s\n",
+                track_type, ctts_total, sample_count, filename.c_str());
+      }
+      return -1;
+    }
+  }
+
+  // Rule: the stss sample numbers are valid and strictly increasing.
+  // Section 8.6.2.1: "The table is arranged in strictly increasing order of
+  // sample number."
+  // Section 3.1.49, sample number: "ordinal index number of a given sample
+  // where the first sample has sample number 1".
+  // So every sample_number must be in 1..sample_count, and each one larger
+  // than the one before it.
+  const auto stss = stbl->GetTypedBox<ISOBMFF::STSS>("stss");
+  if (stss) {
+    uint64_t previous = 0;
+    for (size_t i = 0; i < stss->GetEntryCount(); ++i) {
+      const uint64_t sample_number = stss->GetSampleNumber(i);
+      if (sample_number <= previous || sample_number > sample_count) {
+        if (debug > 0) {
+          fprintf(stderr,
+                  "error: %s track stss entry %zu (sample number %" PRIu64
+                  ") is not in strictly increasing order within 1..%" PRIu64
+                  " in %s\n",
+                  track_type, i, sample_number, sample_count, filename.c_str());
+        }
+        return -1;
+      }
+      previous = sample_number;
+    }
+  }
+
+  return 0;
+}
+
 std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     const char* infile, const LiblcvmConfig& liblcvm_config) {
   // 0. create an ISOBMFF configuration object
@@ -516,6 +675,11 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     }
     return nullptr;
   }
+  struct stat stat_buf;
+  if (stat(ptr->filename.c_str(), &stat_buf) < 0)
+    return nullptr;
+  ptr->filesize = stat_buf.st_size;
+  const uint64_t file_size = static_cast<uint64_t>(stat_buf.st_size);
 
   // 2. look for a moov container box
   std::shared_ptr<ISOBMFF::ContainerBox> moov =
@@ -599,6 +763,9 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
         continue;
       }
 
+      if (validate_sample_tables(stbl, false, file_size, ptr->filename,
+                                 liblcvm_config.get_debug()) < 0)
+        return nullptr;
       const int timing_result = track.timing.parse_timing_information(
           stbl, timescale_track_hz, liblcvm_config.get_max_num_frames(), false,
           ptr->filename, liblcvm_config.get_debug());
@@ -630,6 +797,9 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     track.width = tkhd->GetWidth();
     track.height = tkhd->GetHeight();
 
+    if (validate_sample_tables(stbl, true, file_size, ptr->filename,
+                               liblcvm_config.get_debug()) < 0)
+      return nullptr;
     const auto remaining = static_cast<uint32_t>(
         liblcvm_config.get_max_num_frames() - total_video_frames);
     const int timing_result = track.timing.parse_timing_information(
@@ -649,11 +819,6 @@ std::shared_ptr<IsobmffFileInformation> IsobmffFileInformation::parse(
     total_video_frames += static_cast<uint64_t>(track.timing.get_num_frames());
     ptr->video_tracks.push_back(std::move(track));
   }
-  struct stat stat_buf;
-  if (stat(ptr->filename.c_str(), &stat_buf) < 0)
-    return nullptr;
-  ptr->filesize = stat_buf.st_size;
-
   return ptr;
 }
 

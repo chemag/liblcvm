@@ -15,13 +15,14 @@ def write(name, count, delta, offsets=None, version=1, hz=1000):
     if offsets is not None:
         ctts = m.full('ctts', m.u32(len(offsets)) + b''.join(
             m.u32(1) + struct.pack('>i', offset) for offset in offsets), version << 24)
+    stsz = m.stsz(count)
     stss = m.full('stss', m.u32(1) + m.u32(1))
     tkhd = m.full('tkhd', m.u32(0)*2 + m.u32(11) + m.u32(0) + m.u32(4000)
                   + bytes(16) + m.MATRIX + m.u32(16 << 16)*2, 3)
     mdhd = m.full('mdhd', m.u32(0)*2 + m.u32(hz) + m.u32(4000) + bytes(4))
     hdlr = m.full('hdlr', m.u32(0) + b'vide' + bytes(12) + b'\0')
     trak = m.box('trak', tkhd + m.box('mdia', mdhd + hdlr + m.box('minf',
-                          m.box('stbl', stsd + stts + ctts + stss))))
+                          m.box('stbl', stsd + stts + stsz + ctts + stss))))
     (ROOT / name).write_bytes(m.box('ftyp', b'isom' + m.u32(0) + b'isom')
                              + m.box('moov', m.MVHD + trak))
 

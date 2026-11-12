@@ -19,6 +19,7 @@ def video(track_id, width, height, frames, rate, seconds, keys=(1,), ctts=None,
     entries = stts_entries if stts_entries is not None else [(frames, 1000)]
     stts = m.full('stts', m.u32(len(entries)) + b''.join(
         m.u32(count) + m.u32(delta) for count, delta in entries))
+    sizes = m.stsz(sum(count for count, _ in entries))
     stss = m.full('stss', m.u32(len(keys)) + b''.join(m.u32(k) for k in keys))
     offsets = b''
     if ctts is not None:
@@ -31,7 +32,7 @@ def video(track_id, width, height, frames, rate, seconds, keys=(1,), ctts=None,
     mdhd = m.full('mdhd', m.u32(0) * 2 + m.u32(timescale) + m.u32(frames * 1000) + bytes(4))
     hdlr = m.full('hdlr', m.u32(0) + b'vide' + bytes(12) + b'\0')
     return m.box('trak', tkhd + m.box('mdia', mdhd + hdlr + m.box('minf',
-                 m.box('stbl', stsd + stts + stss + offsets))))
+                 m.box('stbl', stsd + stts + sizes + stss + offsets))))
 
 
 def audio(track_id, eac3=False):

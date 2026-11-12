@@ -20,9 +20,12 @@ def write(name, tracks):
 write('timing_audio_stts.mp4', [
     v.video(11, 320, 240, 120, 30, 4),
     m.track(31, 'soun', m.AAC, 12288, 4000, 48000,
-            sample_timing=table([(12, 1024)]))])
+            sample_timing=table([(12, 1024)]), sample_sizes=m.stsz(12))])
 write('timing_empty_ctts.mp4', [v.video(11, 320, 240, 4, 1, 4, ctts=[])])
 write('timing_scalar_tick_overflow.mp4', [
     m.track(31, 'soun', m.AAC, 1, 1, 48000,
             sample_timing=table([(0xffffffff, 0xffffffff),
-                                 (0xffffffff, 0xffffffff)]))])
+                                 (0xffffffff, 0xffffffff)]),
+            # the largest sample count stsz can declare: the stts total
+            # (2 * 0xffffffff samples) can never match it
+            sample_sizes=m.stsz(0xffffffff, 1))])

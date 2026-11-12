@@ -48,36 +48,32 @@ class LiblcvmRegressionTest : public ::testing::Test {
 
 // The ctts box describes more samples than the stts box. The pts update
 // loop used to write past the end of pts_unit_list/pts_sec_list
-// (heap-buffer-overflow). The extra ctts samples are now ignored.
+// (heap-buffer-overflow). The extra ctts samples were then ignored. Now the
+// file is rejected: a ctts describing more samples than the sample count
+// (stsz) is invalid (see liblcvm_sample_tables_unittest.cc).
 TEST_F(LiblcvmRegressionTest, TestCttsMoreSamplesThanStts) {
   for (bool sort_by_pts : {true, false}) {
     for (bool skip_audio_parsing : {true, false}) {
-      auto ptr = parse("ctts_more_samples_than_stts.mov", sort_by_pts,
-                       skip_audio_parsing);
-      ASSERT_NE(nullptr, ptr);
-      const auto timing = ptr->get_timing();
-      EXPECT_EQ(timing.get_pts_unit_list().size(),
-                static_cast<size_t>(timing.get_num_frames()));
-      EXPECT_EQ(timing.get_pts_sec_list().size(),
-                static_cast<size_t>(timing.get_num_frames()));
-      // no ctts value beyond the last frame
-      EXPECT_LE(timing.get_ctts_unit_list().size(),
-                timing.get_pts_unit_list().size());
-      parse_to_lists("ctts_more_samples_than_stts.mov", sort_by_pts,
-                     skip_audio_parsing);
+      EXPECT_EQ(nullptr, parse("ctts_more_samples_than_stts.mov", sort_by_pts,
+                               skip_audio_parsing));
+      EXPECT_NE(0, parse_to_lists("ctts_more_samples_than_stts.mov",
+                                  sort_by_pts, skip_audio_parsing));
     }
   }
 }
 
 // A large dts plus a ctts offset exceeded the int32_t range of the pts
 // value (signed integer overflow, undefined behavior). The addition now
-// wraps around. Only observable with UBSan.
+// wraps around (see liblcvm_arithmetic_unittest.cc). This file is now
+// rejected before that point: its ctts describes more samples than its
+// sample count (stsz).
 TEST_F(LiblcvmRegressionTest, TestCttsPtsInt32Overflow) {
   for (bool sort_by_pts : {true, false}) {
     for (bool skip_audio_parsing : {true, false}) {
-      parse("ctts_pts_int32_overflow.mov", sort_by_pts, skip_audio_parsing);
-      parse_to_lists("ctts_pts_int32_overflow.mov", sort_by_pts,
-                     skip_audio_parsing);
+      EXPECT_EQ(nullptr, parse("ctts_pts_int32_overflow.mov", sort_by_pts,
+                               skip_audio_parsing));
+      EXPECT_NE(0, parse_to_lists("ctts_pts_int32_overflow.mov", sort_by_pts,
+                                  skip_audio_parsing));
     }
   }
 }
@@ -87,10 +83,20 @@ TEST_F(LiblcvmRegressionTest, TestCttsPtsInt32Overflow) {
 // explicit entries, and sorting by pts indexed it with the (larger) frame
 // numbers, reading past its end (heap-buffer-overflow). ctts_unit_list now
 // has one entry per frame.
+//
+// This fuzzer-found file is now rejected before that point, because its
+// stts describes 262,778 samples and its stsz 634. The fix is still
+// exercised by sample_tables_valid_ctts_fewer.mp4, whose tables are
+// consistent.
 TEST_F(LiblcvmRegressionTest, TestCttsFewerSamplesThanStts) {
   for (bool sort_by_pts : {true, false}) {
     for (bool skip_audio_parsing : {true, false}) {
-      auto ptr = parse("ctts_fewer_samples_than_stts.mov", sort_by_pts,
+      EXPECT_EQ(nullptr, parse("ctts_fewer_samples_than_stts.mov", sort_by_pts,
+                               skip_audio_parsing));
+      EXPECT_NE(0, parse_to_lists("ctts_fewer_samples_than_stts.mov",
+                                  sort_by_pts, skip_audio_parsing));
+
+      auto ptr = parse("sample_tables_valid_ctts_fewer.mp4", sort_by_pts,
                        skip_audio_parsing);
       ASSERT_NE(nullptr, ptr);
       const auto timing = ptr->get_timing();
@@ -101,7 +107,7 @@ TEST_F(LiblcvmRegressionTest, TestCttsFewerSamplesThanStts) {
       EXPECT_EQ(timing.get_dts_sec_list().size(), num_frames);
       EXPECT_EQ(timing.get_pts_sec_list().size(), num_frames);
       EXPECT_EQ(timing.get_frame_num_orig_list().size(), num_frames);
-      parse_to_lists("ctts_fewer_samples_than_stts.mov", sort_by_pts,
+      parse_to_lists("sample_tables_valid_ctts_fewer.mp4", sort_by_pts,
                      skip_audio_parsing);
     }
   }
@@ -126,21 +132,18 @@ TEST_F(LiblcvmRegressionTest, TestFrameDropRatioNan) {
 }
 
 // Consecutive pts values far apart in the int32_t range: the pts delta
-// overflowed (signed integer overflow, undefined behavior). Only
-// observable with UBSan.
+// overflowed (signed integer overflow, undefined behavior). The deltas are
+// now computed in 64 bits (see liblcvm_arithmetic_unittest.cc, whose
+// fixtures have consecutive timestamps 2^31 and more apart). This
+// fuzzer-found file is now rejected before that point, because its stts
+// describes 712 samples and its stsz 634.
 TEST_F(LiblcvmRegressionTest, TestPtsDeltaInt32Overflow) {
   for (bool sort_by_pts : {true, false}) {
     for (bool skip_audio_parsing : {true, false}) {
-      auto ptr = parse("pts_delta_int32_overflow.mov", sort_by_pts,
-                       skip_audio_parsing);
-      ASSERT_NE(nullptr, ptr);
-      const auto timing = ptr->get_timing();
-      // one inter-frame duration per pair of consecutive frames
-      ASSERT_GT(timing.get_pts_unit_list().size(), 0u);
-      EXPECT_EQ(timing.get_pts_duration_sec_list().size(),
-                timing.get_pts_unit_list().size() - 1);
-      parse_to_lists("pts_delta_int32_overflow.mov", sort_by_pts,
-                     skip_audio_parsing);
+      EXPECT_EQ(nullptr, parse("pts_delta_int32_overflow.mov", sort_by_pts,
+                               skip_audio_parsing));
+      EXPECT_NE(0, parse_to_lists("pts_delta_int32_overflow.mov", sort_by_pts,
+                                  skip_audio_parsing));
     }
   }
 }
@@ -148,7 +151,9 @@ TEST_F(LiblcvmRegressionTest, TestPtsDeltaInt32Overflow) {
 // The stts box declares billions of frames in a 17 KB file. Every frame
 // adds an entry to several per-frame lists, so parsing used to allocate
 // until it ran out of memory. Files declaring more than max_num_frames
-// frames (default 2^20) are now rejected before any allocation.
+// frames (default 2^20) were then rejected before any allocation. Now the
+// file is rejected earlier still: its stts total (134,218,362) is not its
+// stsz sample count (634).
 TEST_F(LiblcvmRegressionTest, TestSttsHugeSampleCount) {
   for (bool sort_by_pts : {true, false}) {
     for (bool skip_audio_parsing : {true, false}) {
