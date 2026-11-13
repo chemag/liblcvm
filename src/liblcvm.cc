@@ -1583,10 +1583,10 @@ int VideoTrack::parse_video_information(
     this->video_codec_type = (hvc1 != nullptr) ? "hvc1" : "hev1";
     this->width2 = hevc_box->GetWidth();
     this->height2 = hevc_box->GetHeight();
-    this->horizresolution = hevc_box->GetHorizResolution();
-    this->vertresolution = hevc_box->GetVertResolution();
+    this->horizresolution = hevc_box->GetHorizResolutionRaw();
+    this->vertresolution = hevc_box->GetVertResolutionRaw();
     this->depth = hevc_box->GetDepth();
-    this->chroma_format = hvcc->GetChromaFormat();
+    this->chroma_format = hvcc->GetChromaFormatIDC();
     this->bit_depth_luma = 8 + hvcc->GetBitDepthLumaMinus8();
     this->bit_depth_chroma = 8 + hvcc->GetBitDepthChromaMinus8();
     this->colour_primaries = -1;
@@ -1611,8 +1611,8 @@ int VideoTrack::parse_video_information(
     this->video_codec_type = (avc1 != nullptr) ? "avc1" : "avc3";
     this->width2 = avc_box->GetWidth();
     this->height2 = avc_box->GetHeight();
-    this->horizresolution = avc_box->GetHorizResolution();
-    this->vertresolution = avc_box->GetVertResolution();
+    this->horizresolution = avc_box->GetHorizResolutionRaw();
+    this->vertresolution = avc_box->GetVertResolutionRaw();
     this->depth = avc_box->GetDepth();
     this->chroma_format = -1;
     this->bit_depth_luma = -1;
