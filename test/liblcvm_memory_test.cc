@@ -100,6 +100,13 @@ class MemoryUsageTest : public ::testing::Test {
     return static_cast<double>(bytes) / (1024.0 * 1024.0);
   }
 
+  // The difference between two memory measurements, in MB. Signed: memory
+  // can go down between two measurements, and an unsigned difference
+  // (size_t) then wraps around to a huge increase.
+  double deltaMB(size_t after, size_t before) {
+    return bytesToMB(after) - bytesToMB(before);
+  }
+
   // Represents a single point-in-time memory measurement
   // Used for creating timeline-based memory profiles
   struct MemorySnapshot {
@@ -214,19 +221,19 @@ TEST_F(MemoryUsageTest, MultipleVideosMemoryUsage) {
     processVideo(videos[i]);
 
     size_t memory_after = getCurrentMemoryUsageBytes();
-    size_t memory_delta = memory_after - memory_before;
+    double memory_delta_mb = deltaMB(memory_after, memory_before);
 
     std::cout << "  Memory after: " << bytesToMB(memory_after) << " MB"
               << std::endl;
-    std::cout << "  Delta: " << (memory_delta > 0 ? "+" : "")
-              << bytesToMB(memory_delta) << " MB" << std::endl;
+    std::cout << "  Delta: " << (memory_delta_mb > 0 ? "+" : "")
+              << memory_delta_mb << " MB" << std::endl;
 
     peak_memory = std::max(peak_memory, memory_after);
     memory_before = memory_after;
   }
 
   size_t final_memory = getCurrentMemoryUsageBytes();
-  size_t total_increase = final_memory - initial_memory;
+  double total_increase_mb = deltaMB(final_memory, initial_memory);
 
   std::cout << "\n=== Summary ===" << std::endl;
   std::cout << "Initial memory: " << bytesToMB(initial_memory) << " MB"
@@ -234,13 +241,13 @@ TEST_F(MemoryUsageTest, MultipleVideosMemoryUsage) {
   std::cout << "Final memory: " << bytesToMB(final_memory) << " MB"
             << std::endl;
   std::cout << "Peak memory: " << bytesToMB(peak_memory) << " MB" << std::endl;
-  std::cout << "Total increase: " << bytesToMB(total_increase) << " MB"
-            << std::endl;
+  std::cout << "Total increase: " << total_increase_mb << " MB" << std::endl;
   std::cout << "Average per video: "
-            << bytesToMB(total_increase / videos.size()) << " MB" << std::endl;
+            << total_increase_mb / static_cast<double>(videos.size()) << " MB"
+            << std::endl;
 
   double memory_increase_threshold_mb = 100.0;
-  EXPECT_LT(bytesToMB(total_increase), memory_increase_threshold_mb)
+  EXPECT_LT(total_increase_mb, memory_increase_threshold_mb)
       << "Memory usage increased by more than " << memory_increase_threshold_mb
       << " MB after processing " << videos.size() << " video(s)";
 }
@@ -296,21 +303,20 @@ TEST_F(MemoryUsageTest, SingleVideoMemoryLeakCheck) {
   }
 
   size_t final_memory = getCurrentMemoryUsageBytes();
-  size_t total_increase = final_memory - initial_memory;
+  double total_increase_mb = deltaMB(final_memory, initial_memory);
 
   std::cout << "\n=== Summary ===" << std::endl;
   std::cout << "Initial memory: " << bytesToMB(initial_memory) << " MB"
             << std::endl;
   std::cout << "Final memory: " << bytesToMB(final_memory) << " MB"
             << std::endl;
-  std::cout << "Total increase: " << bytesToMB(total_increase) << " MB"
-            << std::endl;
-  std::cout << "Increase per iteration: "
-            << bytesToMB(total_increase / iterations) << " MB" << std::endl;
+  std::cout << "Total increase: " << total_increase_mb << " MB" << std::endl;
+  std::cout << "Increase per iteration: " << total_increase_mb / iterations
+            << " MB" << std::endl;
 
   // Threshold: If memory increases by more than 1 MB per iteration, fail
   double leak_threshold_per_iteration_mb = 1.0;
-  double increase_per_iteration = bytesToMB(total_increase) / iterations;
+  double increase_per_iteration = total_increase_mb / iterations;
 
   EXPECT_LT(increase_per_iteration, leak_threshold_per_iteration_mb)
       << "Potential memory leak detected: " << increase_per_iteration
